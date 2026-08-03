@@ -48,8 +48,11 @@ class RankedListing:
     listing: Listing
     match_score: float
     valuation_label: str
+    valuation_reason: str
     confidence: float
+    recommendation_score: float
+    market_median: float | None
+    price_ratio: float | None
     reasons: list[str]
     warnings: list[str]
     comparables: list[dict[str, Any]]
-

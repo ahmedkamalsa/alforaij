@@ -9,78 +9,124 @@
 <body>
   <header class="topbar">
     <div>
-      <p class="eyebrow">بحث وتقييم عقاري محلي</p>
+      <p class="eyebrow">تحليل محلي مبني على الأدلة</p>
       <h1>مساعد الفريج للبحث والتقييم العقاري</h1>
     </div>
     <div class="status" id="healthStatus">جاري فحص البيانات...</div>
   </header>
 
-  <main class="layout">
-    <section class="panel request-panel">
-      <div class="panel-head">
-        <h2>الطلب</h2>
-        <div class="segmented" role="group" aria-label="نمط العملية">
-          <button class="mode active" data-mode="search_and_value">بحث وتقييم</button>
-          <button class="mode" data-mode="search">بحث</button>
-          <button class="mode" data-mode="valuation">تقييم</button>
-        </div>
+  <main class="workspace">
+    <aside class="request-panel">
+      <div class="section-title">
+        <h2>طلب البحث</h2>
+        <span>تحليل قابل للتعديل</span>
       </div>
 
-      <textarea id="requestText" rows="7" spellcheck="false">مطلوب بيت في المطلاع مساحة من 400 إلى 500 متر، هدام أو صالح للسكن، الميزانية حتى 350 ألف، ويفضل شارع واحد.</textarea>
+      <textarea id="requestText" rows="8" spellcheck="false">مطلوب بيت في المطلاع مساحة من 400 إلى 500 متر، هدام أو صالح للسكن، الميزانية حتى 350 ألف، ويفضل شارع واحد.</textarea>
+
+      <div class="mode-row" role="group" aria-label="نمط العملية">
+        <button class="mode active" data-mode="search_and_value">بحث وتقييم</button>
+        <button class="mode" data-mode="search">بحث</button>
+        <button class="mode" data-mode="valuation">تقييم</button>
+      </div>
 
       <div class="actions">
         <button id="analyzeBtn" class="primary">تحليل الطلب</button>
-        <button id="runBtn">تشغيل البحث</button>
-        <button id="printBtn">طباعة التقرير</button>
+        <button id="runBtn">تشغيل النتائج</button>
+        <button id="printBtn">طباعة</button>
       </div>
 
       <div class="fields">
         <label>نوع العملية<input id="transactionField" type="text"></label>
         <label>نوع العقار<input id="typeField" type="text"></label>
-        <label>المناطق<input id="areasField" type="text"></label>
+        <label class="wide">المناطق<input id="areasField" type="text"></label>
         <label>أقل مساحة<input id="minAreaField" type="number" min="0"></label>
         <label>أعلى مساحة<input id="maxAreaField" type="number" min="0"></label>
         <label>ميزانية البيع<input id="budgetField" type="number" min="0"></label>
         <label>ميزانية الإيجار<input id="rentBudgetField" type="number" min="0"></label>
         <label>عدد الغرف<input id="bedroomsField" type="number" min="0"></label>
       </div>
-    </section>
+    </aside>
 
-    <section class="panel summary-panel">
-      <div class="panel-head">
-        <h2>الخلاصة</h2>
+    <section class="main-panel">
+      <section class="summary-strip">
+        <div>
+          <span class="metric-label">النتائج</span>
+          <strong id="resultCount">0</strong>
+        </div>
+        <div>
+          <span class="metric-label">أفضل توصية</span>
+          <strong id="topScore">-</strong>
+        </div>
+        <div>
+          <span class="metric-label">مصدر متصل</span>
+          <strong id="connectedSources">-</strong>
+        </div>
         <button id="downloadReportBtn">حفظ التقرير JSON</button>
-      </div>
-      <p id="summaryText" class="summary-text">لم يتم تشغيل تحليل بعد.</p>
-      <div id="sourceStatus" class="source-grid"></div>
-    </section>
+      </section>
 
-    <section class="panel results-panel">
-      <div class="panel-head">
-        <h2>النتائج المرتبة</h2>
-        <span id="resultCount" class="count">0 نتيجة</span>
-      </div>
-      <div id="results" class="results"></div>
+      <section class="insight-panel">
+        <div>
+          <h2>الخلاصة</h2>
+          <p id="summaryText">لم يتم تشغيل تحليل بعد.</p>
+        </div>
+        <div class="method-box">
+          <h3>طريقة الترتيب</h3>
+          <p id="rankingMethod">بعد تشغيل البحث ستظهر طريقة حساب درجة التوصية.</p>
+        </div>
+      </section>
+
+      <section class="sources-panel">
+        <div class="section-title">
+          <h2>مصادر البحث والتقييم</h2>
+          <span>المتصل والناقص</span>
+        </div>
+        <div id="sourceStatus" class="source-grid"></div>
+        <div id="externalSourcePlan" class="source-grid muted-grid"></div>
+      </section>
+
+      <section class="results-panel">
+        <div class="section-title">
+          <h2>النتائج المرتبة</h2>
+          <span>حسب درجة التوصية</span>
+        </div>
+        <div id="results" class="results"></div>
+      </section>
     </section>
   </main>
 
   <template id="resultTemplate">
     <article class="result-card">
-      <div class="result-main">
-        <div>
-          <h3></h3>
-          <p class="meta"></p>
+      <div class="rank-cell"></div>
+      <div class="result-body">
+        <div class="result-head">
+          <div>
+            <h3></h3>
+            <p class="meta"></p>
+          </div>
+          <div class="verdict">
+            <span class="verdict-label"></span>
+            <strong class="recommendation"></strong>
+          </div>
         </div>
-        <div class="score"></div>
+
+        <div class="score-grid"></div>
+        <p class="valuation-reason"></p>
+        <p class="description"></p>
+
+        <div class="reason-block">
+          <h4>لماذا ظهرت بهذا الترتيب؟</h4>
+          <div class="reasons"></div>
+          <div class="warnings"></div>
+        </div>
+
+        <details class="evidence">
+          <summary>الأدلة والمقارنات</summary>
+          <div class="comparables"></div>
+        </details>
+
+        <a class="open-link" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>
       </div>
-      <div class="facts"></div>
-      <p class="description"></p>
-      <div class="reasons"></div>
-      <details class="evidence">
-        <summary>الأدلة والمقارنات</summary>
-        <div class="comparables"></div>
-      </details>
-      <a class="open-link" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>
     </article>
   </template>
 

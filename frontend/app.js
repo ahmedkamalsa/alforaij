@@ -15,12 +15,6 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function numberOrNull(value) {
-  if (value === "" || value === null || value === undefined) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function setStatus(text) {
   $("healthStatus").textContent = text;
 }
@@ -49,7 +43,6 @@ function currentRequestText() {
     $("budgetField").value && `الميزانية ${$("budgetField").value} د.ك`,
     $("rentBudgetField").value && `الإيجار ${$("rentBudgetField").value} د.ك`,
     $("bedroomsField").value && `${$("bedroomsField").value} غرف`,
-    `نمط العملية: ${state.mode}`,
   ].filter(Boolean);
   return `${text}\n${additions.join("، ")}`;
 }
@@ -89,28 +82,70 @@ async function runAnalysis() {
   }
 }
 
-function renderSources(sources) {
+function renderSources(report) {
   const root = $("sourceStatus");
   root.innerHTML = "";
-  for (const source of sources || []) {
+  let connected = 0;
+  for (const source of report.sourceStatus || []) {
+    if (source.status === "success") connected += 1;
     const item = document.createElement("div");
-    item.className = `badge ${source.status}`;
-    item.textContent = `${source.name}: ${source.records} سجل - ${source.status}`;
+    item.className = `source-card ${source.status}`;
+    item.innerHTML = `
+      <strong>${escapeHtml(source.name)}</strong>
+      <span>${escapeHtml(source.status)} | ${escapeHtml(source.records)} سجل</span>
+      <p>${escapeHtml(source.note)}</p>
+    `;
     root.appendChild(item);
+  }
+  $("connectedSources").textContent = connected || "-";
+
+  const planRoot = $("externalSourcePlan");
+  planRoot.innerHTML = "";
+  for (const source of report.externalSourcePlan || []) {
+    const item = document.createElement("div");
+    item.className = "source-card pending";
+    item.innerHTML = `
+      <strong>${escapeHtml(source.name)}</strong>
+      <span>${escapeHtml(source.status)}</span>
+      <p>${escapeHtml(source.action)}</p>
+    `;
+    planRoot.appendChild(item);
   }
 }
 
-function fact(label, value) {
+function renderMethod(report) {
+  const method = report.rankingMethod;
+  if (!method) return;
+  const weights = method.weights || {};
+  $("rankingMethod").innerHTML = `
+    ${escapeHtml(method.note)}
+    <br>
+    <span>مطابقة الطلب ${escapeHtml(weights.matchScore)}</span>
+    <span>جاذبية السعر ${escapeHtml(weights.dealScore)}</span>
+    <span>الثقة ${escapeHtml(weights.confidence)}</span>
+    <span>${escapeHtml(weights.missingDataPenalty)}</span>
+  `;
+}
+
+function scoreItem(label, value, type = "") {
   if (value === null || value === undefined || value === "") return "";
-  return `<span class="fact">${escapeHtml(label)}: ${escapeHtml(value)}</span>`;
+  return `<div class="score-item ${type}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function formatMoney(value) {
+  if (!value && value !== 0) return "";
+  return `${Number(value).toLocaleString("en-US")} د.ك`;
 }
 
 function renderReport(report) {
   $("summaryText").textContent = report.summary;
-  renderSources(report.sourceStatus);
+  renderSources(report);
+  renderMethod(report);
 
   const results = report.results || [];
-  $("resultCount").textContent = `${results.length} نتيجة`;
+  $("resultCount").textContent = results.length;
+  $("topScore").textContent = results[0] ? `${Math.round(results[0].recommendationScore)} / 100` : "-";
+
   const root = $("results");
   root.innerHTML = "";
   if (!results.length) {
@@ -119,29 +154,41 @@ function renderReport(report) {
   }
 
   const template = $("resultTemplate");
-  for (const item of results) {
+  results.forEach((item, index) => {
     const node = template.content.cloneNode(true);
+    node.querySelector(".rank-cell").textContent = index + 1;
     node.querySelector("h3").textContent = `${item.code} - ${item.area || "منطقة غير محددة"}`;
-    node.querySelector(".meta").textContent = `${item.governorate || ""} | ${item.transaction || ""} | ${item.propertyType || item.detailClass || ""}`;
-    node.querySelector(".score").textContent = `${item.valuationLabel} (${Math.round((item.confidence || 0) * 100)}%)`;
-    node.querySelector(".facts").innerHTML = [
-      fact("السعر", item.priceText || item.price),
-      fact("المساحة", item.space ? `${item.space} م²` : "غير مذكورة"),
-      fact("تاريخ النشر", item.publishedDate),
-      fact("درجة المطابقة", item.matchScore),
+    node.querySelector(".meta").textContent = `${item.source || "مصدر غير محدد"} | ${item.governorate || ""} | ${item.transaction || ""} | ${item.propertyType || item.detailClass || ""}`;
+    node.querySelector(".verdict-label").textContent = item.valuationLabel || "بدون حكم";
+    node.querySelector(".recommendation").textContent = `توصية ${Math.round(item.recommendationScore || 0)} / 100`;
+    node.querySelector(".score-grid").innerHTML = [
+      scoreItem("السعر", item.priceText || item.price),
+      scoreItem("المساحة", item.space ? `${item.space} م²` : "غير مذكورة"),
+      scoreItem("وسيط المقارنات", formatMoney(item.marketMedian)),
+      scoreItem("نسبة السعر للوسيط", item.priceRatio ? `${Math.round(item.priceRatio * 100)}%` : "غير كافية"),
+      scoreItem("مطابقة الطلب", `${Math.round(item.matchScore || 0)} / 100`),
+      scoreItem("الثقة", `${Math.round((item.confidence || 0) * 100)}%`, "confidence"),
+      scoreItem("تاريخ النشر", item.publishedDate),
     ].join("");
+    node.querySelector(".valuation-reason").textContent = item.valuationReason || "لا يوجد سبب تقييم كاف.";
     node.querySelector(".description").textContent = item.summary || item.features || "";
-    node.querySelector(".reasons").innerHTML = (item.reasons || []).map((reason) => `<span class="reason">${escapeHtml(reason)}</span>`).join("");
+    node.querySelector(".reasons").innerHTML = (item.reasons || [])
+      .map((reason) => `<span class="pill good">${escapeHtml(reason)}</span>`)
+      .join("");
+    node.querySelector(".warnings").innerHTML = (item.warnings || [])
+      .map((warning) => `<span class="pill warn">${escapeHtml(warning)}</span>`)
+      .join("");
     const comps = node.querySelector(".comparables");
     comps.innerHTML = (item.comparables || []).map((comp) => {
       const price = comp.priceText || comp.price || "غير معلن";
-      return `<span class="comp">${escapeHtml(comp.code)} | ${escapeHtml(comp.area)} | ${escapeHtml(price)}</span>`;
+      const href = comp.url ? ` href="${escapeHtml(comp.url)}" target="_blank" rel="noreferrer"` : "";
+      return `<a class="comp"${href}>${escapeHtml(comp.code)} | ${escapeHtml(comp.area)} | ${escapeHtml(price)}</a>`;
     }).join("") || '<span class="comp">لا توجد مقارنات كافية</span>';
     const link = node.querySelector(".open-link");
     link.href = item.originalUrl || "#";
     link.hidden = !item.originalUrl;
     root.appendChild(node);
-  }
+  });
 }
 
 function downloadReport() {
