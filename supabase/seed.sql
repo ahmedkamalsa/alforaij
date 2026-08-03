@@ -1,0 +1,2 @@
+-- Optional seed target.
+-- Use scripts/import_board_payload.py first, then load records into listings via a small importer when Supabase is configured.

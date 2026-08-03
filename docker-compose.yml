@@ -1,0 +1,14 @@
+services:
+  research-assistant:
+    image: python:3.13-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+      - ../vs/site/index.html:/vs/site/index.html:ro
+    environment:
+      ALFORAIJ_ASSISTANT_HOST: 0.0.0.0
+      ALFORAIJ_ASSISTANT_PORT: 8000
+      ALFORAIJ_BOARD_HTML: /vs/site/index.html
+    command: python -m backend.main
+    ports:
+      - "8000:8000"

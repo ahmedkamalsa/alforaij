@@ -1,0 +1,15 @@
+labels:
+  excellent_deal: لقطة ممتازة
+  below_market: أقل من السوق
+  fair: سعر عادل
+  slightly_high: أعلى قليلاً
+  high: غالي
+  excessive: مبالغ فيه
+price_ratio_thresholds:
+  excellent_deal: 0.82
+  below_market: 0.92
+  fair: 1.08
+  slightly_high: 1.18
+  high: 1.35
+minimum_comparables_for_directional_value: 3
+maximum_comparables_shown: 5

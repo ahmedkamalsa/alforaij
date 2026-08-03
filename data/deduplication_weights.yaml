@@ -1,0 +1,9 @@
+weights:
+  same_area: 0.25
+  same_property_type: 0.2
+  same_space: 0.2
+  same_price: 0.15
+  similar_summary: 0.2
+thresholds:
+  likely_duplicate: 0.75
+  possible_duplicate: 0.55

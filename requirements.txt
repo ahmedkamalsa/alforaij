@@ -1,0 +1,6 @@
+# The current MVP runs with Python standard library only.
+# Optional future stack:
+# fastapi>=0.115
+# uvicorn>=0.30
+# sqlalchemy>=2.0
+# pytest>=8.0

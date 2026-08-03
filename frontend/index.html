@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>مساعد الفريج للبحث والتقييم العقاري</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">بحث وتقييم عقاري محلي</p>
+      <h1>مساعد الفريج للبحث والتقييم العقاري</h1>
+    </div>
+    <div class="status" id="healthStatus">جاري فحص البيانات...</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel request-panel">
+      <div class="panel-head">
+        <h2>الطلب</h2>
+        <div class="segmented" role="group" aria-label="نمط العملية">
+          <button class="mode active" data-mode="search_and_value">بحث وتقييم</button>
+          <button class="mode" data-mode="search">بحث</button>
+          <button class="mode" data-mode="valuation">تقييم</button>
+        </div>
+      </div>
+
+      <textarea id="requestText" rows="7" spellcheck="false">مطلوب بيت في المطلاع مساحة من 400 إلى 500 متر، هدام أو صالح للسكن، الميزانية حتى 350 ألف، ويفضل شارع واحد.</textarea>
+
+      <div class="actions">
+        <button id="analyzeBtn" class="primary">تحليل الطلب</button>
+        <button id="runBtn">تشغيل البحث</button>
+        <button id="printBtn">طباعة التقرير</button>
+      </div>
+
+      <div class="fields">
+        <label>نوع العملية<input id="transactionField" type="text"></label>
+        <label>نوع العقار<input id="typeField" type="text"></label>
+        <label>المناطق<input id="areasField" type="text"></label>
+        <label>أقل مساحة<input id="minAreaField" type="number" min="0"></label>
+        <label>أعلى مساحة<input id="maxAreaField" type="number" min="0"></label>
+        <label>ميزانية البيع<input id="budgetField" type="number" min="0"></label>
+        <label>ميزانية الإيجار<input id="rentBudgetField" type="number" min="0"></label>
+        <label>عدد الغرف<input id="bedroomsField" type="number" min="0"></label>
+      </div>
+    </section>
+
+    <section class="panel summary-panel">
+      <div class="panel-head">
+        <h2>الخلاصة</h2>
+        <button id="downloadReportBtn">حفظ التقرير JSON</button>
+      </div>
+      <p id="summaryText" class="summary-text">لم يتم تشغيل تحليل بعد.</p>
+      <div id="sourceStatus" class="source-grid"></div>
+    </section>
+
+    <section class="panel results-panel">
+      <div class="panel-head">
+        <h2>النتائج المرتبة</h2>
+        <span id="resultCount" class="count">0 نتيجة</span>
+      </div>
+      <div id="results" class="results"></div>
+    </section>
+  </main>
+
+  <template id="resultTemplate">
+    <article class="result-card">
+      <div class="result-main">
+        <div>
+          <h3></h3>
+          <p class="meta"></p>
+        </div>
+        <div class="score"></div>
+      </div>
+      <div class="facts"></div>
+      <p class="description"></p>
+      <div class="reasons"></div>
+      <details class="evidence">
+        <summary>الأدلة والمقارنات</summary>
+        <div class="comparables"></div>
+      </details>
+      <a class="open-link" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>
+    </article>
+  </template>
+
+  <script src="/app.js"></script>
+</body>
+</html>

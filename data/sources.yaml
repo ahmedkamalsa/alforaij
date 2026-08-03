@@ -1,0 +1,21 @@
+sources:
+  - id: alforaij_board
+    name: الفريج - لوحة البيانات المحلية
+    status: connected
+    connector: backend.connectors.alforaij
+    records_file: data/seed_listings.json
+    notes:
+      - المصدر الحالي هو payload المضمن داخل site/index.html من مشروع alforaijboard.
+      - المساحة تعتمد على الحقل الصريح space أو نص مساحة واضح، وليس على الارتداد أو الواجهة.
+  - id: alforaij_front
+    name: منصة الفريج الأصلية
+    status: manual_link_only
+    base_url: https://front.alforaij.com/
+    notes:
+      - الروابط الأصلية محفوظة داخل كل إعلان.
+      - لا يتم سحب خارجي مباشر الآن لتجنب تسجيل دخول أو شروط غير واضحة.
+  - id: official_transactions
+    name: صفقات رسمية مستقبلية
+    status: planned
+    notes:
+      - تحتاج مصدر رسمي أو ملف مستورد قبل استخدامها كدليل تقييم قوي.
