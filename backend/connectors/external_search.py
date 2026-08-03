@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+from urllib.parse import quote_plus
+
+from backend.models import PropertyRequest
+
+
+EXTERNAL_SOURCES = [
+    {
+        "id": "sakan",
+        "name": "Sakan",
+        "url": "https://sakan.co/en",
+        "site": "sakan.co",
+        "status": "search_link",
+    },
+    {
+        "id": "opensooq",
+        "name": "السوق المفتوح الكويت",
+        "url": "https://kw.opensooq.com",
+        "site": "kw.opensooq.com",
+        "status": "search_link",
+    },
+    {
+        "id": "mourjan",
+        "name": "مرجان الكويت",
+        "url": "https://www.mourjan.com/kw/",
+        "site": "mourjan.com/kw",
+        "status": "search_link",
+    },
+    {
+        "id": "q8aqar",
+        "name": "دليل عقارات الكويت Q8Aqar",
+        "url": "https://www.q8aqar.com",
+        "site": "q8aqar.com",
+        "status": "search_link",
+    },
+]
+
+
+def request_query(request: PropertyRequest) -> str:
+    parts = [
+        request.transaction,
+        request.property_type,
+        " ".join(request.areas),
+        f"{request.min_area:g} متر" if request.min_area else "",
+        f"{request.budget:g} د.ك" if request.budget else "",
+        f"{request.rent_budget:g} د.ك" if request.rent_budget else "",
+    ]
+    query = " ".join(part for part in parts if part).strip()
+    return query or request.raw_text
+
+
+def external_search_links(request: PropertyRequest) -> list[dict[str, str]]:
+    query = request_query(request)
+    links: list[dict[str, str]] = []
+    for source in EXTERNAL_SOURCES:
+        google_query = quote_plus(f"site:{source['site']} {query}")
+        links.append(
+            {
+                "id": source["id"],
+                "name": source["name"],
+                "status": "رابط بحث خارجي",
+                "url": f"https://www.google.com/search?q={google_query}",
+                "directUrl": source["url"],
+                "evidenceStatus": "لم تدخل نتائجه في التقييم حتى يتم ربط API أو استيراد بيانات موثوق.",
+            }
+        )
+    return links

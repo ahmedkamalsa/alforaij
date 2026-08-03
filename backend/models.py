@@ -50,9 +50,13 @@ class RankedListing:
     valuation_label: str
     valuation_reason: str
     confidence: float
+    deal_score: float
     recommendation_score: float
     market_median: float | None
     price_ratio: float | None
+    match_breakdown: list[dict[str, Any]]
+    recommendation_breakdown: list[dict[str, Any]]
+    number_sources: dict[str, Any]
     reasons: list[str]
     warnings: list[str]
     comparables: list[dict[str, Any]]

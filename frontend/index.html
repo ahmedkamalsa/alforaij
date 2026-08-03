@@ -33,6 +33,7 @@
       <div class="actions">
         <button id="analyzeBtn" class="primary">تحليل الطلب</button>
         <button id="runBtn">تشغيل النتائج</button>
+        <button id="externalBtn" disabled>فتح المصادر الخارجية</button>
         <button id="printBtn">طباعة</button>
       </div>
 
@@ -83,6 +84,7 @@
         </div>
         <div id="sourceStatus" class="source-grid"></div>
         <div id="externalSourcePlan" class="source-grid muted-grid"></div>
+        <div id="externalLinks" class="external-links"></div>
       </section>
 
       <section class="results-panel">
@@ -123,6 +125,15 @@
         <details class="evidence">
           <summary>الأدلة والمقارنات</summary>
           <div class="comparables"></div>
+        </details>
+
+        <details class="calc-details">
+          <summary>مصدر كل رقم وطريقة الحساب</summary>
+          <div class="number-sources"></div>
+          <h4>تفصيل مطابقة الطلب</h4>
+          <div class="match-breakdown"></div>
+          <h4>تفصيل درجة التوصية</h4>
+          <div class="recommendation-breakdown"></div>
         </details>
 
         <a class="open-link" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>

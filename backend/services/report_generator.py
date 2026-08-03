@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+from backend.connectors.external_search import external_search_links
 from backend.models import PropertyRequest, RankedListing
 
 
@@ -28,8 +29,12 @@ def ranked_to_dict(item: RankedListing) -> dict:
         "valuationLabel": item.valuation_label,
         "valuationReason": item.valuation_reason,
         "confidence": item.confidence,
+        "dealScore": item.deal_score,
         "marketMedian": item.market_median,
         "priceRatio": item.price_ratio,
+        "matchBreakdown": item.match_breakdown,
+        "recommendationBreakdown": item.recommendation_breakdown,
+        "numberSources": item.number_sources,
         "reasons": item.reasons,
         "warnings": item.warnings,
         "comparables": item.comparables,
@@ -75,16 +80,17 @@ def build_report(request: PropertyRequest, items: list[RankedListing], source_co
             },
             {
                 "name": "مصادر خارجية",
-                "status": "not_configured",
+                "status": "search_links",
                 "records": 0,
-                "note": "غير مربوطة بنتائج فعلية الآن. تحتاج API أو مصدر بيانات مسموح قبل عرض نتائج مواقع أخرى داخل التقرير.",
+                "note": "تم تجهيز روابط بحث مباشرة للمصادر الخارجية، لكنها لا تدخل في التقييم قبل ربط API أو استيراد بيانات موثوق.",
             },
         ],
         "externalSourcePlan": [
             {"name": "موقع الفريج الأصلي", "status": "روابط أصلية فقط", "action": "فتح الإعلان الأصلي من كل نتيجة."},
-            {"name": "مواقع عقارية كويتية خارجية", "status": "غير متصل", "action": "تحتاج API أو موافقة على السحب المنظم قبل دمج النتائج."},
+            {"name": "مواقع عقارية كويتية خارجية", "status": "روابط بحث جاهزة", "action": "يمكن فتح نفس البحث في المواقع الخارجية من قسم المصادر."},
             {"name": "صفقات رسمية", "status": "غير متصل", "action": "تحتاج ملف صفقات أو قاعدة رسمية حتى يصبح التقييم أقوى."},
         ],
+        "externalSearchLinks": external_search_links(request),
         "summary": summary,
         "results": [ranked_to_dict(item) for item in items],
         "limitations": [

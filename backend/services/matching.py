@@ -1,42 +1,71 @@
 from __future__ import annotations
 
+from typing import Any
+
 from backend.models import Listing, PropertyRequest
 from backend.services.request_parser import normalize_text
 
 
-def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, list[str], list[str]]:
+def add_component(breakdown: list[dict[str, Any]], name: str, points: float, reason: str) -> None:
+    breakdown.append({"name": name, "points": round(points, 1), "reason": reason})
+
+
+def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, list[str], list[str], list[dict[str, Any]]]:
     score = 0.0
     reasons: list[str] = []
     warnings: list[str] = []
+    breakdown: list[dict[str, Any]] = []
 
     if request.transaction:
         if request.transaction == "مطلوب للشراء" and listing.transaction == "للبيع":
             score += 28
-            reasons.append("طلب شراء يقابله عرض بيع مناسب")
+            reason = "طلب شراء يقابله عرض بيع مناسب."
+            reasons.append(reason)
+            add_component(breakdown, "نوع العملية", 28, reason)
         elif request.transaction == "مطلوب للإيجار" and listing.transaction == "للإيجار":
             score += 28
-            reasons.append("طلب إيجار يقابله عرض إيجار مناسب")
+            reason = "طلب إيجار يقابله عرض إيجار مناسب."
+            reasons.append(reason)
+            add_component(breakdown, "نوع العملية", 28, reason)
         elif request.transaction in {"مطلوب للشراء", "مطلوب للإيجار"} and listing.transaction == request.transaction:
             score += 6
-            warnings.append("هذه نتيجة طلب مشابه وليست عرضًا مباشرًا")
+            reason = "هذه نتيجة طلب مشابه وليست عرضًا مباشرًا."
+            warnings.append(reason)
+            add_component(breakdown, "نوع العملية", 6, reason)
         elif request.transaction in listing.transaction or listing.transaction in request.transaction:
             score += 25
-            reasons.append("نوع المعاملة مطابق")
+            reason = "نوع المعاملة مطابق."
+            reasons.append(reason)
+            add_component(breakdown, "نوع العملية", 25, reason)
+        else:
+            add_component(breakdown, "نوع العملية", 0, f"المطلوب {request.transaction} والإعلان {listing.transaction}.")
 
-    if request.property_type and request.property_type in (listing.property_type + " " + listing.detail_class):
-        score += 18
-        reasons.append("نوع العقار قريب من الطلب")
+    if request.property_type:
+        if request.property_type in (listing.property_type + " " + listing.detail_class):
+            score += 18
+            reason = f"نوع العقار مطابق أو قريب: {listing.property_type or listing.detail_class}."
+            reasons.append("نوع العقار قريب من الطلب")
+            add_component(breakdown, "نوع العقار", 18, reason)
+        else:
+            add_component(breakdown, "نوع العقار", 0, f"المطلوب {request.property_type} والإعلان {listing.property_type}.")
 
     if request.areas:
         normalized_area = normalize_text(listing.area)
         if any(normalize_text(area) in normalized_area for area in request.areas):
             score += 28
+            reason = f"منطقة الإعلان {listing.area} ضمن مناطق الطلب."
             reasons.append("المنطقة مطابقة")
+            add_component(breakdown, "المنطقة", 28, reason)
         elif listing.governorate and any(normalize_text(area) in normalize_text(listing.governorate) for area in request.areas):
             score += 8
+            reason = f"تطابق على مستوى المحافظة فقط: {listing.governorate}."
             reasons.append("المحافظة قريبة من الطلب")
+            add_component(breakdown, "المنطقة", 8, reason)
+        else:
+            add_component(breakdown, "المنطقة", 0, f"منطقة الإعلان {listing.area} ليست ضمن {', '.join(request.areas)}.")
     else:
         score += 5
+        add_component(breakdown, "المنطقة", 5, "لم يحدد الطلب منطقة، لذلك لم يتم استبعاد الإعلان بسبب الموقع.")
 
     if request.min_area or request.max_area:
         if listing.space:
@@ -44,43 +73,67 @@ def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, li
             max_area = request.max_area or 10**9
             if min_area <= listing.space <= max_area:
                 score += 15
+                reason = f"مساحة الإعلان {listing.space:g} م² داخل النطاق المطلوب {min_area:g}-{max_area:g} م²."
                 reasons.append("المساحة ضمن النطاق المطلوب")
+                add_component(breakdown, "المساحة", 15, reason)
             else:
+                reason = f"مساحة الإعلان {listing.space:g} م² خارج النطاق المطلوب."
                 warnings.append("المساحة خارج النطاق المطلوب")
+                add_component(breakdown, "المساحة", 0, reason)
         else:
-            warnings.append("لا توجد مساحة معلنة للمقارنة")
+            reason = "مساحة الإعلان غير مذكورة، لذلك لم تدخل في نقاط المطابقة ولا في سعر المتر."
+            warnings.append("المساحة غير معلنة")
+            add_component(breakdown, "المساحة", 0, reason)
 
     target_budget = request.rent_budget or request.budget
     if target_budget and listing.price:
         delta = abs(listing.price - target_budget) / max(target_budget, 1)
         if delta <= 0.08:
             score += 12
+            reason = f"السعر {listing.price:,.0f} د.ك قريب جدًا من الميزانية {target_budget:,.0f} د.ك."
             reasons.append("السعر قريب جدًا من الميزانية")
+            add_component(breakdown, "الميزانية", 12, reason)
         elif delta <= 0.2:
             score += 7
+            reason = f"السعر {listing.price:,.0f} د.ك قريب من الميزانية {target_budget:,.0f} د.ك."
             reasons.append("السعر قريب من الميزانية")
+            add_component(breakdown, "الميزانية", 7, reason)
         elif listing.price > target_budget:
+            reason = f"السعر {listing.price:,.0f} د.ك أعلى من الميزانية {target_budget:,.0f} د.ك."
             warnings.append("السعر أعلى من الميزانية")
+            add_component(breakdown, "الميزانية", 0, reason)
+        else:
+            reason = f"السعر {listing.price:,.0f} د.ك أقل من الميزانية {target_budget:,.0f} د.ك."
+            reasons.append("السعر أقل من الميزانية")
+            add_component(breakdown, "الميزانية", 10, reason)
+            score += 10
 
     searchable = normalize_text(" ".join([listing.summary, listing.features, listing.detail_class]))
     for feature in request.features + request.condition:
         if normalize_text(feature) in searchable:
             score += 4
-            reasons.append(f"يوجد عامل مطلوب: {feature}")
+            reason = f"يوجد عامل مطلوب: {feature}."
+            reasons.append(reason)
+            add_component(breakdown, "المواصفات", 4, reason)
 
     if not listing.price:
         warnings.append("السعر غير معلن")
-    if not listing.space:
+    if not listing.space and not any(item["name"] == "المساحة" for item in breakdown):
         warnings.append("المساحة غير معلنة")
+        add_component(breakdown, "المساحة", 0, "المساحة غير مذكورة في الإعلان.")
 
-    return min(score, 100), reasons, warnings
+    return min(score, 100), reasons, warnings, breakdown
 
 
-def top_matches(request: PropertyRequest, listings: list[Listing], limit: int = 20) -> list[tuple[Listing, float, list[str], list[str]]]:
+def top_matches(
+    request: PropertyRequest,
+    listings: list[Listing],
+    limit: int = 20,
+) -> list[tuple[Listing, float, list[str], list[str], list[dict[str, Any]]]]:
     ranked = []
     for listing in listings:
-        score, reasons, warnings = score_listing(request, listing)
+        score, reasons, warnings, breakdown = score_listing(request, listing)
         if score > 0:
-            ranked.append((listing, score, reasons, warnings))
+            ranked.append((listing, score, reasons, warnings, breakdown))
     ranked.sort(key=lambda item: (item[1], item[0].published_date), reverse=True)
     return ranked[:limit]

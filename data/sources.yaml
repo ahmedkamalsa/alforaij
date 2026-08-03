@@ -19,3 +19,27 @@ sources:
     status: planned
     notes:
       - تحتاج مصدر رسمي أو ملف مستورد قبل استخدامها كدليل تقييم قوي.
+  - id: sakan
+    name: Sakan
+    status: search_link
+    url: https://sakan.co/en
+    notes:
+      - تم ربطه كرابط بحث خارجي فقط، ولا تدخل نتائجه في التقييم قبل وجود API أو استيراد بيانات.
+  - id: opensooq_kw
+    name: السوق المفتوح الكويت
+    status: search_link
+    url: https://kw.opensooq.com
+    notes:
+      - تم ربطه كرابط بحث خارجي فقط، ولا تدخل نتائجه في التقييم قبل وجود API أو استيراد بيانات.
+  - id: mourjan_kw
+    name: مرجان الكويت
+    status: search_link
+    url: https://www.mourjan.com/kw/
+    notes:
+      - تم ربطه كرابط بحث خارجي فقط، ولا تدخل نتائجه في التقييم قبل وجود API أو استيراد بيانات.
+  - id: q8aqar
+    name: دليل عقارات الكويت Q8Aqar
+    status: search_link
+    url: https://www.q8aqar.com
+    notes:
+      - تم ربطه كرابط بحث خارجي فقط، ولا تدخل نتائجه في التقييم قبل وجود API أو استيراد بيانات.

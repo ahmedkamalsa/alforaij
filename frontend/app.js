@@ -111,6 +111,20 @@ function renderSources(report) {
     `;
     planRoot.appendChild(item);
   }
+
+  const linksRoot = $("externalLinks");
+  linksRoot.innerHTML = "";
+  for (const link of report.externalSearchLinks || []) {
+    const a = document.createElement("a");
+    a.className = "external-link";
+    a.href = link.url;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+    a.textContent = `بحث في ${link.name}`;
+    a.title = link.evidenceStatus;
+    linksRoot.appendChild(a);
+  }
+  $("externalBtn").disabled = !(report.externalSearchLinks || []).length;
 }
 
 function renderMethod(report) {
@@ -130,6 +144,28 @@ function renderMethod(report) {
 function scoreItem(label, value, type = "") {
   if (value === null || value === undefined || value === "") return "";
   return `<div class="score-item ${type}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function sourceItem(label, source) {
+  if (!source) return "";
+  const value = source.display ?? source.value ?? "غير متاح";
+  return `
+    <div class="source-line">
+      <strong>${escapeHtml(label)}</strong>
+      <span>${escapeHtml(value)}</span>
+      <p>${escapeHtml(source.source)}</p>
+    </div>
+  `;
+}
+
+function breakdownItem(item) {
+  return `
+    <div class="breakdown-item">
+      <strong>${escapeHtml(item.name)}</strong>
+      <span>${escapeHtml(item.points)} نقطة</span>
+      <p>${escapeHtml(item.reason || `القيمة ${item.value ?? ""} - الوزن ${item.weight ?? ""}`)}</p>
+    </div>
+  `;
 }
 
 function formatMoney(value) {
@@ -184,6 +220,28 @@ function renderReport(report) {
       const href = comp.url ? ` href="${escapeHtml(comp.url)}" target="_blank" rel="noreferrer"` : "";
       return `<a class="comp"${href}>${escapeHtml(comp.code)} | ${escapeHtml(comp.area)} | ${escapeHtml(price)}</a>`;
     }).join("") || '<span class="comp">لا توجد مقارنات كافية</span>';
+
+    const sources = item.numberSources || {};
+    node.querySelector(".number-sources").innerHTML = [
+      sourceItem("السعر", sources.price),
+      sourceItem("المساحة", sources.space),
+      sourceItem("وسيط المقارنات", sources.marketMedian),
+      sourceItem("نسبة السعر للوسيط", sources.priceRatio),
+      sourceItem("الثقة", sources.confidence),
+    ].join("");
+    node.querySelector(".match-breakdown").innerHTML = (item.matchBreakdown || [])
+      .map(breakdownItem)
+      .join("");
+    node.querySelector(".recommendation-breakdown").innerHTML = (item.recommendationBreakdown || [])
+      .map((row) => `
+        <div class="breakdown-item">
+          <strong>${escapeHtml(row.name)}</strong>
+          <span>${escapeHtml(row.points)} نقطة</span>
+          <p>القيمة: ${escapeHtml(row.value)} | الوزن: ${escapeHtml(row.weight)}</p>
+        </div>
+      `)
+      .join("");
+
     const link = node.querySelector(".open-link");
     link.href = item.originalUrl || "#";
     link.hidden = !item.originalUrl;
@@ -214,6 +272,11 @@ function bind() {
   $("runBtn").addEventListener("click", runAnalysis);
   $("printBtn").addEventListener("click", () => window.print());
   $("downloadReportBtn").addEventListener("click", downloadReport);
+  $("externalBtn").addEventListener("click", () => {
+    for (const link of state.report?.externalSearchLinks || []) {
+      window.open(link.url, "_blank", "noreferrer");
+    }
+  });
 }
 
 async function boot() {
