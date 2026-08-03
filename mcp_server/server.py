@@ -28,7 +28,7 @@ def analyze(text: str) -> dict:
     listings = load_listings()
     ranked = top_matches(request, listings, limit=40)
     enriched = enrich_rankings(request, ranked, listings)
-    return build_report(request, deduplicate_ranked(enriched)[:20], len(listings))
+    return build_report(request, deduplicate_ranked(enriched)[:20], len(listings), [])
 
 
 def handle(message: dict) -> dict:

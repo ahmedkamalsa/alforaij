@@ -41,7 +41,12 @@ def ranked_to_dict(item: RankedListing) -> dict:
     }
 
 
-def build_report(request: PropertyRequest, items: list[RankedListing], source_count: int) -> dict:
+def build_report(
+    request: PropertyRequest,
+    items: list[RankedListing],
+    source_count: int,
+    external_statuses: list[dict] | None = None,
+) -> dict:
     top = items[0] if items else None
     summary = "لم يتم العثور على نتائج كافية داخل بيانات الفريج."
     if top:
@@ -78,16 +83,22 @@ def build_report(request: PropertyRequest, items: list[RankedListing], source_co
                 "records": source_count,
                 "note": "تم البحث في نسخة بيانات الفريج المحلية المستخرجة من لوحة alforaijboard.",
             },
-            {
-                "name": "مصادر خارجية",
-                "status": "search_links",
-                "records": 0,
-                "note": "تم تجهيز روابط بحث مباشرة للمصادر الخارجية، لكنها لا تدخل في التقييم قبل ربط API أو استيراد بيانات موثوق.",
-            },
+            *[
+                {
+                    "name": status.get("name", "مصدر خارجي"),
+                    "status": status.get("status", "unknown"),
+                    "records": status.get("records", 0),
+                    "responseMs": status.get("responseMs"),
+                    "url": status.get("url"),
+                    "note": status.get("note", ""),
+                    "availableCount": status.get("availableCount"),
+                }
+                for status in (external_statuses or [])
+            ],
         ],
         "externalSourcePlan": [
             {"name": "موقع الفريج الأصلي", "status": "روابط أصلية فقط", "action": "فتح الإعلان الأصلي من كل نتيجة."},
-            {"name": "مواقع عقارية كويتية خارجية", "status": "روابط بحث جاهزة", "action": "يمكن فتح نفس البحث في المواقع الخارجية من قسم المصادر."},
+            {"name": "مواقع عقارية كويتية خارجية", "status": "Live جزئي", "action": "OpenSooq وMourjan وQ8Aqar تدخل كبيانات عند توفر نتائج قابلة للاستخراج. Sakan يتم فحصه وتسجيل حالته."},
             {"name": "صفقات رسمية", "status": "غير متصل", "action": "تحتاج ملف صفقات أو قاعدة رسمية حتى يصبح التقييم أقوى."},
         ],
         "externalSearchLinks": external_search_links(request),

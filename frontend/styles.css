@@ -291,6 +291,13 @@ button:hover {
   line-height: 1.7;
 }
 
+.source-card a {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--blue);
+  font-weight: 800;
+}
+
 .source-card.success {
   border-color: #b7dfc2;
   background: var(--green-soft);
@@ -298,6 +305,8 @@ button:hover {
 
 .source-card.not_configured,
 .source-card.search_links,
+.source-card.no_results,
+.source-card.page_reachable,
 .source-card.pending {
   border-color: #ead59a;
   background: var(--amber-soft);

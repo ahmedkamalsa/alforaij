@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from backend.config import FRONTEND_DIR, HOST, PORT
 from backend.connectors.alforaij import load_listings
+from backend.connectors.live_sources import search_external_sources
 from backend.services.deduplication import deduplicate_ranked
 from backend.services.matching import top_matches
 from backend.services.report_generator import build_report
@@ -58,19 +59,27 @@ class Handler(BaseHTTPRequestHandler):
             json_response(self, {"request": parse_request(text).__dict__})
             return
         if path == "/api/analyze":
-            request = parse_request(text)
-            if payload.get("mode") in {"search", "valuation", "search_and_value"}:
-                request.intent = str(payload["mode"])
-            listings = load_listings()
-            ranked = top_matches(request, listings, limit=40)
-            enriched = enrich_rankings(request, ranked, listings)
-            deduped = deduplicate_ranked(enriched)[:20]
-            json_response(self, build_report(request, deduped, len(listings)))
+            try:
+                request = parse_request(text)
+                if payload.get("mode") in {"search", "valuation", "search_and_value"}:
+                    request.intent = str(payload["mode"])
+                listings = load_listings()
+                local_count = len(listings)
+                external_statuses = []
+                if payload.get("includeExternal", True):
+                    external_listings, external_statuses = search_external_sources(request)
+                    listings.extend(external_listings)
+                ranked = top_matches(request, listings, limit=40)
+                enriched = enrich_rankings(request, ranked, listings)
+                deduped = deduplicate_ranked(enriched)[:20]
+                json_response(self, build_report(request, deduped, local_count, external_statuses))
+            except Exception as exc:
+                json_response(self, {"error": "Analysis failed", "detail": str(exc)}, status=500)
             return
         json_response(self, {"error": "Unknown endpoint"}, status=404)
 
     def log_message(self, format: str, *args) -> None:
-        print(f"{self.address_string()} - {format % args}")
+        return
 
 
 def main() -> None:

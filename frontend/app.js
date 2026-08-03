@@ -88,12 +88,16 @@ function renderSources(report) {
   let connected = 0;
   for (const source of report.sourceStatus || []) {
     if (source.status === "success") connected += 1;
+    const response = source.responseMs ? ` | ${source.responseMs}ms` : "";
+    const available = source.availableCount ? ` | متاح بالموقع: ${source.availableCount}` : "";
+    const url = source.url ? `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">فتح المصدر المفحوص</a>` : "";
     const item = document.createElement("div");
     item.className = `source-card ${source.status}`;
     item.innerHTML = `
       <strong>${escapeHtml(source.name)}</strong>
-      <span>${escapeHtml(source.status)} | ${escapeHtml(source.records)} سجل</span>
+      <span>${escapeHtml(source.status)} | ${escapeHtml(source.records)} سجل${escapeHtml(response)}${escapeHtml(available)}</span>
       <p>${escapeHtml(source.note)}</p>
+      ${url}
     `;
     root.appendChild(item);
   }
