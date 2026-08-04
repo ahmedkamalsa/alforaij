@@ -1,0 +1,183 @@
+﻿
+-- supabase\migrations\001_initial_schema.sql
+
+create table if not exists listings (
+  id bigserial primary key,
+  code text unique,
+  source text not null default 'alforaij',
+  transaction_type text,
+  governorate text,
+  area text,
+  property_type text,
+  detail_class text,
+  price numeric,
+  price_text text,
+  space numeric,
+  listing_mode text,
+  summary text,
+  features text,
+  published_date date,
+  original_url text,
+  raw jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists saved_reports (
+  id bigserial primary key,
+  request_text text not null,
+  extracted_request jsonb not null,
+  report jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists listings_area_idx on listings (area);
+create index if not exists listings_type_idx on listings (property_type);
+create index if not exists listings_transaction_idx on listings (transaction_type);
+create index if not exists listings_price_idx on listings (price);
+create index if not exists listings_space_idx on listings (space);
+
+
+
+-- supabase\migrations\002_source_quality_and_runs.sql
+
+create table if not exists source_registry (
+  id text primary key,
+  name text not null,
+  category text not null,
+  connection text not null,
+  role text not null,
+  trust_level text not null,
+  scoring_policy text not null,
+  evidence_policy text not null,
+  status text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists source_runs (
+  id bigserial primary key,
+  source_id text references source_registry(id),
+  request_text text,
+  request_json jsonb not null default '{}'::jsonb,
+  status text not null,
+  records_found integer not null default 0,
+  records_scored integer not null default 0,
+  response_ms numeric,
+  source_url text,
+  note text,
+  error text,
+  started_at timestamptz not null default now()
+);
+
+create table if not exists listing_evidence (
+  id bigserial primary key,
+  listing_code text not null,
+  source_id text references source_registry(id),
+  evidence_type text not null,
+  evidence_url text,
+  field_name text,
+  field_value text,
+  confidence numeric,
+  raw jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists source_runs_source_idx on source_runs (source_id);
+create index if not exists source_runs_started_idx on source_runs (started_at desc);
+create index if not exists listing_evidence_code_idx on listing_evidence (listing_code);
+create index if not exists listing_evidence_source_idx on listing_evidence (source_id);
+
+
+
+-- supabase\seed_source_registry.sql
+
+insert into source_registry (
+  id,
+  name,
+  category,
+  connection,
+  role,
+  trust_level,
+  scoring_policy,
+  evidence_policy,
+  status
+) values
+(
+  'alforaij_board',
+  'الفريج - بيانات اللوحة المحلية',
+  'مصدر أساسي',
+  'ملف بيانات محلي',
+  'يدخل في البحث والمطابقة والتقييم',
+  'مرتفع داخل حدود بيانات الفريج',
+  'يدخل في درجة المطابقة والتقييم عند توفر السعر والمساحة والرابط.',
+  'كل نتيجة تحتفظ برابط الإعلان الأصلي والحقول الخام عند توفرها.',
+  'connected'
+),
+(
+  'opensooq_kw',
+  'OpenSooq Kuwait',
+  'سوق إعلانات خارجي',
+  'بحث حي من صفحة النتائج العامة',
+  'يدخل في البحث والتقييم بعد فلترة النوع والمنطقة والعملية',
+  'متوسط',
+  'لا يدخل الإعلان إلا إذا كان تصنيفه عقاريًا ويطابق الطلب صراحة.',
+  'الرابط والسعر والمنطقة والوصف تحفظ كمصدر لكل رقم مستخرج.',
+  'live_scored'
+),
+(
+  'mourjan_kw',
+  'Mourjan Kuwait',
+  'سوق إعلانات خارجي',
+  'قراءة HTML من صفحة البحث العامة',
+  'يدخل في البحث والتقييم عند وجود كارت إعلان مطابق',
+  'متوسط',
+  'يتم تحديد نوع العقار من مسار الإعلان، وليس من طلب المستخدم.',
+  'الرابط والوصف والسعر الصريح تدخل كدليل عند توفرها.',
+  'live_scored'
+),
+(
+  'q8aqar',
+  'Q8Aqar',
+  'دليل عقاري كويتي',
+  'صفحات منطقة ونوع العقار العامة',
+  'يدخل فقط عند ظهور رابط إعلان يثبت نفس الطلب',
+  'متوسط كرابط دليل، أعلى عند قراءة صفحة التفاصيل',
+  'إذا لم يثبت الإعلان أنه نفس المنطقة والنوع والعملية لا يدخل في التقييم.',
+  'عند نقص السعر أو المساحة يظهر كرابط دليل ولا يرفع تقييم السعر.',
+  'live_conditional'
+),
+(
+  'sakan',
+  'Sakan',
+  'بوابة بحث عقاري',
+  'فحص صفحة البحث العامة',
+  'حاليًا دليل توفر فقط وليس تقييم سعر',
+  'منخفض للتقييم حتى يتوفر API أو endpoint تفاصيل',
+  'لا يدخل في الدرجة إلا بعد استخراج إعلانات تفصيلية قابلة للتحقق.',
+  'يعرض عدد المتاح ورابط الصفحة فقط.',
+  'availability_only'
+),
+(
+  'official_transactions',
+  'الصفقات الرسمية / التسجيل العقاري',
+  'مصدر رسمي',
+  'استيراد ملف أو API عند توفره',
+  'المصدر الأقوى لتقييم السعر عند ربطه',
+  'مرتفع جدًا',
+  'يستخدم كمرجع سوقي مرجح أعلى من الإعلانات عند توفر صفقات مشابهة.',
+  'يجب حفظ رقم وتاريخ الصفقة والمنطقة والنوع والمساحة والسعر.',
+  'planned'
+)
+on conflict (id) do update set
+  name = excluded.name,
+  category = excluded.category,
+  connection = excluded.connection,
+  role = excluded.role,
+  trust_level = excluded.trust_level,
+  scoring_policy = excluded.scoring_policy,
+  evidence_policy = excluded.evidence_policy,
+  status = excluded.status,
+  updated_at = now();
+
+

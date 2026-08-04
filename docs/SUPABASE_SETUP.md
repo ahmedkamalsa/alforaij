@@ -22,7 +22,13 @@ DATABASE_URL=
 
 ## SQL المطلوب تشغيله
 
-شغل الملفات بالترتيب من SQL Editor داخل Supabase:
+الأبسط: افتح SQL Editor وشغل الملف كاملًا:
+
+```text
+supabase/setup_all.sql
+```
+
+أو شغل الملفات بالترتيب:
 
 1. `supabase/migrations/001_initial_schema.sql`
 2. `supabase/migrations/002_source_quality_and_runs.sql`
