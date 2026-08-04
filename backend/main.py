@@ -14,6 +14,8 @@ from backend.services.matching import top_matches
 from backend.services.report_generator import build_report
 from backend.services.request_parser import parse_request
 from backend.services.source_registry import source_registry
+from backend.services.supabase_store import is_configured as supabase_is_configured
+from backend.services.supabase_store import persist_analysis
 from backend.services.valuation import enrich_rankings
 
 
@@ -31,7 +33,7 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/api/health":
             listings = load_listings()
-            json_response(self, {"status": "ok", "records": len(listings)})
+            json_response(self, {"status": "ok", "records": len(listings), "supabase": supabase_is_configured()})
             return
         if path == "/api/sources":
             json_response(self, {"sources": source_registry()})
@@ -76,7 +78,16 @@ class Handler(BaseHTTPRequestHandler):
                 ranked = top_matches(request, listings, limit=40)
                 enriched = enrich_rankings(request, ranked, listings)
                 deduped = deduplicate_ranked(enriched)[:20]
-                json_response(self, build_report(request, deduped, local_count, external_statuses))
+                report = build_report(request, deduped, local_count, external_statuses)
+                try:
+                    report["persistence"] = persist_analysis(request, report, report["sourceStatus"])
+                except Exception as persist_error:
+                    report["persistence"] = {
+                        "enabled": supabase_is_configured(),
+                        "status": "failed",
+                        "error": str(persist_error),
+                    }
+                json_response(self, report)
             except Exception as exc:
                 json_response(self, {"error": "Analysis failed", "detail": str(exc)}, status=500)
             return

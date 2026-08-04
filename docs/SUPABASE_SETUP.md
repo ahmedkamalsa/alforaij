@@ -12,12 +12,13 @@
 ثم ضعها في ملف `.env` محليًا:
 
 ```text
-SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_URL=https://cuvakjwqrwkwwemjfefh.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 DATABASE_URL=
 ```
 
 لا تضع `service_role key` في الواجهة أو GitHub Pages.
+التطبيق يقرأ ملف `.env` تلقائيًا عند التشغيل المحلي.
 
 ## SQL المطلوب تشغيله
 
@@ -31,6 +32,18 @@ DATABASE_URL=
 
 ```powershell
 python scripts\sync_source_registry_supabase.py
+```
+
+ولرفع إعلانات الفريج المحلية:
+
+```powershell
+python scripts\sync_listings_supabase.py
+```
+
+لطباعة SQL كاملًا وتجهيزه للنسخ داخل SQL Editor:
+
+```powershell
+python scripts\print_supabase_sql.py
 ```
 
 ## وظيفة الجداول

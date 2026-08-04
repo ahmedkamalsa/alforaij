@@ -44,6 +44,15 @@ python scripts\import_board_payload.py --html ..\vs\site\index.html --out data\s
 
 ملفات السكيما موجودة في `supabase/migrations`. اتبع [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) ثم ضع `SUPABASE_URL` و`SUPABASE_SERVICE_ROLE_KEY` في `.env` عند بدء الربط الفعلي.
 
+بعد ضبط المفاتيح:
+
+```powershell
+python scripts\sync_source_registry_supabase.py
+python scripts\sync_listings_supabase.py
+```
+
+كل تحليل جديد سيحاول حفظ التقرير وسجل تشغيل المصادر تلقائيًا. إذا لم توجد المفاتيح سيعمل التطبيق محليًا ويعرض `Supabase: غير مضبوط`.
+
 ## MCP
 
 يوجد خادم MCP أولي في `mcp_server/server.py`. يوفر نفس محرك التحليل بصيغة JSON، ومناسب كقاعدة ربط لاحقة مع Codex أو أدوات داخلية.

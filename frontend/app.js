@@ -19,6 +19,14 @@ function setStatus(text) {
   $("healthStatus").textContent = text;
 }
 
+function persistenceLabel(value) {
+  if (!value) return "-";
+  if (value.status === "saved") return "تم الحفظ";
+  if (value.status === "not_configured") return "غير مضبوط";
+  if (value.status === "failed") return "فشل الحفظ";
+  return value.status || "-";
+}
+
 function fillFields(request) {
   state.parsed = request;
   $("transactionField").value = request.transaction || "";
@@ -203,6 +211,7 @@ function renderReport(report) {
   const results = report.results || [];
   $("resultCount").textContent = results.length;
   $("topScore").textContent = results[0] ? `${Math.round(results[0].recommendationScore)} / 100` : "-";
+  $("persistenceStatus").textContent = persistenceLabel(report.persistence);
 
   const root = $("results");
   root.innerHTML = "";
@@ -305,7 +314,7 @@ async function boot() {
   bind();
   try {
     const health = await fetch("/api/health").then((r) => r.json());
-    setStatus(`البيانات: ${health.records} إعلان`);
+    setStatus(`البيانات: ${health.records} إعلان | Supabase: ${health.supabase ? "متصل" : "غير مضبوط"}`);
   } catch {
     setStatus("تعذر فحص البيانات");
   }
