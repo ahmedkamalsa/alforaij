@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from backend.connectors.live_sources import listing_from_text
+from backend.connectors.live_sources import first_area_meta, listing_from_text
+from backend.services.request_parser import parse_request
 
 
 class LiveSourceParsingTests(unittest.TestCase):
@@ -20,6 +21,15 @@ class LiveSourceParsingTests(unittest.TestCase):
 
         self.assertEqual(listing.price, 320000)
         self.assertIn("\u0639\u0648\u0645\u0644 \u0643\u0623\u0644\u0641", listing.raw["priceSource"])
+
+    def test_bnaid_al_qar_routes_to_real_source_slugs(self) -> None:
+        request = parse_request(
+            "\u0634\u0642\u0629 \u0644\u0644\u0628\u064a\u0639 \u0641\u064a "
+            "\u0628\u0646\u064a\u062f \u0627\u0644\u0642\u0627\u0631"
+        )
+
+        self.assertEqual(first_area_meta(request)["q8aqar"], "bnaid-al-qar")
+        self.assertEqual(first_area_meta(request)["sakan_city"], "bnaid-al-qar")
 
 
 if __name__ == "__main__":

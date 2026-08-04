@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.models import Listing, PropertyRequest
-from backend.services.request_parser import normalize_text
+from backend.services.request_parser import normalize_text, text_has_area
 
 
 def add_component(breakdown: list[dict[str, Any]], name: str, points: float, reason: str) -> None:
@@ -38,7 +38,10 @@ def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, li
             reasons.append(reason)
             add_component(breakdown, "نوع العملية", 25, reason)
         else:
-            add_component(breakdown, "نوع العملية", 0, f"المطلوب {request.transaction} والإعلان {listing.transaction}.")
+            reason = f"المطلوب {request.transaction} والإعلان {listing.transaction}."
+            warnings.append(reason)
+            add_component(breakdown, "نوع العملية", 0, reason)
+            return 0, reasons, warnings, breakdown
 
     if request.property_type:
         if request.property_type in (listing.property_type + " " + listing.detail_class):
@@ -47,22 +50,25 @@ def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, li
             reasons.append("نوع العقار قريب من الطلب")
             add_component(breakdown, "نوع العقار", 18, reason)
         else:
-            add_component(breakdown, "نوع العقار", 0, f"المطلوب {request.property_type} والإعلان {listing.property_type}.")
+            reason = f"المطلوب {request.property_type} والإعلان {listing.property_type}."
+            warnings.append(reason)
+            add_component(breakdown, "نوع العقار", 0, reason)
+            if listing.property_type and listing.property_type != "عقارات":
+                return 0, reasons, warnings, breakdown
 
     if request.areas:
-        normalized_area = normalize_text(listing.area)
-        if any(normalize_text(area) in normalized_area for area in request.areas):
+        area_evidence = " ".join([listing.area, listing.governorate, listing.summary, listing.features])
+        if any(text_has_area(area, area_evidence) for area in request.areas):
             score += 28
-            reason = f"منطقة الإعلان {listing.area} ضمن مناطق الطلب."
+            shown_area = listing.area or "مذكورة في نص الإعلان"
+            reason = f"منطقة الإعلان {shown_area} ضمن مناطق الطلب."
             reasons.append("المنطقة مطابقة")
             add_component(breakdown, "المنطقة", 28, reason)
-        elif listing.governorate and any(normalize_text(area) in normalize_text(listing.governorate) for area in request.areas):
-            score += 8
-            reason = f"تطابق على مستوى المحافظة فقط: {listing.governorate}."
-            reasons.append("المحافظة قريبة من الطلب")
-            add_component(breakdown, "المنطقة", 8, reason)
         else:
-            add_component(breakdown, "المنطقة", 0, f"منطقة الإعلان {listing.area} ليست ضمن {', '.join(request.areas)}.")
+            reason = f"لا يوجد دليل أن الإعلان داخل {', '.join(request.areas)}."
+            warnings.append(reason)
+            add_component(breakdown, "المنطقة", 0, reason)
+            return 0, reasons, warnings, breakdown
     else:
         score += 5
         add_component(breakdown, "المنطقة", 5, "لم يحدد الطلب منطقة، لذلك لم يتم استبعاد الإعلان بسبب الموقع.")

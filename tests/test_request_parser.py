@@ -33,6 +33,16 @@ class RequestParserTests(unittest.TestCase):
         self.assertEqual(request.min_area, 750)
         self.assertEqual(request.budget, 1_200_000)
 
+    def test_bnaid_al_qar_request_is_understood(self) -> None:
+        request = parse_request(
+            "\u0634\u0642\u0629 \u0644\u0644\u0628\u064a\u0639 \u0641\u064a "
+            "\u0628\u0646\u064a\u062f \u0627\u0644\u0642\u0627\u0631"
+        )
+
+        self.assertEqual(request.transaction, "\u0644\u0644\u0628\u064a\u0639")
+        self.assertEqual(request.property_type, "\u0634\u0642\u0629")
+        self.assertEqual(request.areas, ["\u0628\u0646\u064a\u062f \u0627\u0644\u0642\u0627\u0631"])
+
 
 if __name__ == "__main__":
     unittest.main()

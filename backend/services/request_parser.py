@@ -25,7 +25,22 @@ KNOWN_AREAS = [
     "الفردوس",
     "صباح الناصر",
     "الدسمة",
+    "بنيد القار",
 ]
+
+AREA_ALIASES = {
+    "بنيد القار": [
+        "بنيدالقار",
+        "بنيد القار",
+        "بنييد القار",
+        "بند القار",
+        "bnaid al-qar",
+        "bnaid al qar",
+        "bneid al-qar",
+        "bneid al qar",
+        "bnaid alqar",
+    ],
+}
 
 PROPERTY_TYPES = {
     "بيت": ["بيت", "منزل", "فيلا", "قسيمة", "هدام", "دور"],
@@ -43,6 +58,19 @@ def normalize_text(text: str) -> str:
     text = re.sub(r"ة", "ه", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+
+def area_terms(area: str) -> list[str]:
+    return [area, *AREA_ALIASES.get(area, [])]
+
+
+def text_has_area(area: str, text: str) -> bool:
+    normalized = normalize_text(text)
+    lower_text = (text or "").lower()
+    for term in area_terms(area):
+        if normalize_text(term) in normalized or term.lower() in lower_text:
+            return True
+    return False
 
 
 def parse_money(text: str) -> float | None:
@@ -106,7 +134,7 @@ def parse_request(raw_text: str) -> PropertyRequest:
 
     areas = []
     for area in KNOWN_AREAS:
-        if normalize_text(area) in normalized and area not in areas:
+        if text_has_area(area, raw_text) and area not in areas:
             areas.append(area)
 
     min_area, max_area, excluded = extract_area_range(raw_text)
@@ -146,4 +174,3 @@ def parse_request(raw_text: str) -> PropertyRequest:
         features=features,
         excluded_area_numbers=excluded,
     )
-

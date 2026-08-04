@@ -65,6 +65,24 @@ class AnalysisTests(unittest.TestCase):
 
         self.assertEqual(len(deduped), 1)
 
+    def test_explicit_area_request_excludes_other_areas(self) -> None:
+        request = parse_request(
+            "\u0634\u0642\u0629 \u0644\u0644\u0628\u064a\u0639 \u0641\u064a "
+            "\u0628\u0646\u064a\u062f \u0627\u0644\u0642\u0627\u0631"
+        )
+        wrong_area = listing("AF-salwa", 120000, 100)
+        wrong_area.area = "\u0633\u0644\u0648\u0649"
+        wrong_area.summary = "\u0634\u0642\u0629 \u0644\u0644\u0628\u064a\u0639 \u0641\u064a \u0633\u0644\u0648\u0649"
+        wrong_area.property_type = "\u0634\u0642\u0629"
+        correct_area = listing("AF-bnaid", 145000, 120)
+        correct_area.area = "\u0628\u0646\u064a\u062f \u0627\u0644\u0642\u0627\u0631"
+        correct_area.summary = "\u0634\u0642\u0629 \u0644\u0644\u0628\u064a\u0639 \u0641\u064a \u0628\u0646\u064a\u062f \u0627\u0644\u0642\u0627\u0631"
+        correct_area.property_type = "\u0634\u0642\u0629"
+
+        ranked = top_matches(request, [wrong_area, correct_area])
+
+        self.assertEqual([item[0].code for item in ranked], ["AF-bnaid"])
+
 
 if __name__ == "__main__":
     unittest.main()
