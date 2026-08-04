@@ -4,6 +4,7 @@ from dataclasses import asdict
 
 from backend.connectors.external_search import external_search_links
 from backend.models import PropertyRequest, RankedListing
+from backend.services.source_registry import source_registry
 
 
 def ranked_to_dict(item: RankedListing) -> dict:
@@ -88,6 +89,7 @@ def build_report(
                     "name": status.get("name", "مصدر خارجي"),
                     "status": status.get("status", "unknown"),
                     "records": status.get("records", 0),
+                    "candidates": status.get("candidates", status.get("records", 0)),
                     "responseMs": status.get("responseMs"),
                     "url": status.get("url"),
                     "note": status.get("note", ""),
@@ -96,10 +98,11 @@ def build_report(
                 for status in (external_statuses or [])
             ],
         ],
+        "sourceRegistry": source_registry(),
         "externalSourcePlan": [
-            {"name": "موقع الفريج الأصلي", "status": "روابط أصلية فقط", "action": "فتح الإعلان الأصلي من كل نتيجة."},
-            {"name": "مواقع عقارية كويتية خارجية", "status": "Live جزئي", "action": "OpenSooq وMourjan وQ8Aqar تدخل كبيانات عند توفر نتائج قابلة للاستخراج. Sakan يتم فحصه وتسجيل حالته."},
-            {"name": "صفقات رسمية", "status": "غير متصل", "action": "تحتاج ملف صفقات أو قاعدة رسمية حتى يصبح التقييم أقوى."},
+            {"name": "توسيع Q8Aqar", "status": "الخطوة التالية", "action": "قراءة صفحات التفاصيل نفسها لاستخراج السعر والمساحة بدل رابط فقط عند توفرها."},
+            {"name": "Sakan", "status": "يحتاج endpoint أو API", "action": "لا يدخل في التقييم حتى نحصل على بيانات إعلان تفصيلية لا مجرد عداد صفحة."},
+            {"name": "صفقات رسمية", "status": "أعلى أولوية للتقييم", "action": "استيراد صفقات وزارة العدل/مصدر رسمي إلى Supabase واستخدامها كوسيط سوق مرجح."},
         ],
         "externalSearchLinks": external_search_links(request),
         "summary": summary,

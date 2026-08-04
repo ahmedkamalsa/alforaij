@@ -33,13 +33,16 @@ python scripts\import_board_payload.py --html ..\vs\site\index.html --out data\s
 ## ما يعتمد عليه التقييم الآن
 
 - بيانات `data/seed_listings.json` المستخرجة من لوحة `alforaijboard`.
-- المقارنة تتم داخل نفس المنطقة أو المحافظة ونفس نوع العقار قدر الإمكان.
+- OpenSooq وMourjan عند توفر إعلان حي يطابق المنطقة ونوع العقار ونوع العملية.
+- Q8Aqar يدخل فقط عندما يثبت رابط/نص الإعلان نفس الطلب، وإلا يظهر كمصدر مفحوص لا كمقارنة سعرية.
+- Sakan حاليًا دليل توفر ورابط صفحة فقط، ولا يدخل في التقييم حتى يتوفر API أو endpoint تفاصيل قابل للتحقق.
+- المقارنة تتم داخل نفس المنطقة ونفس نوع العقار قدر الإمكان.
 - المساحة لا يتم استخراجها من كلمات مثل `ارتداد` أو `واجهة` أو `عرض الشارع`.
 - التقييم استرشادي وليس تقييمًا رسميًا.
 
 ## Supabase
 
-ملف السكيما موجود في `supabase/migrations/001_initial_schema.sql`. الربط السحابي يحتاج `SUPABASE_URL` و`SUPABASE_SERVICE_ROLE_KEY` في `.env` عند بدء مرحلة الربط الفعلية.
+ملفات السكيما موجودة في `supabase/migrations`. اتبع [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) ثم ضع `SUPABASE_URL` و`SUPABASE_SERVICE_ROLE_KEY` في `.env` عند بدء الربط الفعلي.
 
 ## MCP
 

@@ -319,6 +319,61 @@ button:hover {
   margin-top: 12px;
 }
 
+.registry-wrap {
+  margin-top: 14px;
+}
+
+.registry-wrap h3 {
+  margin-bottom: 8px;
+}
+
+.registry-table {
+  display: grid;
+  gap: 8px;
+}
+
+.registry-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) minmax(220px, 1.2fr) minmax(240px, 1.4fr) minmax(130px, .7fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.registry-row strong,
+.registry-row span {
+  display: block;
+}
+
+.registry-row span,
+.registry-row p,
+.registry-row em {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.registry-row p {
+  margin: 0;
+}
+
+.registry-row em {
+  font-style: normal;
+  font-weight: 800;
+}
+
+.registry-row.live_scored,
+.registry-row.connected {
+  border-color: #b7dfc2;
+}
+
+.registry-row.availability_only,
+.registry-row.live_conditional {
+  border-color: #ead59a;
+}
+
 .external-link {
   display: inline-block;
   padding: 8px 10px;
@@ -561,6 +616,10 @@ summary {
 
   .request-panel {
     position: static;
+  }
+
+  .registry-row {
+    grid-template-columns: 1fr;
   }
 }
 

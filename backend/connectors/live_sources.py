@@ -279,6 +279,7 @@ def search_opensooq(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
         url = f"https://kw.opensooq.com/en/{path}"
     body, status, ms, error = fetch_url(url)
     listings: list[Listing] = []
+    candidates = 0
     if body:
         next_match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', body, re.S)
         if next_match:
@@ -293,6 +294,7 @@ def search_opensooq(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
                 cat1 = str(item.get("cat1_code", ""))
                 if cat1 and "RealEstate" not in cat1:
                     continue
+                candidates += 1
                 code = "OS-" + str(item.get("id") or item.get("post_url", "").rstrip("/").split("/")[-1])
                 if code in seen_ids:
                     continue
@@ -327,6 +329,7 @@ def search_opensooq(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
                     product = element.get("item", {})
                     if product.get("@type") != "Product":
                         continue
+                    candidates += 1
                     offer = product.get("offers", {})
                     code = "OS-" + str(product.get("url", "").rstrip("/").split("/")[-1])
                     listing = listing_from_text(
@@ -345,6 +348,7 @@ def search_opensooq(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
         "name": "OpenSooq",
         "status": "success" if listings else "no_results",
         "records": len(listings),
+        "candidates": candidates,
         "responseMs": ms,
         "url": url,
         "note": error or "تم البحث بعبارة الطلب واستخراج النتائج القابلة للقراءة من بيانات الصفحة.",
@@ -357,11 +361,13 @@ def search_mourjan(request: PropertyRequest) -> tuple[list[Listing], dict[str, A
     url = f"https://www.mourjan.com/kw/kuwait/properties/{mode}/?{query}"
     body, status, ms, error = fetch_url(url)
     listings: list[Listing] = []
+    candidates = 0
     ad_pattern = re.compile(
         r'<div class="ad[^"]*"[^>]*>.*?<div class=widget id=([0-9]+)>.*?<a class=link href=([^>]+)>.*?<div dir=auto class="content ar">(.*?)</div>',
         re.S,
     )
     for code, href, description in ad_pattern.findall(body):
+        candidates += 1
         url_abs = urllib.parse.urljoin("https://www.mourjan.com", href)
         listing = listing_from_text(
             source="Mourjan",
@@ -379,6 +385,7 @@ def search_mourjan(request: PropertyRequest) -> tuple[list[Listing], dict[str, A
         "name": "Mourjan",
         "status": "success" if listings else "no_results",
         "records": len(listings),
+        "candidates": candidates,
         "responseMs": ms,
         "url": url,
         "note": error or "تم استخراج كروت إعلانات عامة من HTML الصفحة.",
@@ -393,7 +400,9 @@ def search_q8aqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
     url = f"https://q8aqar.com/{mode}/{part}/{area_slug}/" if area_slug else f"https://q8aqar.com/{mode}/{part}/"
     body, status, ms, error = fetch_url(url)
     listings: list[Listing] = []
+    candidates = 0
     for href, title in re.findall(r'<a href="(https://q8aqar\.com/details/realestate/[0-9]+/)">(.*?)</a>', body, re.S):
+        candidates += 1
         title_clean = clean_text(title)
         code = "Q8-" + href.rstrip("/").split("/")[-1]
         listing = listing_from_text(
@@ -412,9 +421,10 @@ def search_q8aqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
         "name": "Q8Aqar",
         "status": "success" if listings else "no_results",
         "records": len(listings),
+        "candidates": candidates,
         "responseMs": ms,
         "url": url,
-        "note": error or "تم استخراج روابط تفاصيل معلنة من صفحة المنطقة العامة.",
+        "note": error or f"تم فحص {candidates} رابطًا من صفحة المنطقة. دخل التقييم فقط ما أثبت نفس المنطقة والنوع والعملية.",
     }
 
 
@@ -438,6 +448,7 @@ def check_sakan(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]
         "name": "Sakan",
         "status": "page_reachable" if body else "failed",
         "records": 0,
+        "candidates": 0,
         "availableCount": count,
         "responseMs": ms,
         "url": url,

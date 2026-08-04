@@ -13,6 +13,7 @@ from backend.services.deduplication import deduplicate_ranked
 from backend.services.matching import top_matches
 from backend.services.report_generator import build_report
 from backend.services.request_parser import parse_request
+from backend.services.source_registry import source_registry
 from backend.services.valuation import enrich_rankings
 
 
@@ -31,6 +32,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/health":
             listings = load_listings()
             json_response(self, {"status": "ok", "records": len(listings)})
+            return
+        if path == "/api/sources":
+            json_response(self, {"sources": source_registry()})
             return
         if path == "/":
             path = "/index.html"

@@ -90,12 +90,13 @@ function renderSources(report) {
     if (source.status === "success") connected += 1;
     const response = source.responseMs ? ` | ${source.responseMs}ms` : "";
     const available = source.availableCount ? ` | متاح بالموقع: ${source.availableCount}` : "";
+    const candidates = source.candidates !== undefined ? ` | مفحوص: ${source.candidates}` : "";
     const url = source.url ? `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">فتح المصدر المفحوص</a>` : "";
     const item = document.createElement("div");
     item.className = `source-card ${source.status}`;
     item.innerHTML = `
       <strong>${escapeHtml(source.name)}</strong>
-      <span>${escapeHtml(source.status)} | ${escapeHtml(source.records)} سجل${escapeHtml(response)}${escapeHtml(available)}</span>
+      <span>${escapeHtml(source.status)} | دخل التقييم: ${escapeHtml(source.records)}${escapeHtml(candidates)}${escapeHtml(response)}${escapeHtml(available)}</span>
       <p>${escapeHtml(source.note)}</p>
       ${url}
     `;
@@ -114,6 +115,23 @@ function renderSources(report) {
       <p>${escapeHtml(source.action)}</p>
     `;
     planRoot.appendChild(item);
+  }
+
+  const registryRoot = $("sourceRegistry");
+  registryRoot.innerHTML = "";
+  for (const source of report.sourceRegistry || []) {
+    const row = document.createElement("div");
+    row.className = `registry-row ${source.status || ""}`;
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(source.name)}</strong>
+        <span>${escapeHtml(source.category)} | ${escapeHtml(source.connection)}</span>
+      </div>
+      <p>${escapeHtml(source.role)}</p>
+      <p>${escapeHtml(source.scoringPolicy)}</p>
+      <em>${escapeHtml(source.trustLevel)}</em>
+    `;
+    registryRoot.appendChild(row);
   }
 
   const linksRoot = $("externalLinks");
