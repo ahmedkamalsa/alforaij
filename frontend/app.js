@@ -225,7 +225,7 @@ function renderReport(report) {
     const node = template.content.cloneNode(true);
     node.querySelector(".rank-cell").textContent = index + 1;
     node.querySelector("h3").textContent = `${item.code} - ${item.area || "منطقة غير محددة"}`;
-    node.querySelector(".meta").textContent = `${item.source || "مصدر غير محدد"} | ${item.governorate || ""} | ${item.transaction || ""} | ${item.propertyType || item.detailClass || ""}`;
+    node.querySelector(".meta").textContent = `${item.source || "مصدر غير محدد"} | ${item.governorate || ""} | ${item.transaction || ""} | ${item.propertyType || item.detailClass || ""} | ${item.listingType || "غير محدد"}`;
     node.querySelector(".verdict-label").textContent = item.valuationLabel || "بدون حكم";
     node.querySelector(".recommendation").textContent = `توصية ${Math.round(item.recommendationScore || 0)} / 100`;
     node.querySelector(".score-grid").innerHTML = [
@@ -239,6 +239,22 @@ function renderReport(report) {
     ].join("");
     node.querySelector(".valuation-reason").textContent = item.valuationReason || "لا يوجد سبب تقييم كاف.";
     node.querySelector(".description").textContent = item.summary || item.features || "";
+    
+    const financingBlock = node.querySelector(".financing-info");
+    if (item.financing && item.financing.monthly_payment) {
+      financingBlock.innerHTML = `
+        <h4 style="margin-top:15px; margin-bottom:10px;">معلومات التمويل العقاري المتوقعة</h4>
+        <div class="score-grid">
+          ${scoreItem("الدفعة المقدمة", formatMoney(item.financing.down_payment))}
+          ${scoreItem("القسط الشهري", formatMoney(item.financing.monthly_payment), "monthly")}
+          ${scoreItem("الفائدة", item.financing.interest_rate_percent ? `${item.financing.interest_rate_percent}%` : "")}
+          ${scoreItem("مدة القرض", item.financing.years ? `${item.financing.years} سنة` : "")}
+        </div>
+      `;
+    } else {
+      financingBlock.innerHTML = "";
+    }
+    
     node.querySelector(".reasons").innerHTML = (item.reasons || [])
       .map((reason) => `<span class="pill good">${escapeHtml(reason)}</span>`)
       .join("");

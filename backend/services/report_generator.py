@@ -8,7 +8,10 @@ from backend.services.source_registry import source_registry
 
 
 def ranked_to_dict(item: RankedListing) -> dict:
+    from backend.services.financing_calculator import calculate_mortgage
     listing = item.listing
+    financing = calculate_mortgage(listing.price) if listing.price else {}
+    
     return {
         "code": listing.code,
         "source": listing.source,
@@ -21,6 +24,7 @@ def ranked_to_dict(item: RankedListing) -> dict:
         "priceText": listing.price_text,
         "space": listing.space,
         "listingMode": listing.listing_mode,
+        "listingType": getattr(listing, 'listing_type', "غير محدد"),
         "summary": listing.summary,
         "features": listing.features,
         "publishedDate": listing.published_date,
@@ -39,6 +43,7 @@ def ranked_to_dict(item: RankedListing) -> dict:
         "reasons": item.reasons,
         "warnings": item.warnings,
         "comparables": item.comparables,
+        "financing": financing,
     }
 
 
@@ -47,6 +52,7 @@ def build_report(
     items: list[RankedListing],
     source_count: int,
     external_statuses: list[dict] | None = None,
+    ai_insights: dict | None = None,
 ) -> dict:
     top = items[0] if items else None
     summary = "لم يتم العثور على نتائج كافية داخل بيانات الفريج."
@@ -57,6 +63,28 @@ def build_report(
             f"درجة التوصية {int(top.recommendation_score)} من 100، والثقة {int(top.confidence * 100)}% "
             f"اعتمادًا على {len(top.comparables)} مقارنة متاحة."
         )
+
+    external_plan = [
+        {"name": "توسيع Q8Aqar", "status": "الخطوة التالية", "action": "قراءة صفحات التفاصيل نفسها لاستخراج السعر والمساحة بدل رابط فقط عند توفرها."},
+        {"name": "Sakan", "status": "يحتاج endpoint أو API", "action": "لا يدخل في التقييم حتى نحصل على بيانات إعلان تفصيلية لا مجرد عداد صفحة."},
+        {"name": "صفقات رسمية", "status": "أعلى أولوية للتقييم", "action": "استيراد صفقات وزارة العدل/مصدر رسمي إلى Supabase واستخدامها كوسيط سوق مرجح."},
+    ]
+
+    if ai_insights:
+        # Build a richer summary from AI insights
+        rich_summary = f"**تحليل الخبير العقاري:**\n{ai_insights.get('executive_summary', '')}\n\n"
+        rich_summary += f"**الأدلة والمصادر المستعملة:**\n{ai_insights.get('sources_evidence', '')}\n\n"
+        rich_summary += f"**اقتراحات للعميل:**\n{ai_insights.get('suggestions', '')}"
+        summary = rich_summary
+        
+        # Override plan if AI provided missing data
+        if "missing_data" in ai_insights and ai_insights["missing_data"]:
+            external_plan.insert(0, {
+                "name": "نواقص البيانات المكتشفة (AI)",
+                "status": "مطلوب لتأكيد التقييم",
+                "action": ai_insights["missing_data"]
+            })
+
     return {
         "request": asdict(request),
         "rankingMethod": {
@@ -99,11 +127,7 @@ def build_report(
             ],
         ],
         "sourceRegistry": source_registry(),
-        "externalSourcePlan": [
-            {"name": "توسيع Q8Aqar", "status": "الخطوة التالية", "action": "قراءة صفحات التفاصيل نفسها لاستخراج السعر والمساحة بدل رابط فقط عند توفرها."},
-            {"name": "Sakan", "status": "يحتاج endpoint أو API", "action": "لا يدخل في التقييم حتى نحصل على بيانات إعلان تفصيلية لا مجرد عداد صفحة."},
-            {"name": "صفقات رسمية", "status": "أعلى أولوية للتقييم", "action": "استيراد صفقات وزارة العدل/مصدر رسمي إلى Supabase واستخدامها كوسيط سوق مرجح."},
-        ],
+        "externalSourcePlan": external_plan,
         "externalSearchLinks": external_search_links(request),
         "summary": summary,
         "results": [ranked_to_dict(item) for item in items],

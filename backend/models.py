@@ -21,6 +21,7 @@ class PropertyRequest:
     condition: list[str] = field(default_factory=list)
     features: list[str] = field(default_factory=list)
     excluded_area_numbers: dict[str, float] = field(default_factory=dict)
+    site_features: list[str] = field(default_factory=list)  # زاوية، شارعين، إلخ
 
 
 @dataclass
@@ -40,6 +41,8 @@ class Listing:
     published_date: str
     original_url: str
     source: str = "الفريج"
+    listing_type: str = "غير محدد"  # مباشر | مكتب | غير محدد
+    seller_info: str = ""  # معلومات إضافية عن البائع
     raw: dict[str, Any] = field(default_factory=dict)
 
 

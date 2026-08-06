@@ -19,6 +19,8 @@ from backend.services.supabase_store import persist_analysis
 from backend.services.valuation import enrich_rankings
 
 
+from backend.services.ai_evaluator import generate_professional_analysis
+
 def json_response(handler: BaseHTTPRequestHandler, payload: dict, status: int = 200) -> None:
     body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
     handler.send_response(status)
@@ -78,7 +80,11 @@ class Handler(BaseHTTPRequestHandler):
                 ranked = top_matches(request, listings, limit=40)
                 enriched = enrich_rankings(request, ranked, listings)
                 deduped = deduplicate_ranked(enriched)[:20]
-                report = build_report(request, deduped, local_count, external_statuses)
+                
+                # Fetch AI professional analysis
+                ai_insights = generate_professional_analysis(request, deduped, external_statuses)
+                
+                report = build_report(request, deduped, local_count, external_statuses, ai_insights)
                 try:
                     report["persistence"] = persist_analysis(request, report, report["sourceStatus"])
                 except Exception as persist_error:
@@ -89,6 +95,8 @@ class Handler(BaseHTTPRequestHandler):
                     }
                 json_response(self, report)
             except Exception as exc:
+                import traceback
+                traceback.print_exc()
                 json_response(self, {"error": "Analysis failed", "detail": str(exc)}, status=500)
             return
         json_response(self, {"error": "Unknown endpoint"}, status=404)

@@ -94,6 +94,13 @@ def save_source_runs(request: PropertyRequest, statuses: list[dict[str, Any]]) -
         "Mourjan": "mourjan_kw",
         "Q8Aqar": "q8aqar",
         "Sakan": "sakan",
+        "Waseet": "waseet",
+        "نبض عقار (NabdAqar)": "nabdaqar",
+        "نبض عقار": "nabdaqar",
+        "NabdAqar": "nabdaqar",
+        "بوعقار / بوشملان (Bu3qar)": "bu3qar",
+        "بوعقار": "bu3qar",
+        "Bu3qar": "bu3qar",
     }
     for status in statuses:
         source_name = str(status.get("name") or "")
@@ -122,6 +129,13 @@ def save_listing_evidence(report: dict[str, Any]) -> None:
         "Mourjan": "mourjan_kw",
         "Q8Aqar": "q8aqar",
         "Sakan": "sakan",
+        "Waseet": "waseet",
+        "نبض عقار (NabdAqar)": "nabdaqar",
+        "نبض عقار": "nabdaqar",
+        "NabdAqar": "nabdaqar",
+        "بوعقار / بوشملان (Bu3qar)": "bu3qar",
+        "بوعقار": "bu3qar",
+        "Bu3qar": "bu3qar",
     }
     for item in report.get("results", []):
         source_id = source_ids.get(item.get("source"), str(item.get("source") or "").lower())

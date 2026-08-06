@@ -27,6 +27,8 @@ PORT = int(os.getenv("ALFORAIJ_ASSISTANT_PORT", "8000"))
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
+AGENT_ROUTER_API_KEY = os.getenv("AGENT_ROUTER_API_KEY", "")
+AGENT_ROUTER_API_URL = os.getenv("AGENT_ROUTER_API_URL", "https://api.agentrouter.org/v1/chat/completions")
 SEED_LISTINGS_PATH = Path(os.getenv("ALFORAIJ_SEED_LISTINGS", DATA_DIR / "seed_listings.json"))
 BOARD_HTML_PATH = Path(
     os.getenv(

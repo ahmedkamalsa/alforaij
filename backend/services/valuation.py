@@ -31,6 +31,8 @@ def comparable_pool(target: Listing, listings: list[Listing]) -> list[Listing]:
     return sorted(pool, key=lambda row: (row.area == target.area, row.published_date), reverse=True)[:8]
 
 
+from backend.services.official_valuation import calculate_valuation, assess_deal_quality
+
 def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
     price = target.price
     clean = [row.price for row in comps if row.price]
@@ -46,6 +48,13 @@ def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
         }
         for row in comps[:5]
     ]
+    
+    # محاولة الحصول على التقييم الرسمي
+    features = []
+    if hasattr(target, 'features') and target.features:
+        features.extend(target.features.split(" "))
+        
+    official_val, off_breakdown = calculate_valuation(target.area, target.space, features)
 
     if not price:
         return ValuationResult(
@@ -58,8 +67,51 @@ def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
             evidence=evidence,
         )
 
+    # إذا كان لدينا تقييم رسمي، سنستخدمه كأساس
+    if official_val:
+        label = assess_deal_quality(price, official_val)
+        ratio = price / official_val
+        reason = f"التقييم استند لبيانات رسمية لمتوسط المنطقة. القيمة العادلة المتوقعة {official_val:,.0f} د.ك، والمطلوب {price:,.0f} د.ك."
+        
+        # تحويل ratio إلى deal_score
+        if ratio <= 0.85: deal_score = 100
+        elif ratio <= 0.95: deal_score = 88
+        elif ratio <= 1.05: deal_score = 74
+        elif ratio <= 1.15: deal_score = 58
+        else: deal_score = 30
+        
+        confidence = 0.85 # ثقة عالية للبيانات الرسمية
+        
+        return ValuationResult(
+            label=label,
+            reason=reason,
+            confidence=confidence,
+            deal_score=deal_score,
+            market_median=official_val, # استخدام الرسمي كـ market median
+            price_ratio=ratio,
+            evidence=evidence,
+        )
+
     if len(clean) < 3:
         market = median(clean) if clean else None
+        # Sanity check: if the single/limited comparisons indicate a large mismatch, try to recover price from seed data
+        if market and price and price < (market / 10):
+            # try to find original seed listing by code
+            try:
+                from backend.config import SEED_LISTINGS_PATH
+                import json
+                if SEED_LISTINGS_PATH.exists():
+                    seed_records = json.loads(SEED_LISTINGS_PATH.read_text(encoding='utf-8'))
+                    seed_match = next((r for r in seed_records if str(r.get('code')) == str(target.code)), None)
+                    if seed_match and seed_match.get('price'):
+                        seed_price = float(seed_match['price'])
+                        # accept seed price if it is much closer to market
+                        if abs(seed_price - market) < abs(price - market) or seed_price > price * 10:
+                            old_price = price
+                            price = seed_price
+                            evidence.insert(0, {"source": "seed_override", "note": f"Price replaced from seed data {old_price} -> {seed_price}"})
+            except Exception:
+                pass
         return ValuationResult(
             label="تقييم استرشادي ببيانات محدودة",
             reason=f"يوجد {len(clean)} مقارنة سعرية فقط، وهذا أقل من الحد الأدنى المفضل وهو 3 مقارنات.",
@@ -72,6 +124,26 @@ def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
 
     market = median(clean)
     ratio = price / market if market else 1
+
+    # Sanity override: إذا كان السعر الحالي بعيد جداً عن وسيط السوق (أقل من 10%) حاول استخدام بيانات seed المحلية إن وُجدت
+    if market and price and ratio < 0.1:
+        try:
+            from backend.config import SEED_LISTINGS_PATH
+            import json
+            if SEED_LISTINGS_PATH.exists():
+                seed_records = json.loads(SEED_LISTINGS_PATH.read_text(encoding='utf-8'))
+                seed_match = next((r for r in seed_records if str(r.get('code')) == str(target.code)), None)
+                if seed_match and seed_match.get('price'):
+                    seed_price = float(seed_match['price'])
+                    # قبول سعر الـ seed إذا كان أقرب لوسيط السوق أو على الأقل أكبر بعامل 10
+                    if abs(seed_price - market) < abs(price - market) or seed_price > price * 10:
+                        old_price = price
+                        price = seed_price
+                        ratio = price / market if market else ratio
+                        evidence.insert(0, {"source": "seed_override", "note": f"تم استبدال السعر من بيانات seed {old_price} -> {seed_price}"})
+        except Exception:
+            pass
+
     basis = "المقارنة تمت على السعر الإجمالي للعروض المشابهة"
     if target.space:
         basis += " مع توفر مساحة الإعلان"
