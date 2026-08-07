@@ -11,9 +11,12 @@ class SourceRegistryTests(unittest.TestCase):
 
         self.assertEqual(sources["opensooq_kw"]["status"], "live_scored")
         self.assertEqual(sources["mourjan_kw"]["status"], "live_scored")
-        self.assertEqual(sources["q8aqar"]["status"], "live_conditional")
-        self.assertEqual(sources["sakan"]["status"], "availability_only")
+        # الخطة المستقبلية نُفّذت: Q8Aqar يقرأ صفحات التفاصيل، وSakan يحاول الحالة المضمّنة
+        self.assertEqual(sources["q8aqar"]["status"], "live_scored")
+        self.assertEqual(sources["sakan"]["status"], "live_conditional")
         self.assertIn("لا يدخل في الدرجة", sources["sakan"]["scoringPolicy"])
+        # الصفقات الرسمية أصبحت موصلًا متصلًا (أعلى مرجع في التقييم)
+        self.assertEqual(sources["official_transactions"]["status"], "connected")
 
 
 if __name__ == "__main__":

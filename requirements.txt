@@ -4,3 +4,8 @@
 # uvicorn>=0.30
 # sqlalchemy>=2.0
 # pytest>=8.0
+
+# تقارير PDF العربية (تم تفعيلها)
+reportlab>=4.0
+arabic_reshaper>=3.0
+python-bidi>=0.4

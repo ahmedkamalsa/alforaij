@@ -264,6 +264,65 @@ button:hover {
   padding-right: 12px;
 }
 
+.analysis-badge {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+.analysis-badge.ai {
+  background: var(--green-soft);
+  color: var(--green);
+  border: 1px solid #b7dfc2;
+}
+
+.analysis-badge.local {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border: 1px solid #ead59a;
+}
+
+.scope-note {
+  display: inline-block;
+  margin: 4px 0 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scope-note[hidden] {
+  display: none;
+}
+
+.collapsible {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--panel);
+}
+
+.collapsible summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--blue);
+}
+
+.collapsible > *:not(summary) {
+  margin-top: 10px;
+}
+
+.insight-panel .collapsible {
+  align-self: start;
+}
+
 .source-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -307,7 +366,18 @@ button:hover {
 .source-card.search_links,
 .source-card.no_results,
 .source-card.page_reachable,
-.source-card.pending {
+.source-card.pending,
+.source-card.no_data {
+  border-color: #ead59a;
+  background: var(--amber-soft);
+}
+
+.source-card.done {
+  border-color: #b7dfc2;
+  background: var(--green-soft);
+}
+
+.source-card.partial {
   border-color: #ead59a;
   background: var(--amber-soft);
 }
@@ -606,6 +676,357 @@ summary {
   border: 1px dashed var(--line);
   border-radius: 8px;
 }
+
+/* ========== أفضل الفرص والتوقعات ========== */
+.opportunities-panel {
+  padding: 16px;
+  border: 1px solid #c8d8f0;
+  background: linear-gradient(180deg, #fbfdff 0%, #fff 100%);
+}
+
+.opp-head {
+  align-items: center;
+}
+
+.opp-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.opp-updated {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--green-soft);
+  border: 1px solid #b7dfc2;
+  border-radius: 8px;
+  padding: 5px 9px;
+}
+
+.opp-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.opp-tab {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.opp-tab:hover {
+  border-color: var(--blue);
+}
+
+.opp-tab.active {
+  background: #101828;
+  border-color: #101828;
+  color: #fff;
+}
+
+.opp-filters summary {
+  color: var(--ink);
+}
+
+.opp-filter-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.opp-filter-fields select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.official-note {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #ead59a;
+  background: var(--amber-soft);
+  color: var(--amber);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.8;
+  font-weight: 700;
+}
+
+.official-note[hidden] {
+  display: none;
+}
+
+.opp-card {
+  border-color: #c8d8f0;
+  background: #fff;
+}
+
+.opp-rank {
+  background: var(--blue);
+}
+
+.opp-verdict {
+  border-color: #c8d8f0;
+}
+
+.opp-clients {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed #b7dfc2;
+  background: var(--green-soft);
+  border-radius: 8px;
+}
+
+.opp-clients > strong {
+  color: var(--green);
+}
+
+.opp-client {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #d9ecdd;
+  font-size: 13px;
+}
+
+.opp-client span {
+  display: block;
+  font-weight: 700;
+}
+
+.opp-client code {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 3px 8px;
+  background: #fff;
+  border: 1px solid #b7dfc2;
+  border-radius: 6px;
+  color: var(--green);
+  font-weight: 800;
+}
+
+.client-msg {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.forecast-card {
+  border-color: #e2d9b8;
+}
+
+.forecast-rank {
+  background: #9a6700;
+}
+
+.opp-direction {
+  font-weight: 800;
+}
+
+.opp-direction.up {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.opp-direction.down {
+  background: #fff1f0;
+  color: var(--red);
+}
+
+.opp-direction.flat {
+  background: var(--panel);
+  color: var(--muted);
+}
+
+/* ========== العملاء + تنبيهات واتساب + الأداء الزمني ========== */
+.client-form {
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid #b7cdf4;
+  background: var(--blue-soft);
+  border-radius: 8px;
+}
+
+.client-form h3 {
+  margin-bottom: 4px;
+  color: var(--blue);
+}
+
+.client-list-head {
+  margin: 12px 0 8px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.client-list {
+  display: grid;
+  gap: 8px;
+}
+
+.client-row {
+  display: grid;
+  grid-template-columns: minmax(90px, .6fr) minmax(130px, 1fr) minmax(110px, .8fr) minmax(140px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.client-row code {
+  padding: 4px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.wa-open {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #25d366;
+  color: #fff;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wa-open:hover {
+  filter: brightness(.94);
+}
+
+.alert-card {
+  border-color: #ead59a;
+  background: #fffdf5;
+}
+
+.alert-card .client-msg {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px dashed #ead59a;
+  background: #fff;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+.alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.alert-phones code {
+  padding: 4px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.copy-btn {
+  padding: 6px 12px;
+  background: #101828;
+  color: #fff;
+  border-color: #101828;
+}
+
+.copy-btn:hover {
+  filter: brightness(1.15);
+  border-color: #101828;
+}
+
+.old-price {
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hist-chart {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow-x: auto;
+}
+
+.hist-chart svg {
+  width: 100%;
+  min-width: 520px;
+  height: auto;
+}
+
+.hist-date {
+  font-size: 11px;
+  fill: var(--muted);
+}
+
+.hist-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hist-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hist-legend-item i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.hist-legend-item .opp-direction {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+/* Chat panel styles */
+.chat-panel { padding: 12px; }
+.chat-window {
+  height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+.chat-message { margin: 8px 0; display:block; }
+.chat-message .bubble { display: inline-block; max-width: 100%; padding: 10px 12px; border-radius: 12px; }
+.chat-message.user .bubble { background: #eaf7ff; border: 1px solid #b7cdf4; color: var(--blue); float: right; }
+.chat-message.assistant .bubble { background: #f6f9f6; border: 1px solid #e6efe6; color: var(--ink); float: left; }
+.chat-message .meta { font-size: 11px; color: var(--muted); margin-top:6px; }
+.chat-controls { display:flex; gap:8px; margin-top:10px; }
+.chat-controls input[type=text] { flex:1; padding:10px; border-radius:8px; border:1px solid var(--line); }
+.chat-controls button { padding:10px 14px; }
+.chat-options { display:flex; gap:10px; margin-top:10px; font-size:13px; color:var(--muted); }
+.chat-results-preview { margin-top:8px; font-weight:700; }
+.compact-actions { margin-top:10px; display:flex; gap:8px; }
 
 @media (max-width: 1120px) {
   .workspace,

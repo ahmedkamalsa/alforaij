@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import json
 import urllib.request
-import urllib.error
 from dataclasses import asdict
+from statistics import median
 
 from backend.config import AGENT_ROUTER_API_KEY, AGENT_ROUTER_API_URL
 from backend.models import PropertyRequest, RankedListing
 
-def generate_professional_analysis(
+
+AI_TIMEOUT_SECONDS = 12  # مهلة قصيرة حتى لا يعلق التحليل عند تعذر الاتصال
+
+
+def _call_ai_analysis(
     request: PropertyRequest,
     top_listings: list[RankedListing],
-    external_statuses: list[dict]
+    external_statuses: list[dict],
 ) -> dict | None:
+    """استدعاء نموذج الذكاء الاصطناعي الخارجي. يعيد None عند غياب المفتاح أو فشل الاتصال."""
     if not AGENT_ROUTER_API_KEY:
         return None
 
@@ -33,7 +38,7 @@ def generate_professional_analysis(
             "valuation_label": item.valuation_label,
             "valuation_reason": item.valuation_reason,
         })
-        
+
     sources_data = [{"name": s.get("name"), "status": s.get("status"), "records": s.get("records")} for s in external_statuses]
 
     prompt = f"""أنت مستشار عقاري كويتي محترف ومحلل بيانات خبير.
@@ -55,31 +60,112 @@ def generate_professional_analysis(
 """
 
     payload = {
-        "model": "gpt-4o-mini", # Standard model
+        "model": "gpt-4o-mini",  # Standard model
         "messages": [
             {"role": "system", "content": "You are a professional real estate consultant. Always respond in valid JSON format."},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ],
         "response_format": {"type": "json_object"},
-        "temperature": 0.4
+        "temperature": 0.4,
     }
 
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {AGENT_ROUTER_API_KEY}"
+        "Authorization": f"Bearer {AGENT_ROUTER_API_KEY}",
     }
 
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(AGENT_ROUTER_API_URL, data=data, headers=headers, method="POST")
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, timeout=AI_TIMEOUT_SECONDS) as response:
             result = json.loads(response.read().decode("utf-8"))
             if "choices" in result and len(result["choices"]) > 0:
                 content = result["choices"][0]["message"]["content"]
-                return json.loads(content)
+                parsed = json.loads(content)
+                if isinstance(parsed, dict) and parsed.get("executive_summary"):
+                    return parsed
     except Exception as e:
         print(f"AI Evaluator Error: {e}")
-        return None
-    
     return None
+
+
+def fallback_professional_analysis(
+    request: PropertyRequest,
+    top_listings: list[RankedListing],
+    external_statuses: list[dict],
+) -> dict:
+    """تحليل احترافي محلي (بدون API) يضمن نتيجة مهنية دائمًا حتى عند غياب المفتاح أو فشل الاتصال."""
+    top = top_listings[:5]
+    areas = "، ".join(dict.fromkeys(item.listing.area for item in top if item.listing.area)) or "غير محددة"
+
+    summary_parts: list[str] = []
+    if top:
+        best = top[0]
+        price_display = best.listing.price_text or "غير معلن"
+        summary_parts.append(
+            f"أفضل توصية حسب البيانات المتاحة هي {best.listing.code} في {best.listing.area or areas} "
+            f"بسعر {price_display}، وحكم السعر «{best.valuation_label}» بثقة {int(best.confidence * 100)}%."
+        )
+    else:
+        summary_parts.append("لم تتوفر عروض مطابقة كافية داخل البيانات الحالية لتكوين توصية سعرية موثوقة.")
+
+    medians = [item.market_median for item in top if item.market_median]
+    if medians:
+        representative = median(medians)
+        summary_parts.append(f"وسيط أسعار المقارنات المتاح يقارب {representative:,.0f} د.ك.")
+    summary_parts.append("التقييم استرشادي مبني على العروض المتاحة وقت البحث وليس تقييمًا رسميًا.")
+
+    evidence_parts: list[str] = []
+    working = [s for s in external_statuses if s.get("status") in ("success", "connected") or s.get("records")]
+    if working:
+        evidence_parts.append(
+            "المصادر الحية التي أسهمت بنتائج: " + "، ".join(str(s.get("name")) for s in working) + "."
+        )
+    else:
+        evidence_parts.append(
+            "لم تسهم المصادر الخارجية بنتائج مطابقة وقت البحث؛ اعتمد التحليل على بيانات الفريج المحلية."
+        )
+    failed = [s for s in external_statuses if s.get("status") == "failed"]
+    if failed:
+        evidence_parts.append(
+            "تعذر الوصول إلى: " + "، ".join(str(s.get("name")) for s in failed) + " (قد يكون حظرًا مؤقتًا أو تغييرًا في بنية الموقع)."
+        )
+
+    missing_parts = [
+        "صفقات وزارة العدل الرسمية لنفس المنطقة ونوع العقار",
+        "مساحات ومواصفات دقيقة لجميع العروض المقارنة",
+        "سعر المتر الرسمي للمنطقة عند توفر قاعدة بيانات موثوقة",
+    ]
+    if not top:
+        missing_parts.append("عروض مطابقة إضافية (توسيع نطاق المناطق أو تعديل الفلاتر)")
+
+    suggestions_parts = [
+        "التحقق من الصفقات الرسمية الأحدث قبل اتخاذ قرار الشراء",
+        "معاينة العقار فعليًا والتأكد من الواجهة والمساحة والموقع",
+        "التفاوض على السعر استنادًا إلى وسيط المقارنات المعروض في كل نتيجة",
+    ]
+    if request.budget:
+        suggestions_parts.append("متابعة الإعلانات الجديدة ضمن الميزانية المحددة في التقرير")
+
+    return {
+        "executive_summary": " ".join(summary_parts),
+        "sources_evidence": " ".join(evidence_parts),
+        "missing_data": "؛ ".join(missing_parts),
+        "suggestions": "؛ ".join(suggestions_parts),
+    }
+
+
+def generate_professional_analysis(
+    request: PropertyRequest,
+    top_listings: list[RankedListing],
+    external_statuses: list[dict],
+) -> dict:
+    """تحليل احترافي: يحاول AI أولاً، ويعود تلقائيًا لتحليل محلي احترافي عند غياب المفتاح أو فشل الاتصال."""
+    ai = _call_ai_analysis(request, top_listings, external_statuses)
+    if ai:
+        ai["analysisMethod"] = "ai"
+        return ai
+    fallback = fallback_professional_analysis(request, top_listings, external_statuses)
+    fallback["analysisMethod"] = "local"
+    return fallback

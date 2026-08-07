@@ -55,24 +55,33 @@ def build_report(
     ai_insights: dict | None = None,
 ) -> dict:
     top = items[0] if items else None
+    scope_note = "، ".join(request.areas) if request.areas else "كل المناطق"
     summary = "لم يتم العثور على نتائج كافية داخل بيانات الفريج."
     if top:
         summary = (
             f"أفضل نتيجة مبدئية هي {top.listing.code} في {top.listing.area} "
             f"بسعر {top.listing.price_text or 'غير معلن'}، وحكم السعر: {top.valuation_label}. "
             f"درجة التوصية {int(top.recommendation_score)} من 100، والثقة {int(top.confidence * 100)}% "
-            f"اعتمادًا على {len(top.comparables)} مقارنة متاحة."
+            f"اعتمادًا على {len(top.comparables)} مقارنة متاحة"
+            + (" داخل المنطقة المطلوبة." if request.areas else " داخل البيانات المتاحة.")
         )
 
     external_plan = [
-        {"name": "توسيع Q8Aqar", "status": "الخطوة التالية", "action": "قراءة صفحات التفاصيل نفسها لاستخراج السعر والمساحة بدل رابط فقط عند توفرها."},
-        {"name": "Sakan", "status": "يحتاج endpoint أو API", "action": "لا يدخل في التقييم حتى نحصل على بيانات إعلان تفصيلية لا مجرد عداد صفحة."},
-        {"name": "صفقات رسمية", "status": "أعلى أولوية للتقييم", "action": "استيراد صفقات وزارة العدل/مصدر رسمي إلى Supabase واستخدامها كوسيط سوق مرجح."},
+        {"name": "توسيع Q8Aqar", "status": "منفذ ✓", "action": "يقرأ الآن صفحات التفاصيل نفسها لتحسين السعر والمساحة بدل الرابط فقط، مع الإبقاء على العنوان كأساس."},
+        {"name": "Sakan", "status": "منفذ جزئيًا", "action": "يحاول الآن استخراج الإعلانات من الحالة المضمّنة في الصفحة عند توفرها، وإلا يبقى دليل توفر وعدد متاح."},
+        {"name": "الصفقات الرسمية", "status": "منفذ ✓", "action": "تُقرأ من جدول official_transactions في Supabase وملف محلي، وتُستخدم كوسيط سوق مرجّح أعلى من الإعلانات في التقييم (أعلى مصداقية)."},
+        {"name": "منصات توسعة جديدة", "status": "منفذ ✓", "action": "أُضيف Aqarat و4Sale كموصلين حيين بنفس قواعد الفلترة والدليل، ومرورهما بسجل تشغيل المصادر."},
+        {"name": "مصادر مكاتب / API شريك", "status": "الخطوة التالية", "action": "ربط API أو Feed من مكاتب عقارية عند توفره، ثم تمريره بنفس فلاتر الدليل وتسجيل التشغيل."},
     ]
 
     if ai_insights:
         # Build a richer summary from AI insights
-        rich_summary = f"**تحليل الخبير العقاري:**\n{ai_insights.get('executive_summary', '')}\n\n"
+        analysis_heading = (
+            "تحليل الخبير العقاري (ذكاء اصطناعي)"
+            if ai_insights.get("analysisMethod") == "ai"
+            else "تحليل محلي احترافي"
+        )
+        rich_summary = f"**{analysis_heading}:**\n{ai_insights.get('executive_summary', '')}\n\n"
         rich_summary += f"**الأدلة والمصادر المستعملة:**\n{ai_insights.get('sources_evidence', '')}\n\n"
         rich_summary += f"**اقتراحات للعميل:**\n{ai_insights.get('suggestions', '')}"
         summary = rich_summary
@@ -87,6 +96,16 @@ def build_report(
 
     return {
         "request": asdict(request),
+        "aiInsights": ai_insights or {},
+        "searchScope": {
+            "areas": request.areas,
+            "note": (
+                f"تم حصر البحث والتقييم في المناطق المطلوبة فقط: {scope_note}"
+                if request.areas
+                else "لم يحدد الطلب منطقة، فشمل البحث كل المناطق المتاحة."
+            ),
+        },
+        "analysisMethod": (ai_insights or {}).get("analysisMethod", "none"),
         "rankingMethod": {
             "title": "طريقة ترتيب النتائج",
             "note": "الترتيب ليس حسب الثقة وحدها. درجة التوصية تجمع مطابقة الطلب، جاذبية السعر مقابل وسيط المقارنات، درجة الثقة، وخصم البيانات الناقصة.",

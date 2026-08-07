@@ -13,6 +13,22 @@ def load_benchmarks() -> dict[str, float]:
 
 AREA_BENCHMARKS = load_benchmarks()
 
+def derive_market_benchmark(area_name: str, listings: list | None) -> tuple[float | None, int]:
+    """اشتقاق وسيط سعر المتر من الإعلانات الفعلية في المنطقة عند غياب معيار رسمي.
+
+    يعيد (سعر المتر الوسيط، عدد الأدلة المستخدمة). حتمي بالكامل — لا عشوائية.
+    """
+    if not area_name or not listings:
+        return None, 0
+    rates = []
+    for listing in listings:
+        if listing.area == area_name and listing.price and listing.space:
+            rates.append(listing.price / listing.space)
+    if not rates:
+        return None, 0
+    rates.sort()
+    return rates[len(rates) // 2], len(rates)
+
 def get_area_benchmark(area_name: str) -> float | None:
     """إرجاع وسيط سعر المتر للمنطقة بناءً على الاسم أو الاسم البديل."""
     if not area_name:

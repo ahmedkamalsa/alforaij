@@ -15,9 +15,9 @@ KNOWN_AREAS = [
     # محافظة العاصمة
     "الديرة", "القبلة", "الشرق", "مرقاب", "كيفان", "الدسمة",
     "الروضة", "الخالدية", "الفيحاء", "اليرموك", "القادسية",
-    "النزهة", "الأندلس", "الاندلس", "الشويخ", "الصليبخات",
+    "النهضة", "الأندلس", "الاندلس", "الشويخ", "الصليبخات",
     "الريان", "العديلية", "غرناطة", "إشبيلية", "اشبيلية",
-    "الشامية", "الصوابر", "دسمة", "نزهة", "ضاحية عبدالله السالم",
+    "الشامية", "الصوابر", "دسمة", "ضاحية عبدالله السالم",
     "عبدالله السالم", "قرطبة", "بنيد القار", "مطرف",
     # محافظة حولي
     "السالمية", "الجابرية", "حولي", "الرميثية", "بيان",
@@ -55,6 +55,24 @@ for _a in KNOWN_AREAS:
 KNOWN_AREAS = _unique
 
 # ─────────────────────────────────────────────
+# دمج المناطق الفعلية الموجودة في البيانات المحلية تلقائيًا
+# حتى لا يفشل اكتشاف المنطقة (مثل: النهضة) ويبحث النظام في كل المناطق
+# ─────────────────────────────────────────────
+try:
+    from backend.config import SEED_LISTINGS_PATH
+
+    if SEED_LISTINGS_PATH.exists():
+        import json as _json
+
+        _records = _json.loads(SEED_LISTINGS_PATH.read_text(encoding="utf-8"))
+        for _row in _records:
+            _area = str(_row.get("area") or "").strip()
+            if _area and _area not in KNOWN_AREAS:
+                KNOWN_AREAS.append(_area)
+except Exception:
+    pass  # في غياب البيانات نكتفي بالقائمة الثابتة
+
+# ─────────────────────────────────────────────
 # أسماء بديلة (Aliases) لكل منطقة
 # ─────────────────────────────────────────────
 AREA_ALIASES: dict[str, list[str]] = {
@@ -85,6 +103,7 @@ AREA_ALIASES: dict[str, list[str]] = {
     "الأحمدي": ["احمدي", "ahmadi", "al-ahmadi"],
     "الجهراء": ["جهراء", "jahra", "al-jahra"],
     "الفروانية": ["فروانية", "farwaniya", "farwaniyya"],
+    "النهضة": ["نزهة", "النزهه", "نزهه", "النهضه", "nuzha", "al-nuzha", "النزهة"],
 }
 
 PROPERTY_TYPES = {
@@ -182,26 +201,49 @@ def parse_money(text: str) -> float | None:
     return None
 
 
-def extract_area_range(text: str) -> tuple[float | None, float | None, dict[str, float]]:
+def excluded_numbers(text: str) -> dict[str, float]:
+    """استخراج أرقام المستثناة من المساحة (ارتداد، واجهة، عرض شارع)."""
     text = normalize_text(text)
     excluded: dict[str, float] = {}
     for label in ("ارتداد", "واجهه", "واجهة", "شارع عرض", "عرض الشارع"):
         match = re.search(rf"{label}\s*([0-9]+(?:\.[0-9]+)?)\s*(?:متر|م)", text)
         if match:
             excluded[label] = float(match.group(1))
+    return excluded
+
+
+def _follows_exclusion(text: str, pos: int, spans: list[tuple[int, int]]) -> bool:
+    """هل يقع موضع الرقم داخل نطاق واجهة/ارتداد/عرض شارع أو ملاصق له مباشرة؟"""
+    for start, end in spans:
+        if start <= pos <= end:
+            return True
+        if pos > end and not text[end:pos].strip():
+            return True
+    return False
+
+
+def extract_area_range(text: str) -> tuple[float | None, float | None, dict[str, float]]:
+    text = normalize_text(text)
+    excluded: dict[str, float] = {}
+    exclusion_spans: list[tuple[int, int]] = []
+    for label in ("ارتداد", "واجهه", "واجهة", "شارع عرض", "عرض الشارع"):
+        for match in re.finditer(rf"{label}\s*([0-9]+(?:\.[0-9]+)?)\s*(?:متر|م)", text):
+            if label not in excluded:
+                excluded[label] = float(match.group(1))
+            exclusion_spans.append(match.span())
 
     range_match = re.search(r"(?:مساحه|المساحه)\s*(?:من)?\s*([0-9]+)\s*(?:الى|إلى|-)\s*([0-9]+)", text)
     if range_match:
         return float(range_match.group(1)), float(range_match.group(2)), excluded
 
-    # دعم كسور عشرية مثل 487.5م²
-    exact_match = re.search(
-        r"(?:مساحه|المساحه|مساحتها|مساحته|المساحة|مساحة)?\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:متر|م2|م²|م\s*²|متر مربع|م(?:\s|$))",
-        text,
+    # دعم كسور عشرية مثل 487.5م² (مع استبعاد أرقام الواجهة/الارتداد/عرض الشارع)
+    exact_pattern = re.compile(
+        r"(?:مساحه|المساحه|مساحتها|مساحته|المساحة|مساحة)?\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:متر|م2|م²|م\s*²|متر مربع|م(?:\s|$))"
     )
-    if exact_match:
-        value = float(exact_match.group(1))
-        return value, value, excluded
+    for match in exact_pattern.finditer(text):
+        if not _follows_exclusion(text, match.start(), exclusion_spans):
+            value = float(match.group(1))
+            return value, value, excluded
 
     return None, None, excluded
 
