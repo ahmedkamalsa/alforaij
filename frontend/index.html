@@ -16,37 +16,46 @@
   </header>
 
   <main class="workspace">
-    <aside class="request-panel">
+    <aside class="request-panel chat-panel">
       <div class="section-title">
-        <h2>طلب البحث</h2>
-        <span>تحليل قابل للتعديل</span>
+        <h2>مربع البحث الذكي (شات)</h2>
+        <span>اسأل، اطلع على الإجابات، وحسّن البحث من نفس المكان</span>
       </div>
 
-      <textarea id="requestText" rows="8" spellcheck="false">مطلوب بيت في المطلاع مساحة من 400 إلى 500 متر، هدام أو صالح للسكن، الميزانية حتى 350 ألف، ويفضل شارع واحد.</textarea>
-
-      <div class="mode-row" role="group" aria-label="نمط العملية">
-        <button class="mode active" data-mode="search_and_value">بحث وتقييم</button>
-        <button class="mode" data-mode="search">بحث</button>
-        <button class="mode" data-mode="valuation">تقييم</button>
+      <div id="chatWindow" class="chat-window" aria-live="polite">
+        <!-- messages will be injected here -->
       </div>
 
-      <div class="actions">
-        <button id="analyzeBtn" class="primary">تحليل الطلب</button>
-        <button id="runBtn">تشغيل النتائج</button>
-        <button id="externalBtn" disabled>فتح المصادر الخارجية</button>
-        <button id="printBtn">طباعة</button>
+      <div class="chat-controls">
+        <input id="chatInput" type="text" placeholder="اكتب سؤالك أو الوصف هنا... مثال: بيت 400م في ابو فطيرة، تشطيب سوبر ديلوكس" autocomplete="off">
+        <button id="sendChatBtn" class="primary">إرسال</button>
       </div>
 
-      <div class="fields">
-        <label>نوع العملية<input id="transactionField" type="text"></label>
-        <label>نوع العقار<input id="typeField" type="text"></label>
-        <label class="wide">المناطق<input id="areasField" type="text"></label>
-        <label>أقل مساحة<input id="minAreaField" type="number" min="0"></label>
-        <label>أعلى مساحة<input id="maxAreaField" type="number" min="0"></label>
-        <label>ميزانية البيع<input id="budgetField" type="number" min="0"></label>
-        <label>ميزانية الإيجار<input id="rentBudgetField" type="number" min="0"></label>
-        <label>عدد الغرف<input id="bedroomsField" type="number" min="0"></label>
+      <div class="chat-options">
+        <label><input type="radio" name="scope" value="company" checked> البحث في الفريج فقط</label>
+        <label><input type="radio" name="scope" value="all"> البحث في كل الشركات</label>
+        <label class="compact"><input id="includeExternal" type="checkbox" checked> تفعيل مصادر خارجية</label>
       </div>
+
+      <div class="actions compact-actions">
+        <button id="clearChatBtn">مسح الشات</button>
+        <button id="downloadReportBtnTop">تنزيل آخر تقرير (JSON)</button>
+        <button id="downloadPdfBtnTop" class="primary">تنزيل تقرير PDF</button>
+      </div>
+
+      <details class="advanced-fields">
+        <summary>خيارات متقدمة</summary>
+        <div class="fields">
+          <label>نوع العملية<input id="transactionField" type="text"></label>
+          <label>نوع العقار<input id="typeField" type="text"></label>
+          <label class="wide">المناطق<input id="areasField" type="text"></label>
+          <label>أقل مساحة<input id="minAreaField" type="number" min="0"></label>
+          <label>أعلى مساحة<input id="maxAreaField" type="number" min="0"></label>
+          <label>ميزانية البيع<input id="budgetField" type="number" min="0"></label>
+          <label>ميزانية الإيجار<input id="rentBudgetField" type="number" min="0"></label>
+          <label>عدد الغرف<input id="bedroomsField" type="number" min="0"></label>
+        </div>
+      </details>
     </aside>
 
     <section class="main-panel">
@@ -68,17 +77,74 @@
           <strong id="persistenceStatus">-</strong>
         </div>
         <button id="downloadReportBtn">حفظ التقرير JSON</button>
+        <button id="downloadPdfBtn" class="primary">تنزيل تقرير PDF</button>
       </section>
 
       <section class="insight-panel">
         <div>
-          <h2>الخلاصة</h2>
+          <h2>الخلاصة <span id="analysisBadge" class="analysis-badge"></span></h2>
+          <p id="searchScopeNote" class="scope-note" hidden></p>
           <p id="summaryText">لم يتم تشغيل تحليل بعد.</p>
         </div>
-        <div class="method-box">
-          <h3>طريقة الترتيب</h3>
-          <p id="rankingMethod">بعد تشغيل البحث ستظهر طريقة حساب درجة التوصية.</p>
+        <details class="collapsible">
+          <summary>طريقة الترتيب والحساب</summary>
+          <div class="method-box">
+            <h3>طريقة الترتيب</h3>
+            <p id="rankingMethod">بعد تشغيل البحث ستظهر طريقة حساب درجة التوصية.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="opportunities-panel">
+        <div class="section-title opp-head">
+          <div>
+            <h2>أفضل الفرص والتوقعات</h2>
+            <span>يومية / أسبوعية / شهرية / سنوية + توقعات الأسعار، بربط مباشر بالعملاء المحتملين</span>
+          </div>
+          <div class="opp-head-actions">
+            <span id="oppUpdated" class="opp-updated"></span>
+            <button id="oppRefreshBtn" class="primary">تحديث الآن</button>
+          </div>
         </div>
+
+        <div class="opp-tabs" id="oppTabs" role="tablist">
+          <button class="opp-tab active" data-tier="daily" role="tab">يومية</button>
+          <button class="opp-tab" data-tier="weekly" role="tab">أسبوعية</button>
+          <button class="opp-tab" data-tier="monthly" role="tab">شهرية</button>
+          <button class="opp-tab" data-tier="yearly" role="tab">سنوية</button>
+          <button class="opp-tab" data-tier="forecast" role="tab">التوقعات</button>
+          <button class="opp-tab" data-tier="clients" role="tab">العملاء</button>
+          <button class="opp-tab" data-tier="alerts" role="tab">تنبيهات واتساب</button>
+          <button class="opp-tab" data-tier="history" role="tab">الأداء الزمني</button>
+        </div>
+
+        <details class="collapsible opp-filters">
+          <summary>الفلاتر (المحافظة / المنطقة / نوع العقار / السعر)</summary>
+          <div class="fields opp-filter-fields">
+            <label>المحافظة
+              <select id="oppGovFilter"><option value="">الكل</option></select>
+            </label>
+            <label>المنطقة
+              <select id="oppAreaFilter"><option value="">الكل</option></select>
+            </label>
+            <label>نوع العقار
+              <select id="oppTypeFilter"><option value="">الكل</option></select>
+            </label>
+            <label>أقل سعر (د.ك)
+              <input id="oppMinPrice" type="number" min="0" placeholder="0">
+            </label>
+            <label>أعلى سعر (د.ك)
+              <input id="oppMaxPrice" type="number" min="0" placeholder="—">
+            </label>
+            <label>الحد الأدنى لدرجة الفرصة
+              <input id="oppMinScore" type="number" min="0" max="100" placeholder="0">
+            </label>
+          </div>
+        </details>
+
+        <p id="oppOfficialNote" class="official-note" hidden></p>
+        <p id="oppConfidenceMethod" class="scope-note" hidden></p>
+        <div id="oppList" class="results"></div>
       </section>
 
       <section class="sources-panel">
@@ -87,11 +153,17 @@
           <span>المتصل والناقص</span>
         </div>
         <div id="sourceStatus" class="source-grid"></div>
-        <div id="externalSourcePlan" class="source-grid muted-grid"></div>
-        <div class="registry-wrap">
-          <h3>منصات الاعتماد</h3>
-          <div id="sourceRegistry" class="registry-table"></div>
-        </div>
+        <details class="collapsible">
+          <summary>الخطة المستقبلية للمصادر</summary>
+          <div id="externalSourcePlan" class="source-grid muted-grid"></div>
+        </details>
+        <details class="collapsible">
+          <summary>منصات الاعتماد (تفاصيل)</summary>
+          <div class="registry-wrap">
+            <h3>منصات الاعتماد</h3>
+            <div id="sourceRegistry" class="registry-table"></div>
+          </div>
+        </details>
         <div id="externalLinks" class="external-links"></div>
       </section>
 

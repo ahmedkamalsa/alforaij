@@ -4,14 +4,17 @@ import gzip
 import html
 import json
 import re
+import threading
 import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+from backend.connectors.official_data import search as search_official_transactions
 from backend.models import Listing, PropertyRequest
 from backend.services.request_parser import KNOWN_AREAS as REQUEST_KNOWN_AREAS
-from backend.services.request_parser import PROPERTY_TYPES, normalize_text, detect_seller_type, extract_area_range, text_has_area
+from backend.services.request_parser import PROPERTY_TYPES, normalize_text, detect_seller_type, extract_area_range, excluded_numbers, text_has_area
 
 
 USER_AGENT = (
@@ -20,6 +23,13 @@ USER_AGENT = (
     "Chrome/126.0.0.0 Safari/537.36"
 )
 TIMEOUT = 12
+MAX_ATTEMPTS = 2
+RETRY_DELAY = 0.6
+
+_FetchResult = tuple[str, int, float, str | None]
+_fetch_cache: dict[tuple[str, tuple[tuple[str, str], ...]], tuple[float, _FetchResult]] = {}
+_fetch_cache_lock = threading.Lock()
+CACHE_TTL_SECONDS = 900  # 15 دقيقة
 
 AREA_SLUGS = {
     "المطلاع": {"q8aqar": "mutlae", "sakan_governorate": "Jahra", "sakan_city": "almutlaa", "mourjan_q": "المطلاع"},
@@ -63,7 +73,15 @@ KNOWN_AREAS = list(dict.fromkeys(list(AREA_SLUGS.keys()) + REQUEST_KNOWN_AREAS +
 
 
 def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[str, int, float, str | None]:
-    """Fetch URL with gzip support and a modern browser User-Agent."""
+    """Fetch URL with retries, gzip support, a short cache, and a modern browser User-Agent."""
+    # مفتاح التخزين يتضمن الرؤوس حتى لا تتصادم طلبات مختلفة لنفس الرابط
+    cache_key = (url, tuple(sorted((extra_headers or {}).items())))
+    # Cache hit (يمنع إعادة جلب نفس الصفحة في نفس الجلسة)
+    with _fetch_cache_lock:
+        cached = _fetch_cache.get(cache_key)
+        if cached and time.time() - cached[0] < CACHE_TTL_SECONDS:
+            return cached[1]
+
     started = time.perf_counter()
     headers: dict[str, str] = {
         "User-Agent": USER_AGENT,
@@ -74,20 +92,32 @@ def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[st
     }
     if extra_headers:
         headers.update(extra_headers)
-    request = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-            raw = response.read()
-            ce = response.headers.get("Content-Encoding", "")
-            if ce == "gzip" or (raw and raw[:2] == b"\x1f\x8b"):
-                try:
-                    raw = gzip.decompress(raw)
-                except Exception:
-                    pass
-            body = raw.decode("utf-8", errors="replace")
-            return body, response.status, round((time.perf_counter() - started) * 1000, 1), None
-    except Exception as exc:
-        return "", 0, round((time.perf_counter() - started) * 1000, 1), str(exc)
+
+    last_error: str | None = None
+    last_ms = round((time.perf_counter() - started) * 1000, 1)
+    for attempt in range(MAX_ATTEMPTS):
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+                raw = response.read()
+                ce = response.headers.get("Content-Encoding", "")
+                if ce == "gzip" or (raw and raw[:2] == b"\x1f\x8b"):
+                    try:
+                        raw = gzip.decompress(raw)
+                    except Exception:
+                        pass
+                body = raw.decode("utf-8", errors="replace")
+                result = (body, response.status, round((time.perf_counter() - started) * 1000, 1), None)
+                with _fetch_cache_lock:
+                    _fetch_cache[cache_key] = (time.time(), result)
+                return result
+        except Exception as exc:
+            last_error = str(exc)
+            last_ms = round((time.perf_counter() - started) * 1000, 1)
+            if attempt < MAX_ATTEMPTS - 1:
+                time.sleep(RETRY_DELAY)
+    result = ("", 0, last_ms, last_error)
+    return result
 
 
 def clean_text(value: str) -> str:
@@ -155,6 +185,7 @@ def parse_space(text: str) -> float | None:
 def extract_space_from_title(text: str) -> float | None:
     """Extract space from short listing titles like 'بيت 400م' or 'مساحة 375 م'."""
     normalized = normalize_text(text)
+    excluded_values = set(excluded_numbers(normalized).values())
     # Pattern: number followed by م or متر
     patterns = [
         r"مساح[هة]\s*([0-9]+(?:\.[0-9]+)?)\s*م",
@@ -162,10 +193,9 @@ def extract_space_from_title(text: str) -> float | None:
         r"([0-9]+)\s*(?:متر مربع|م مربع)",
     ]
     for p in patterns:
-        m = re.search(p, normalized)
-        if m:
+        for m in re.finditer(p, normalized):
             val = float(m.group(1))
-            if 100 <= val <= 10000:  # Reasonable space range
+            if 100 <= val <= 10000 and val not in excluded_values:  # Reasonable space range, ليس واجهة/ارتداد
                 return val
     return None
 
@@ -517,6 +547,7 @@ def search_q8aqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
 
     # Pattern: anchor tags with full detail URLs
     seen_codes: set[str] = set()
+    raw_items: list[tuple[str, str, str]] = []  # (href, title_clean, code)
     for href, title_html in re.findall(
         r'<a\s+href="(https://q8aqar\.com/details/realestate/[0-9]+/)"[^>]*>(.*?)</a>',
         body,
@@ -530,8 +561,26 @@ def search_q8aqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
         if code in seen_codes:
             continue
         seen_codes.add(code)
+        raw_items.append((href, title_clean, code))
+
+    # توسيع Q8Aqar: قراءة صفحات التفاصيل نفسها لتحسين السعر/المساحة (فقط لما تكون ناقصة أو محتاجة تحقق)
+    # نقتصر على العناصر التي تفتقر للسعر أو المساحة لئلا نطيل زمن التحليل بلا فائدة
+    need_detail = [
+        href for href, _t, _c in raw_items
+        if not (extract_price_from_title(_t) or parse_price(_t)) or not extract_space_from_title(_t)
+    ]
+    detail = search_q8aqar_details(need_detail) if need_detail else {}
+    detail_linked = 0
+    for href, title_clean, code in raw_items:
         price = extract_price_from_title(title_clean) or parse_price(title_clean)
         space = extract_space_from_title(title_clean)
+        extra_price, extra_space = detail.get(href, (None, None))
+        if extra_price and (not price or abs(extra_price - price) / price > 0.05):
+            price = extra_price
+            detail_linked += 1
+        if extra_space and not space:
+            space = extra_space
+            detail_linked += 1
         listing = listing_from_text(
             source="Q8Aqar",
             code=code,
@@ -546,6 +595,10 @@ def search_q8aqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
         if request_matches_listing(request, listing):
             listings.append(listing)
 
+    note = f"تم فحص {candidates} رابطًا"
+    if detail:
+        note += f"، وقراءة {len(detail)} صفحة تفاصيل (تحسين السعر/المساحة في {detail_linked} حالة)"
+    note += ". السعر والمساحة تُستخرج من العنوان ثم تُحسَّن من صفحات التفاصيل عند توفرها."
     return listings[:20], {
         "name": "Q8Aqar",
         "status": "success" if listings else ("no_results" if not error else "failed"),
@@ -553,47 +606,7 @@ def search_q8aqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
         "candidates": candidates,
         "responseMs": ms,
         "url": url,
-        "note": error or f"تم فحص {candidates} رابطًا. السعر والمساحة تُستخرج من نص عنوان الإعلان مباشرة.",
-    }
-
-
-def search_sakan(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
-    """
-    Sakan uses JavaScript rendering; the public HTML page doesn't contain listing data.
-    We fetch the page to get a count of available properties and provide a direct deep link.
-    """
-    area_meta = first_area_meta(request)
-    part = property_slug(request, "sakan")
-    buy_or_rent = "rent" if transaction_from_request(request) == "للإيجار" else "buy"
-    gov = area_meta.get("sakan_governorate", "")
-    city = area_meta.get("sakan_city", "")
-    if gov and city:
-        url = f"https://sakan.co/en/{buy_or_rent}/{part}/{gov}/{city}"
-    elif gov:
-        url = f"https://sakan.co/en/{buy_or_rent}/{part}/{gov}"
-    else:
-        url = f"https://sakan.co/en/{buy_or_rent}/{part}"
-    body, status, ms, error = fetch_url(url)
-    count_match = re.search(r"([0-9,]+)\s+(?:available|properties|listing)", body, re.I)
-    count = int(count_match.group(1).replace(",", "")) if count_match else 0
-    # Also look for Arabic count
-    ar_count_match = re.search(r"(\d[\d,]*)\s+(?:عقار|نتيجة|إعلان)", body)
-    if ar_count_match and not count:
-        count = int(ar_count_match.group(1).replace(",", ""))
-    note = (
-        "تم الوصول لصفحة Sakan. البيانات مُعرَّضة عبر JavaScript ولا تظهر في HTML العام. "
-        f"الصفحة تُشير إلى توفر {count} عقار."
-        if not error else error
-    )
-    return [], {
-        "name": "Sakan",
-        "status": "page_reachable" if (body and not error) else "failed",
-        "records": 0,
-        "candidates": 0,
-        "availableCount": count,
-        "responseMs": ms,
-        "url": url,
-        "note": note,
+        "note": error or note,
     }
 
 
@@ -743,6 +756,296 @@ def search_nabdaqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
     }
 
 
+def _detail_price_space(body: str) -> tuple[float | None, float | None]:
+    """استخراج السعر والمساحة من صفحة تفاصيل إعلان (وسوم وصفية أولًا ثم JSON-LD ثم نص صريح)."""
+    price: float | None = None
+    space: float | None = None
+    # الوسوم الوصفية هي الأكثر صرامة (product:price:amount / og:price:amount)
+    for pattern in (
+        r'property="product:price:amount"\s+content="([0-9.,]+)"',
+        r'name="price"\s+content="([0-9.,]+)"',
+        r'property="og:price:amount"\s+content="([0-9.,]+)"',
+    ):
+        match = re.search(pattern, body, re.I)
+        if match:
+            price = float(match.group(1).replace(",", ""))
+            break
+    for pattern in (
+        r'property="product:property:size"\s+content="([0-9.,]+)"',
+        r'name="size"\s+content="([0-9.,]+)"',
+    ):
+        match = re.search(pattern, body, re.I)
+        if match:
+            space = float(match.group(1).replace(",", ""))
+            break
+    # JSON-LD يكمل ما لم تظهره الوسوم
+    for raw_json in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S):
+        try:
+            data = json.loads(raw_json)
+        except json.JSONDecodeError:
+            continue
+        for node in walk_dicts(data):
+            if not isinstance(node, dict):
+                continue
+            offers = node.get("offers") or {}
+            price = price or _number(offers.get("price") if isinstance(offers, dict) else None)
+            price = price or _number(node.get("price"))
+            floor = node.get("floorSize") or node.get("floor_size") or node.get("area")
+            space = space or _number(floor)
+    # نص صريح: سعر ضمن العناوين الرئيسية فقط (حماية من أرقام جانبية)
+    if not price:
+        price = extract_price_from_title(clean_text(body)[:2000]) or parse_price(clean_text(body)[:2000])
+    if not space:
+        space = extract_space_from_title(clean_text(body)[:2000])
+    return price, space
+
+
+def _number(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def search_q8aqar_details(hrefs: list[str]) -> dict[str, tuple[float | None, float | None]]:
+    """قراءة صفحات التفاصيل نفسها لاستخراج السعر والمساحة (توسيع Q8Aqar).
+
+    يُجلب حتى 3 صفحات بالتوازي حتى لا يطيل زمن التحليل (الفشل في صفحة لا يوقف الباقي).
+    يعيد {href: (price, space)} للمواقع التي نجح استخراجها.
+    """
+    detail: dict[str, tuple[float | None, float | None]] = {}
+    if not hrefs:
+        return detail
+
+    def _fetch_one(href: str) -> tuple[str, float | None, float | None]:
+        body, _status, _ms, error = fetch_url(href)
+        if not body or error:
+            return href, None, None
+        price, space = _detail_price_space(body)
+        return href, price, space
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        for href, price, space in pool.map(_fetch_one, hrefs[:3]):
+            if price or space:
+                detail[href] = (price, space)
+    return detail
+
+
+def _extract_sakan_embedded(body: str) -> list[dict[str, Any]]:
+    """محاولة قراءة إعلانات Sakan من الحالة المضمّنة في الصفحة (window.__… أو JSON.parse).
+
+    الموقع يعرض البيانات عبر JavaScript، لذلك نمسح أي كتلة JSON كبيرة تحمل
+    مفاتيح تشبه الإعلانات (title + price أو listing) ونستخرج منها إعلانات صالحة.
+    """
+    blobs: list[str] = []
+    # JSON.parse('…') أو JSON.parse(…)
+    # ملاحظة: فك الإحلالات يجب ألا يمر عبر unicode_escape لأنه يشوّه العربية
+    # متعددة البايتات؛ نكتفي بفك الاقتباسات المائلة ونترك \uXXXX ليتولاه json.loads.
+    for match in re.finditer(r"JSON\.parse\(\s*(['\"])((?:[^'\"\\]|\\.)*)\1\s*\)", body, re.S):
+        raw = match.group(2)
+        blobs.append(raw.replace('\\"', '"').replace("\\'", "'"))
+    # window.__X = {...}
+    for match in re.finditer(r"window\.__[A-Za-z0-9_]*\s*=\s*(\{.*?\});", body, re.S):
+        blobs.append(match.group(1))
+    found: list[dict[str, Any]] = []
+    for blob in blobs:
+        try:
+            data = json.loads(blob)
+        except json.JSONDecodeError:
+            continue
+        for node in walk_dicts(data):
+            if not isinstance(node, dict):
+                continue
+            title = str(node.get("title") or node.get("name") or "")
+            url = str(node.get("url") or node.get("slug") or node.get("listing_url") or "")
+            price = _number(node.get("price"))
+            if not title or not url or price is None:
+                continue
+            if "sakan.co" not in url and not url.startswith("/en/"):
+                continue
+            found.append(node)
+    return found
+
+
+def search_sakan(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    """Sakan: محاولة استخراج إعلانات حقيقية من الحالة المضمّنة، مع الاحتفاظ بعداد المتاح كاحتياط."""
+    area_meta = first_area_meta(request)
+    part = property_slug(request, "sakan")
+    buy_or_rent = "rent" if transaction_from_request(request) == "للإيجار" else "buy"
+    gov = area_meta.get("sakan_governorate", "")
+    city = area_meta.get("sakan_city", "")
+    if gov and city:
+        url = f"https://sakan.co/en/{buy_or_rent}/{part}/{gov}/{city}"
+    elif gov:
+        url = f"https://sakan.co/en/{buy_or_rent}/{part}/{gov}"
+    else:
+        url = f"https://sakan.co/en/{buy_or_rent}/{part}"
+    body, status, ms, error = fetch_url(url)
+    listings: list[Listing] = []
+    embedded = _extract_sakan_embedded(body) if body else []
+    seen: set[str] = set()
+    for node in embedded:
+        url_value = str(node.get("url") or "")
+        full_url = url_value if url_value.startswith("http") else urllib.parse.urljoin("https://sakan.co", url_value)
+        code = "SAK-" + (full_url.rstrip("/").split("/")[-1] or "0")
+        if code in seen:
+            continue
+        seen.add(code)
+        price = _number(node.get("price"))
+        space = _number(node.get("area")) or _number(node.get("size")) or extract_space_from_title(str(node.get("title") or ""))
+        listing = listing_from_text(
+            source="Sakan",
+            code=code,
+            url=full_url,
+            title=str(node.get("title") or ""),
+            description=str(node.get("description") or node.get("title") or ""),
+            price=price,
+            transaction=detect_transaction(str(node.get("title") or ""), transaction_from_request(request)),
+            fallback_type=request.property_type,
+            space_override=space,
+        )
+        if request_matches_listing(request, listing):
+            listings.append(listing)
+
+    count = 0
+    count_match = re.search(r"([0-9,]+)\s+(?:available|properties|listing)", body, re.I)
+    count = int(count_match.group(1).replace(",", "")) if count_match else 0
+    ar_count_match = re.search(r"(\d[\d,]*)\s+(?:عقار|نتيجة|إعلان)", body)
+    if ar_count_match and not count:
+        count = int(ar_count_match.group(1).replace(",", ""))
+    if listings:
+        note = f"تم استخراج {len(listings)} إعلانًا من البيانات المضمّنة في الصفحة (الخطة: إدخال Sakan في التقييم)."
+        status_name = "success"
+    elif embedded:
+        note = f"وجدت الحالة المضمّنة {len(embedded)} عنصرًا لكن لم يثبت أي إعلان أنه نفس المنطقة والنوع والعملية. متاح بالصفحة: {count}."
+        status_name = "no_results"
+    elif body and not error:
+        note = (
+            "تم الوصول لصفحة Sakan؛ البيانات تُعرض عبر JavaScript ولا تظهر كبنية منظمة قابلة للقراءة "
+            "من HTML العام حتى بعد مسح الحالة المضمّنة. "
+            f"الصفحة تُشير إلى توفر {count} عقار."
+        )
+        status_name = "page_reachable"
+    else:
+        note = error or "تعذر الوصول إلى Sakan"
+        status_name = "failed"
+    return listings, {
+        "name": "Sakan",
+        "status": status_name,
+        "records": len(listings),
+        "candidates": len(embedded),
+        "availableCount": count,
+        "responseMs": ms,
+        "url": url,
+        "note": note,
+    }
+
+
+def search_aqarat(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    """منصة Aqarat (مصدر توسعة جديد في الخطة): البحث عن إعلانات عقارية كويتية."""
+    area_query = " ".join(request.areas) if request.areas else ""
+    prop_word = request.property_type or "عقار"
+    transaction_word = transaction_from_request(request)
+    search_q = f"{prop_word} {transaction_word} {area_query}".strip()
+    url = f"https://aqarat.com/search?q={urllib.parse.quote(search_q)}"
+    body, status, ms, error = fetch_url(url)
+    listings: list[Listing] = []
+    candidates = 0
+    if body:
+        seen_codes: set[str] = set()
+        for href, title_html in re.findall(
+            r'<a\s+href="([^"]*(?:property|listing|real-estate|detail)[^"]*)"[^>]*>(.*?)</a>',
+            body,
+            re.S | re.I,
+        ):
+            candidates += 1
+            title_clean = clean_text(title_html)
+            if not title_clean or len(title_clean) < 5:
+                continue
+            code = "AQR-" + href.rstrip("/").split("/")[-1]
+            if code in seen_codes:
+                continue
+            seen_codes.add(code)
+            full_url = urllib.parse.urljoin("https://aqarat.com", href)
+            price = extract_price_from_title(title_clean) or parse_price(title_clean)
+            space = extract_space_from_title(title_clean)
+            listing = listing_from_text(
+                source="Aqarat",
+                code=code,
+                url=full_url,
+                title=title_clean,
+                description=title_clean,
+                price=price,
+                transaction=detect_transaction(title_clean, transaction_from_request(request)),
+                fallback_type=request.property_type,
+                space_override=space,
+            )
+            if request_matches_listing(request, listing):
+                listings.append(listing)
+    return listings[:20], {
+        "name": "Aqarat",
+        "status": "success" if listings else ("no_results" if (body and not error) else "failed"),
+        "records": len(listings),
+        "candidates": candidates,
+        "responseMs": ms,
+        "url": url,
+        "note": error or f"تم فحص {candidates} إعلانًا في Aqarat.",
+    }
+
+
+def search_four_sale(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    """منصة 4Sale الكويتية (مصدر توسعة جديد في الخطة)."""
+    area_query = " ".join(request.areas) if request.areas else ""
+    prop_word = request.property_type or "عقار"
+    search_q = f"{prop_word} {area_query}".strip()
+    url = f"https://kuwait.4sale.com/real-estate?search_text={urllib.parse.quote(search_q)}"
+    body, status, ms, error = fetch_url(url)
+    listings: list[Listing] = []
+    candidates = 0
+    if body:
+        seen_codes: set[str] = set()
+        for href, title_html in re.findall(
+            r'<a\s+href="([^"]*(?:real-estate/|listing/|properties/)[^"]*)"[^>]*>(.*?)</a>',
+            body,
+            re.S | re.I,
+        ):
+            candidates += 1
+            title_clean = clean_text(title_html)
+            if not title_clean or len(title_clean) < 5:
+                continue
+            code = "4S-" + href.rstrip("/").split("/")[-1]
+            if code in seen_codes:
+                continue
+            seen_codes.add(code)
+            full_url = urllib.parse.urljoin("https://kuwait.4sale.com", href)
+            price = extract_price_from_title(title_clean) or parse_price(title_clean)
+            space = extract_space_from_title(title_clean)
+            listing = listing_from_text(
+                source="4Sale",
+                code=code,
+                url=full_url,
+                title=title_clean,
+                description=title_clean,
+                price=price,
+                transaction=detect_transaction(title_clean, transaction_from_request(request)),
+                fallback_type=request.property_type,
+                space_override=space,
+            )
+            if request_matches_listing(request, listing):
+                listings.append(listing)
+    return listings[:20], {
+        "name": "4Sale",
+        "status": "success" if listings else ("no_results" if (body and not error) else "failed"),
+        "records": len(listings),
+        "candidates": candidates,
+        "responseMs": ms,
+        "url": url,
+        "note": error or f"تم فحص {candidates} إعلانًا في 4Sale.",
+    }
+
+
 def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
     """
     Bu3qar / Boshamlan (بوعقار / بوشملان) is a prominent Kuwait real estate platform.
@@ -795,11 +1098,38 @@ def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
     }
 
 
+SEARCHERS: list[tuple[str, Any]] = [
+    ("OpenSooq", search_opensooq),
+    ("Mourjan", search_mourjan),
+    ("Q8Aqar", search_q8aqar),
+    ("Sakan", search_sakan),
+    ("Waseet", search_waseet),
+    ("NabdAqar", search_nabdaqar),
+    ("Bu3qar", search_bu3qar),
+    ("Aqarat", search_aqarat),
+    ("4Sale", search_four_sale),
+    ("الصفقات الرسمية", search_official_transactions),
+]
+
+
 def search_external_sources(request: PropertyRequest) -> tuple[list[Listing], list[dict[str, Any]]]:
+    """تشغيل كل المصادر بالتوازي لتقليل زمن الانتظار الإجمالي بدل التسلسل (حتى 84 ثانية سابقًا)."""
     listings: list[Listing] = []
     statuses: list[dict[str, Any]] = []
-    for searcher in (search_opensooq, search_mourjan, search_q8aqar, search_sakan, search_waseet, search_nabdaqar, search_bu3qar):
-        source_listings, status = searcher(request)
-        listings.extend(source_listings)
-        statuses.append(status)
+    with ThreadPoolExecutor(max_workers=len(SEARCHERS)) as pool:
+        futures = {pool.submit(search, request): name for name, search in SEARCHERS}
+        for future, name in futures.items():
+            try:
+                source_listings, status = future.result()
+            except Exception as exc:  # حماية: أي خطأ غير متوقع في مصدر لا يوقف التحليل
+                source_listings = []
+                status = {
+                    "name": name,
+                    "status": "failed",
+                    "records": 0,
+                    "candidates": 0,
+                    "note": f"خطأ غير متوقع: {exc}",
+                }
+            listings.extend(source_listings)
+            statuses.append(status)
     return listings, statuses

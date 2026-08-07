@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from backend.models import Listing
 from backend.services.supabase_store import listing_row, persist_analysis
@@ -37,7 +38,11 @@ class SupabaseStoreTests(unittest.TestCase):
     def test_persist_analysis_is_noop_when_supabase_not_configured(self) -> None:
         request = parse_request("شقة للبيع في بنيد القار")
 
-        result = persist_analysis(request, {"results": []}, [])
+        # محاكاة بيئة غير مضبوطة بغض النظر عن ملف .env الحالي
+        with mock.patch("backend.services.supabase_store.SUPABASE_URL", ""), mock.patch(
+            "backend.services.supabase_store.SUPABASE_SERVICE_ROLE_KEY", ""
+        ):
+            result = persist_analysis(request, {"results": []}, [])
 
         self.assertEqual(result["status"], "not_configured")
 

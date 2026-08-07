@@ -43,7 +43,10 @@ def _safe_space(row: dict) -> float | None:
         str(row.get(key) or "")
         for key in ("detailText", "detailTitle", "summary", "features")
     )
-    min_area, max_area, _excluded = extract_area_range(text)
+    min_area, max_area, excluded = extract_area_range(text)
+    # لا نقبل رقمًا ظهر كواجهة/ارتداد/عرض شارع كمساحة للعقار
+    if value in excluded.values():
+        return None
     if min_area == value or max_area == value:
         return value
     return None
