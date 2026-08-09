@@ -41,7 +41,6 @@ jobs:
   github-pages:
     needs: prepare
     runs-on: ubuntu-latest
-    continue-on-error: true
     if: ${{ github.event.repository.private == false }}
     environment:
       name: github-pages
@@ -63,6 +62,7 @@ jobs:
   netlify:
     needs: prepare
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -71,9 +71,9 @@ jobs:
       - name: Deploy to Netlify
         run: |
           if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
-            echo "::error::Netlify deploy is not configured. Add NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID as GitHub Actions secrets, or keep using local preview only."
-            echo "GitHub Pages is intentionally unavailable for this private repository on the current GitHub plan."
-            exit 1
+            echo "::warning::Netlify deploy is not configured. Add NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID as GitHub Actions secrets to enable it."
+            echo "GitHub Pages remains the primary deploy path when this repository is public."
+            exit 0
           fi
           npx --yes netlify-cli deploy --prod --dir=frontend --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
         env:

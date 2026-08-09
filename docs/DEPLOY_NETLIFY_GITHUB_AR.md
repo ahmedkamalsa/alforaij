@@ -1,11 +1,12 @@
-# نشر منصة الفريج على Netlify وGitHub
+# نشر منصة الفريج على GitHub Pages وNetlify وCloudflare
 
 ## القرار الحالي
 
-الريبو خاص، وهذا هو الاختيار الصحيح لحماية مفاتيح المشروع والكود. لذلك:
+بعد الموافقة على جعل الريبو عامًا، يصبح GitHub Pages هو مسار النشر الأساسي للواجهة.
 
-- GitHub Pages لا يعمل للريبو الخاص على الخطة الحالية.
-- النشر العام المناسب الآن هو Netlify مع بقاء الريبو خاصًا.
+- GitHub Pages يعمل عند جعل الريبو public.
+- Netlify مسار احتياطي، لكنه يحتاج `NETLIFY_AUTH_TOKEN` و`NETLIFY_SITE_ID`، وحساب Netlify الحالي لديه production deploys متوقفة بسبب credits.
+- Cloudflare Pages مسار احتياطي جيد، ويحتاج `CLOUDFLARE_API_TOKEN` و`CLOUDFLARE_ACCOUNT_ID`.
 - الواجهة فقط تنشر كملفات static من `frontend/`.
 - الباك إند Python يحتاج عنوان API مستقل تضبطه في `ALFORAIJ_API_BASE`.
 
@@ -21,14 +22,27 @@
 ALFORAIJ_API_BASE=https://your-backend-domain.example.com
 ```
 
-وأضف Secretين للنشر على Netlify:
+أسرار Netlify الاختيارية:
 
 ```text
 NETLIFY_AUTH_TOKEN
 NETLIFY_SITE_ID
 ```
 
-بدون هذين السرّين سيفشل Workflow النشر عمدًا برسالة واضحة، حتى لا يظهر نجاح وهمي بدون رابط منشور.
+أسرار Cloudflare الاختيارية:
+
+```text
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID
+```
+
+ومتغير Cloudflare الاختياري:
+
+```text
+CLOUDFLARE_PAGES_PROJECT_NAME=alforaij
+```
+
+بدون أسرار Netlify أو Cloudflare سيظهر تحذير فقط. GitHub Pages يبقى المسار الأساسي بعد جعل الريبو public.
 
 ## مفاتيح الباك إند والتحديث اليومي
 
@@ -45,11 +59,12 @@ OFFICIAL_TRANSACTIONS_SOURCE
 
 ## Workflows
 
-- `deploy-static.yml`: يبني الواجهة، يضبط `frontend/config.js`، وينشر على Netlify عند وجود الأسرار.
+- `deploy-static.yml`: يبني الواجهة، يضبط `frontend/config.js`، وينشر على GitHub Pages، ويحاول Netlify عند وجود أسراره.
+- `deploy-cloudflare-pages.yml`: ينشر على Cloudflare Pages عند وجود أسرار Cloudflare.
 - `daily-data-update.yml`: يشغل وكيل تحديث البيانات يوميًا الساعة 06:00 بتوقيت القاهرة.
 
 ## ملاحظات تشغيل
 
 - لا تضع `SUPABASE_SERVICE_ROLE_KEY` في `frontend/config.js`.
-- GitHub Pages سيظل متوقفًا طالما الريبو خاص والخطة لا تدعمه.
-- عند توفير Netlify secrets يمكن تشغيل `Deploy static frontend` يدويًا من تبويب Actions.
+- لا تجعل أي مفاتيح سرية داخل ملفات `frontend/`.
+- عند توفير Netlify أو Cloudflare secrets يمكن تشغيل workflow الخاص يدويًا من تبويب Actions.
