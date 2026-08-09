@@ -13,16 +13,16 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
-import os
 import threading
 import time
+from pathlib import Path
 from statistics import median
 from typing import Any
 
 from backend.models import Listing, PropertyRequest
 from backend.services.request_parser import normalize_text
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "official_transactions.json")
+DATA_FILE = Path(__file__).resolve().parents[2] / "data" / "official_transactions.json"
 
 # ذاكرة مؤقتة قصيرة (3 دقائق): (وقت التحميل، الصفوف المدمجة، فهرس المناطق المبني مسبقًا)
 # الفهرس يُبنى مرة واحدة مع كل تحميل فيُستخدم للوسيط مباشرة بدل مسح كل الصفقات لكل إعلان
@@ -35,7 +35,7 @@ _MIN_RECENT = 3  # الحد الأدنى من الصفقات الحديثة لق
 
 
 def _load_local_file() -> list[dict[str, Any]]:
-    if not os.path.exists(DATA_FILE):
+    if not DATA_FILE.exists():
         return []
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as handle:
@@ -50,6 +50,16 @@ def _load_from_supabase() -> list[dict[str, Any]]:
         from backend.services.supabase_store import fetch_official_transactions
 
         return fetch_official_transactions()
+    except Exception:
+        return []
+
+
+def _load_from_alhisba_public() -> list[dict[str, Any]]:
+    try:
+        from backend.connectors.alhisba_public import fetch_public_deals
+
+        rows, _meta = fetch_public_deals()
+        return rows
     except Exception:
         return []
 
@@ -105,7 +115,7 @@ def _load_cached(force: bool = False) -> tuple[list[dict[str, Any]], dict[str, l
     with _TRANSACTIONS_LOCK:
         if not force and _TRANSACTIONS_CACHE is not None and now - _TRANSACTIONS_CACHE[0] < _CACHE_TTL:
             return _TRANSACTIONS_CACHE[1], _TRANSACTIONS_CACHE[2]
-        merged = _merge_rows(_load_from_supabase(), _load_local_file())
+        merged = _merge_rows(_load_from_supabase(), _load_local_file() + _load_from_alhisba_public())
         index = _build_area_index(merged)
         _TRANSACTIONS_CACHE = (now, merged, index)
         return merged, index
@@ -205,12 +215,12 @@ def _transaction_listing(row: dict[str, Any], index: int) -> Listing:
         features=f"صفقة رسمية {property_type} في {area}",
         published_date=date_value,
         original_url=str(row.get("original_url") or row.get("url") or ""),
-        source="الصفقات الرسمية",
+        source=str(row.get("source") or "الصفقات الرسمية"),
         listing_type="رسمي",
         raw={
             "official": True,
             "reference": reference,
-            "priceSource": "سجل صفقات رسمي (تسجيل عقاري)",
+            "priceSource": row.get("source_note") or "سجل صفقات رسمي (تسجيل عقاري)",
         },
     )
 
@@ -234,10 +244,13 @@ def search(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
         transactions.append(listing)
 
     if rows:
-        note = f"تمت قراءة {len(rows)} صفقة رسمية"
+        public_refs = sum(1 for row in rows if str(row.get("source") or "").startswith("الحسبة"))
+        note = f"تمت قراءة {len(rows)} صفقة مرجعية"
+        if public_refs:
+            note += f"؛ منها {public_refs} من الصفقات العامة الظاهرة في الحسبة"
         if request.areas:
             note += f"؛ منها {len(transactions)} في المناطق المطلوبة"
-        note += ". تُستخدم كمرجع سوق مرجّح أعلى من الإعلانات عند توفر صفقات بنفس المنطقة."
+        note += ". تُستخدم كمرجع سوق مرجّح أعلى من الإعلانات عند توفر صفقات بنفس المنطقة، مع تمييز مصدر كل صفقة."
     else:
         note = (
             "لا توجد صفقات رسمية مستوردة بعد. المسار الأساسي هو الوكيل اليومي عبر "

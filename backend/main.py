@@ -113,6 +113,7 @@ def _platform_match(source: str, selected: set[str]) -> bool:
         "alforaij": {"الفريج", "alforaij", "Alforaij", "الفريج المحلي"},
         "بوشملان": {"بوشملان", "Bu3qar", "بوعقار", "السوق المباشر"},
         "Bu3qar": {"بوشملان", "Bu3qar", "بوعقار"},
+        "الحسبة": {"الحسبة", "Alhisba", "الحسبة - الصفقات المسجلة العامة"},
     }
     expanded: set[str] = set()
     for name in selected:
@@ -128,6 +129,7 @@ def _is_local_platform_selected(selected: set[str]) -> bool:
 
 def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> list[dict]:
     market_names = {"السوق المباشر", "بوشملان", "OpenSooq", "Mourjan", "Q8Aqar", "Sakan", "Waseet", "4Sale", "Bu3qar", "Aqarat", "NabdAqar"}
+    records = []
     if not selected or selected & market_names:
         try:
             from backend.connectors.market_ads import search as search_market_ads
@@ -136,8 +138,7 @@ def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> l
             listings, _status = search_market_ads(PropertyRequest(raw_text=""))
         except Exception as exc:
             logger.warning("Dashboard market records skipped: %s", exc)
-            return []
-        records = []
+            listings = []
         for listing in listings:
             raw_source = str((listing.raw or {}).get("source_name") or listing.source or "السوق المباشر")
             if selected and not _platform_match(raw_source, selected) and "السوق المباشر" not in selected:
@@ -146,8 +147,23 @@ def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> l
             _normalize_dashboard_place(record, area_map)
             record["source"] = raw_source
             records.append(record)
-        return records
-    return []
+    if not selected or _platform_match("الحسبة - الصفقات المسجلة العامة", selected):
+        try:
+            from backend.connectors.official_data import load_transactions, _transaction_listing
+
+            for index, row in enumerate(load_transactions()):
+                if not str(row.get("source") or "").startswith("الحسبة"):
+                    continue
+                listing = _transaction_listing(row, index)
+                record = _dashboard_record(listing)
+                _normalize_dashboard_place(record, area_map)
+                record["source"] = "الحسبة - الصفقات المسجلة العامة"
+                record["listingMode"] = "مرجع سعري"
+                record["summary"] = "صفقة مسجلة مرجعية للمقارنة وليست إعلانًا متاحًا للبيع."
+                records.append(record)
+        except Exception as exc:
+            logger.warning("Dashboard Alhisba reference records skipped: %s", exc)
+    return records
 
 
 def _record_from_opportunity(item: dict, area_map: dict[str, str]) -> dict:
@@ -510,8 +526,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/market-matching":
             # العرض والطلب: التوفيق العملي بين طلبات «مطلوب للشراء/للإيجار» وأفضل الفرص المقيّمة
             from backend.services.opportunities import build_market_matching, build_opportunities
+            from backend.services.supabase_store import fetch_latest_opportunities
             try:
                 snapshot = _OPPORTUNITIES_CACHE
+                if snapshot is None:
+                    snapshot = fetch_latest_opportunities()
                 if snapshot is None:
                     snapshot = build_opportunities(include_external=True)
                 json_response(self, build_market_matching(snapshot))

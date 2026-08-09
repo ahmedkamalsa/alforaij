@@ -18,6 +18,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from backend.connectors.market_ads import search as search_market_ads
+from backend.connectors.alhisba_public import fetch_public_deals
 from backend.connectors.official_data import search as search_official_transactions
 from backend.connectors.official_indicators import search as search_official_indicators
 from backend.models import Listing, PropertyRequest
@@ -1182,6 +1183,30 @@ def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
     )
 
 
+def search_alhisba_public_deals(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    from backend.connectors.official_data import _transaction_listing
+
+    rows, meta = fetch_public_deals()
+    listings: list[Listing] = []
+    for index, row in enumerate(rows):
+        area = str(row.get("area") or "")
+        if request.areas and not any(text_has_area(requested, area) for requested in request.areas):
+            continue
+        listing = _transaction_listing(row, index)
+        if request.property_type and request.property_type != "عقارات":
+            if request.property_type not in (listing.property_type + " " + listing.detail_class):
+                continue
+        listings.append(listing)
+    status = dict(meta)
+    status["records"] = len(listings)
+    status["candidates"] = len(rows)
+    status["note"] = (
+        "الحسبة تعرض صفقات مسجلة ومزادات وروابط إعلانات شبيهة في الصفحة العامة؛ "
+        "تدخل هنا كدليل مرجعي للسعر وليست إعلانًا متاحًا للبيع."
+    )
+    return listings, status
+
+
 SEARCHERS: list[tuple[str, Any]] = [
     ("OpenSooq", search_opensooq),
     ("Mourjan", search_mourjan),
@@ -1192,6 +1217,7 @@ SEARCHERS: list[tuple[str, Any]] = [
     ("Bu3qar", search_bu3qar),
     ("Aqarat", search_aqarat),
     ("4Sale", search_four_sale),
+    ("الحسبة", search_alhisba_public_deals),
     ("السوق المباشر", search_market_ads),
     ("مؤشرات رسمية", search_official_indicators),
     ("الصفقات الرسمية", search_official_transactions),

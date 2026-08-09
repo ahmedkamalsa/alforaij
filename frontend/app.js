@@ -9,6 +9,7 @@ const boardState = {
   records: [],
   metrics: [],
   opportunities: { count: 0, items: [], calculation: "" },
+  matching: null,
   expandedGovernorates: new Set(),
   activeMetric: "movement",
 };
@@ -368,6 +369,74 @@ function renderCompanionAds(rows) {
   `).join("");
 }
 
+function matchInCurrentBoardScope(match) {
+  const filters = boardFilterValues();
+  const sourceScope = selectedBoardPlatforms();
+  if (filters.governorate && normalizeArabic(match.governorate) !== normalizeArabic(filters.governorate)) return false;
+  if (filters.area && normalizeArabic(match.area) !== normalizeArabic(filters.area)) return false;
+  if (filters.propertyType && normalizeArabic(match.propertyType) !== normalizeArabic(filters.propertyType)) return false;
+  if (sourceScope.sourceMode !== "all") {
+    const source = normalizeArabic(match.source || "");
+    const selected = sourceScope.selectedSources.map(normalizeArabic);
+    const isLocal = source.includes("الفريج") || source.includes("alforaij");
+    if (sourceScope.includeLocal && !sourceScope.includeExternal && !isLocal) return false;
+    if (selected.length && !selected.some((name) => source.includes(name))) return false;
+  }
+  return true;
+}
+
+function renderBoardMarketMatches(rows) {
+  const root = $("boardMarketMatches");
+  if (!root) return;
+  const data = boardState.matching;
+  if (!data) {
+    root.innerHTML = '<div class="empty compact-empty">جاري تحميل فرص الربط...</div>';
+    return;
+  }
+  const currentCodes = new Set(rows.map((row) => String(row.code || "")));
+  const cards = [];
+  for (const req of data.requests || []) {
+    for (const match of req.matches || []) {
+      if (!matchInCurrentBoardScope(match)) continue;
+      if (currentCodes.size && match.code && !currentCodes.has(String(match.code)) && boardFilterValues().metric !== "movement") continue;
+      const budget = Number(req.budget || 0);
+      const price = Number(match.price || 0);
+      const margin = budget && price && budget > price ? budget - price : 0;
+      cards.push({ req, match, margin });
+    }
+  }
+  cards.sort((a, b) => (b.margin - a.margin) || (Number(b.match.matchScore || 0) - Number(a.match.matchScore || 0)) || (Number(b.match.score || 0) - Number(a.match.score || 0)));
+  const top = cards.slice(0, 5);
+  if (!top.length) {
+    root.innerHTML = '<div class="empty compact-empty">لا توجد فرص ربط مؤكدة حسب الفلاتر الحالية.</div>';
+    return;
+  }
+  root.innerHTML = top.map(({ req, match, margin }) => {
+    const kind = req.kind === "rent" ? "إيجار" : "شراء";
+    const marginText = margin ? `${formatMoney(margin)} هامش محتمل` : "هامش غير محسوب";
+    return `
+      <article class="board-match-card">
+        <div class="match-mini-head">
+          <strong>${escapeHtml(kind)}: ${escapeHtml(req.area || match.area || "غير محددة")}</strong>
+          <span>تطابق ${escapeHtml(match.matchScore || 0)} / 100</span>
+        </div>
+        <p>${escapeHtml(req.summary || req.transaction || "")}</p>
+        <div class="match-mini-offer">
+          <span>${escapeHtml(match.code || "")}</span>
+          <b>${escapeHtml(match.priceText || formatMoney(match.price))}</b>
+          <small>${escapeHtml(match.source || "")}</small>
+        </div>
+        <div class="match-margin">${escapeHtml(marginText)}</div>
+        <div class="companion-actions">
+          <button type="button" data-board-ad-code="${escapeHtml(match.code || "")}" data-board-ad-area="${escapeHtml(match.area || "")}" data-board-ad-type="${escapeHtml(match.propertyType || "")}">تحليل الفرصة</button>
+          ${match.url ? `<a href="${escapeHtml(match.url)}" target="_blank" rel="noreferrer">فتح العرض</a>` : ""}
+          ${req.url ? `<a href="${escapeHtml(req.url)}" target="_blank" rel="noreferrer">فتح الطلب</a>` : ""}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
 function metricCells(rows, governorate = "", area = "") {
   const scope = rows.filter((row) => {
     if (governorate && row.governorate !== governorate) return false;
@@ -427,6 +496,7 @@ function renderBoard() {
   renderBoardMetricCards(boardState.records.filter((row) => rowMatchesBoardFilters(row, false, false, true)));
   renderBoardStats(rows);
   renderCompanionAds(rows);
+  renderBoardMarketMatches(rows);
   renderGovernorateTable(rows);
 }
 
@@ -444,6 +514,16 @@ async function loadDashboardBoard() {
     boardState.records = data.records || [];
     boardState.metrics = data.metrics || [];
     boardState.opportunities = data.opportunities || { count: 0, items: [], calculation: "" };
+    fetch(apiUrl("/api/market-matching"))
+      .then((r) => r.json())
+      .then((matching) => {
+        boardState.matching = matching;
+        renderBoard();
+      })
+      .catch(() => {
+        boardState.matching = { requests: [] };
+        renderBoard();
+      });
     const governorates = uniqueValues(boardState.records.map((row) => row.governorate));
     const recentAreas = readRecentAreas();
     setOptions("boardGovernorates", governorates);
@@ -460,7 +540,7 @@ async function loadDashboardBoard() {
     renderBoard();
   } catch (err) {
     const body = $("governorateTableBody");
-    if (body) body.innerHTML = `<tr><td colspan="6">تعذر تحميل لوحة المحافظات: ${escapeHtml(err.message)}</td></tr>`;
+    if (body) body.innerHTML = `<tr><td colspan="7">تعذر تحميل لوحة المحافظات: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 

@@ -1,14 +1,14 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-09T16:19:59",
-  "finishedAt": "2026-08-09T16:21:14",
+  "startedAt": "2026-08-09T17:12:16",
+  "finishedAt": "2026-08-09T17:13:34",
   "steps": [
     {
       "name": "sync_source_registry",
       "status": "ok",
       "result": {
-        "count": 17
+        "count": 19
       }
     },
     {
@@ -39,7 +39,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 179,
+        "totalScored": 177,
         "includeExternal": true
       }
     },
@@ -47,8 +47,8 @@
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 1,
-        "removed": 1,
+        "added": 3,
+        "removed": 4,
         "priceDrops": 0
       }
     }
@@ -56,10 +56,10 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "opportunitiesScored": 179,
+    "opportunitiesScored": 177,
     "notificationCounts": {
-      "added": 1,
-      "removed": 1,
+      "added": 3,
+      "removed": 4,
       "priceDrops": 0
     },
     "officialReferenceSources": {
@@ -154,19 +154,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 316,
+          "count": 324,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 1902,
+          "count": 1993,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 25734,
+          "count": 26314,
           "status": "ok"
         },
         "client_leads": {
@@ -184,13 +184,13 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 346,
+          "count": 349,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 56,
+          "count": 61,
           "status": "ok"
         }
       },

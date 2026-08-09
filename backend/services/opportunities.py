@@ -55,6 +55,7 @@ SOURCE_TRUST: dict[str, float] = {
     "السوق المباشر": 0.75,
     "مؤشرات رسمية": 1.0,
     "الصفقات الرسمية": 1.0,
+    "الحسبة - الصفقات المسجلة العامة": 0.9,
 }
 
 TIERS = [
@@ -364,6 +365,8 @@ def _score_listings(listings, clients: list[dict[str, Any]]) -> tuple[list[dict[
     skipped_unreal = 0
     for listing in listings:
         if not listing.price:
+            continue
+        if getattr(listing, "listing_type", "") == "رسمي" or (getattr(listing, "raw", {}) or {}).get("official"):
             continue
         tx = str(listing.transaction or "")
         if tx.startswith("مطلوب"):

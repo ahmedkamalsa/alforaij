@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-09T16:21:14",
+  "generatedAt": "2026-08-09T17:13:34",
   "hasPrevious": true,
   "counts": {
-    "added": 1,
-    "removed": 1,
+    "added": 3,
+    "removed": 4,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -20,31 +20,83 @@
     "priceDrops": [],
     "added": [
       {
-        "code": "OS-285341192",
+        "code": "OS-283979236",
         "area": "الأحمدي",
         "propertyType": "شقة",
         "price": 120.0,
         "priceText": "120 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
-        "valuationLabel": "إيجار عادل",
+        "valuationLabel": "إيجار ممتاز",
         "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285341192",
+        "url": "https://kw.opensooq.com/search/283979236",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
+        "code": "OS-285324976",
+        "area": "حولي",
+        "propertyType": "عمارة",
+        "price": 750000.0,
+        "priceText": "750,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "سعر عادل",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/285324976",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
+        "code": "MJ-30017148",
+        "area": "القرين",
+        "propertyType": "أرض",
+        "price": 315000.0,
+        "priceText": "315,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "أعلى قليلاً",
+        "source": "Mourjan",
+        "url": "https://www.mourjan.com/kw/kuwait/villas-and-houses/for-sale/30017148/",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       }
     ],
     "removed": [
       {
-        "code": "MJ-29921201",
-        "area": "الزهراء",
-        "propertyType": "أرض",
-        "price": 395000.0,
-        "priceText": "395,000 د.ك",
+        "code": "MJ-28901218",
+        "area": "حولي",
+        "propertyType": "عمارة",
+        "price": 60000.0,
+        "priceText": "60,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
-        "valuationLabel": "غالي",
+        "valuationLabel": "لقطة ممتازة",
         "source": "Mourjan",
-        "url": "https://www.mourjan.com/kw/kuwait/lands/for-sale/29921201/",
+        "url": "https://www.mourjan.com/kw/kuwait/apartments/for-sale/28901218/",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "OS-285324514",
+        "area": "",
+        "propertyType": "عمارة",
+        "price": 32000.0,
+        "priceText": "32,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/285324514",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "OS-284747148",
+        "area": "حولي",
+        "propertyType": "بيت",
+        "price": 230.0,
+        "priceText": "230 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "إيجار ممتاز",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/284747148",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       }
     ]
