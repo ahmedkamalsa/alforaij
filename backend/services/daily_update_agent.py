@@ -17,6 +17,7 @@ from backend.services.supabase_store import (
     fetch_latest_opportunities,
     is_configured,
     save_listings,
+    save_market_listings,
     save_official_transactions,
     save_opportunities,
     supabase_data_summary,
@@ -141,9 +142,26 @@ def run_daily_update_agent(
         step("import_official_transactions", official_result, "ok" if official_result.get("status") == "saved" else "needs_source")
 
         previous_snapshot = fetch_latest_opportunities()
-        snapshot = build_opportunities(include_external=include_external)
+        snapshot = build_opportunities(include_external=include_external, return_external=True)
+        # قاعدة المعرفة: حفظ إعلانات السوق الخارجية المحصودة في market_listings
+        # (مثل بيانات الفريج المحلية تمامًا) حتى تتراكم كل إعلانات المواقع في القاعدة
+        # وتصبح أساس التحليلات الدقيقة — بلا اعتماد على الفحص الحي لحظة الطلب فقط.
+        # تُستبعد صفوف المراجع (مؤشرات رسمية OFFIND-*) لأنها أسعار متر مرجعية لا إعلانات.
+        external_rows = [
+            row
+            for row in snapshot.pop("externalListings", [])
+            if not str(row.get("code") or "").startswith("OFFIND")
+            and "مؤشرات" not in str(row.get("source") or "")
+        ]
         save_opportunities(snapshot)
         step("build_and_save_opportunities", {"totalScored": snapshot.get("totalScored", 0), "includeExternal": include_external})
+
+        harvest = save_market_listings(external_rows)
+        step(
+            "persist_market_listings",
+            harvest,
+            "ok" if harvest.get("status") in ("saved", "empty", "not_configured") else "needs_table",
+        )
 
         summary = supabase_data_summary(len(listings))
         notifications = build_update_notifications(
@@ -162,6 +180,7 @@ def run_daily_update_agent(
             "summary": {
                 "localListings": len(listings),
                 "officialTransactionsImported": official_result.get("count", 0),
+                "marketListingsHarvested": harvest.get("count", 0),
                 "opportunitiesScored": snapshot.get("totalScored", 0),
                 "notificationCounts": notifications.get("counts") or {},
                 "officialReferenceSources": reference_sources,

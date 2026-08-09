@@ -28,7 +28,10 @@ const recentAreasKey = "alforaij_recent_areas_v2";
 
 const $ = (id) => document.getElementById(id);
 const API_BASE = String(window.ALFORAIJ_API_BASE || localStorage.getItem("ALFORAIJ_API_BASE") || "").replace(/\/$/, "");
-const STATIC_SNAPSHOT_MODE = !API_BASE;
+// الوضع الثابت يُفعَّل فقط عندما لا يوجد API حقيقي: لا رابط مضبوط وخارج الجهاز المحلي.
+// على الجهاز المحلي (127.0.0.1/localhost) يعمل الخادم الحي، لذا تُستخدم روابط نسبية لنفس الأصل.
+const isLocalHost = /^(localhost|127\.0\.0\.1|::1|0\.0\.0\.0)(:\d+)?$/i.test(window.location.hostname);
+const STATIC_SNAPSHOT_MODE = !API_BASE && !isLocalHost;
 const STATIC_DATA_MAP = {
   "/api/health": "health.json",
   "/api/sources": "sources.json",
@@ -245,6 +248,7 @@ function syncBoardToSearch(overrides = {}) {
 async function runBoardAnalysis(overrides = {}) {
   syncBoardToSearch(overrides);
   await sendChat();
+  switchMainTab("search");
 }
 
 // تحويل علامات **النص** إلى خط عريض بعد تأمين HTML (بدون مخاطرة XSS)
@@ -298,21 +302,74 @@ function sourceMatchesPlatformScope(row, scope) {
   return !selected.length || selected.some((name) => source.includes(name) || name.includes(source));
 }
 
+// محلل نص الاستعلام داخل المتصفح — يستخرج المنطقة/العملية/النوع/المساحة/الميزانية
+// من جملة الشات الحرّة (مثل «بيع بيت في النهضة 400م») عند غياب فلاتر النموذج أو الـ API.
+function parseQueryFilters(text) {
+  const norm = normalizeArabic(text);
+  const parsed = { area: "", transaction: "", propertyType: "", minArea: 0, maxArea: 0, budget: 0 };
+  if (norm.includes("بدل")) parsed.transaction = "بدل";
+  else if (norm.includes("للبيع") || norm.includes("بيع")) parsed.transaction = "للبيع";
+  else if (norm.includes("للايجار") || norm.includes("ايجار") || norm.includes("استاجر")) parsed.transaction = "للإيجار";
+  else if (norm.includes("مطلوب") || norm.includes("شراء") || norm.includes("ابي") || norm.includes("ابغى")) parsed.transaction = "مطلوب للشراء";
+  if (/بيت|منزل|فيلا|قسيم/.test(norm)) parsed.propertyType = "بيت";
+  else if (/شقه|شقة|دوبلكس|apartment|flat/.test(norm)) parsed.propertyType = "شقة";
+  else if (/ارض|أرض|land|plot/.test(norm)) parsed.propertyType = "أرض";
+  else if (/عماره|عمارة|بنايه|building/.test(norm)) parsed.propertyType = "عمارة";
+  // المنطقة: أطول اسم منطقة موجود في بيانات اللوحة ويظهر داخل نص الاستعلام
+  let best = "";
+  for (const area of uniqueValues((boardState.records || []).map((row) => row.area))) {
+    const a = normalizeArabic(area);
+    if (a && norm.includes(a) && a.length > best.length) best = area;
+  }
+  parsed.area = best;
+  const spaceMatch = norm.match(/(\d+(?:\.\d+)?)\s*م/);
+  if (spaceMatch) {
+    parsed.minArea = Number(spaceMatch[1]);
+    parsed.maxArea = Number(spaceMatch[1]);
+  }
+  const moneyMatch = norm.match(/(?:ميزانيه|ميزانية|حدود|سعر|بحدود|مطلوب)\s*(\d+(?:\.\d+)?)\s*(الف|ألف)?/);
+  if (moneyMatch) {
+    let value = Number(moneyMatch[1]);
+    if (moneyMatch[2]) value *= 1000;
+    parsed.budget = value;
+  }
+  if (!parsed.budget) {
+    const kw = norm.match(/(\d+(?:\.\d+)?)\s*(الف|ألف)?\s*دينار/);
+    if (kw) {
+      let value = Number(kw[1]);
+      if (kw[2]) value *= 1000;
+      parsed.budget = value;
+    }
+  }
+  return parsed;
+}
+
 function staticAnalyzeReport(payload) {
   const filters = payload.filters || {};
   const text = String(payload.text || "");
-  const area = String(filters.areas || filters.area || "").trim();
-  const propertyType = String(filters.propertyType || "").trim();
-  const transaction = String(filters.transaction || "").trim();
-  const minArea = Number(filters.minArea || 0);
-  const maxArea = Number(filters.maxArea || 0);
-  const budget = Number(filters.budget || filters.rentBudget || 0);
+  const parsed = parseQueryFilters(text);
+  const area = String(filters.areas || filters.area || parsed.area || "").trim();
+  const propertyType = String(filters.propertyType || parsed.propertyType || "").trim();
+  const transaction = String(filters.transaction || parsed.transaction || "").trim();
+  const minArea = Number(filters.minArea || parsed.minArea || 0);
+  const maxArea = Number(filters.maxArea || parsed.maxArea || 0);
+  const budget = Number(filters.budget || filters.rentBudget || parsed.budget || 0);
   const sourceScope = selectedBoardPlatforms();
   let rows = (boardState.allRecords || boardState.records || []).slice();
 
-  if (area) rows = rows.filter((row) => normalizeArabic(row.area).includes(normalizeArabic(area)) || normalizeArabic(area).includes(normalizeArabic(row.area)));
-  if (propertyType) rows = rows.filter((row) => normalizeArabic(row.propertyType).includes(normalizeArabic(propertyType)));
-  if (transaction) rows = rows.filter((row) => normalizeArabic(row.transaction).includes(normalizeArabic(transaction)));
+  if (area) rows = rows.filter((row) => {
+    const rowArea = normalizeArabic(row.area);
+    // لا تُطابق السجلات الخالية من المنطقة أي استعلام منطقة (تجنب تطابق «النص.includes(«)» الفارغ)
+    return rowArea && (rowArea.includes(normalizeArabic(area)) || normalizeArabic(area).includes(rowArea));
+  });
+  if (propertyType) rows = rows.filter((row) => {
+    const rowType = normalizeArabic(row.propertyType);
+    return rowType && rowType.includes(normalizeArabic(propertyType));
+  });
+  if (transaction) rows = rows.filter((row) => {
+    const rowTxn = normalizeArabic(row.transaction);
+    return rowTxn && rowTxn.includes(normalizeArabic(transaction));
+  });
   if (minArea) rows = rows.filter((row) => Number(row.space || 0) >= minArea);
   if (maxArea) rows = rows.filter((row) => Number(row.space || 0) <= maxArea);
   rows = rows.filter((row) => sourceMatchesPlatformScope(row, sourceScope));
@@ -359,7 +416,7 @@ function staticAnalyzeReport(payload) {
       priceRatio: median && price ? price / median : null,
       valuationLabel: row.opportunityLabel || (score >= 75 ? "فرصة قوية" : score >= 60 ? "مناسبة" : "تحتاج مراجعة"),
       valuationReason: row.opportunityReason || "تقييم من لقطة البيانات المنشورة: مطابقة الفلاتر، السعر، وجود المقارنات، ومصدر الإعلان.",
-      decisionLine: "نسخة GitHub Pages تستخدم لقطة بيانات منشورة. التحديث الحي يحتاج API backend.",
+      decisionLine: "النسخة المنشورة (static) تستخدم لقطة بيانات. التحديث الحي يتطلب تشغيل خادم الـ API.",
       reasons: [
         area ? `مطابق للمنطقة: ${area}` : "مطابق لنطاق البحث",
         propertyType ? `نوع العقار: ${propertyType}` : "نوع العقار من بيانات الإعلان",
@@ -389,7 +446,7 @@ function staticAnalyzeReport(payload) {
     generatedAt: new Date().toLocaleString("ar-KW"),
     analysisMethod: "local",
     summary: results.length
-      ? `تم تحليل ${results.length} نتيجة من لقطة GitHub Pages. أفضل نتيجة ${results[0].code} بدرجة ${results[0].recommendationScore}/100.`
+      ? `تم تحليل ${results.length} نتيجة من لقطة البيانات المنشورة. أفضل نتيجة ${results[0].code} بدرجة ${results[0].recommendationScore}/100.`
       : "لا توجد نتائج مطابقة في لقطة البيانات المنشورة. جرّب توسيع المنطقة أو المنصة.",
     request: { rawText: text, areas: area ? [area] : [], propertyType, transaction },
     extractedFilters: [
@@ -397,7 +454,7 @@ function staticAnalyzeReport(payload) {
       { label: "نوع العقار", value: propertyType, source: "الفلاتر" },
       { label: "العملية", value: transaction, source: "الفلاتر" },
     ],
-    searchScope: { note: "تحليل من لقطة static منشورة. النتائج الحية تحتاج API backend." },
+    searchScope: { note: "تحليل من لقطة static منشورة. شغّل خادم الـ API للحصول على التحديث الحي والمسح المباشر للمصادر." },
     rankingMethod: {
       title: "ترتيب static",
       description: "الترتيب حسب درجة الفرصة، مطابقة الفلاتر، السعر، وعدد المقارنات المتاحة في اللقطة.",
@@ -407,8 +464,13 @@ function staticAnalyzeReport(payload) {
         { label: "الأدلة", value: "25%" },
       ],
     },
-    sourceStatus: [{ name: "GitHub Pages static snapshot", status: "success", records: rows.length }],
-    similarExternal: { items: results.slice(0, 6), sources: Array.from(new Set(results.map((r) => r.source).filter(Boolean))) },
+    sourceStatus: [{ name: "لقطة static منشورة", status: "success", records: rows.length }],
+    similarExternal: (() => {
+      // قسم «إعلانات مشابهة من المواقع الأخرى»: تُفضَّل المصادر غير الفريج إن وُجدت
+      const nonLocal = results.filter((row) => normalizeArabic(row.source) !== normalizeArabic("الفريج"));
+      const pool = nonLocal.length ? nonLocal : results;
+      return { items: pool.slice(0, 6), sources: Array.from(new Set(pool.map((r) => r.source).filter(Boolean))) };
+    })(),
     profitOpportunities: { items: [] },
     results,
     persistence: { status: "static" },
@@ -417,13 +479,19 @@ function staticAnalyzeReport(payload) {
 
 async function postJson(path, payload) {
   if (STATIC_SNAPSHOT_MODE && path === "/api/analyze") return staticAnalyzeReport(payload);
-  const response = await fetch(apiUrl(path), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
+  try {
+    const response = await fetch(apiUrl(path), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return await response.json();
+  } catch (err) {
+    // أي مضيف بلا API (خادم ثابت محلي، رابط مضبوط غير متاح): التحليل يعمل داخل المتصفح على اللقطة
+    if (path === "/api/analyze") return staticAnalyzeReport(payload);
+    throw err;
+  }
 }
 
 function addChatMessage(role, htmlContent) {
@@ -441,6 +509,7 @@ function clearChat() {
   if (!win) return;
   win.innerHTML = "";
   state.chatMessages = [];
+  setTabCount("tabCountSearch", 0);
 }
 
 function filteredBoardRows() {
@@ -685,6 +754,7 @@ async function loadDashboardBoard() {
     const suffix = params.toString() ? `?${params.toString()}` : "";
     const data = await getJson(`/api/dashboard/summary${suffix}`);
     boardState.allRecords = data.records || [];
+    setTabCount("tabCountBoard", boardState.allRecords.length);
     boardState.records = STATIC_SNAPSHOT_MODE
       ? boardState.allRecords.filter((row) => sourceMatchesPlatformScope(row, platforms))
       : boardState.allRecords;
@@ -754,8 +824,18 @@ async function sendChat() {
   const input = $("chatInput");
   if (!input) return;
   const filters = collectAdvancedFilters();
-  const text = (input.value && input.value.trim()) || buildTextFromFilters(filters);
+  const typed = (input.value && input.value.trim()) || "";
+  const text = typed || buildTextFromFilters(filters);
   if (!text) return;
+  // النص المكتوب يدويًا في الشات هو مصدر الحقيقة: لا تدع قيم حقول الفلاتر القديمة
+  // (الباقية من نقر سابق على اللوحة/نموذج البحث) تتجاوز المنطقة/العملية/النوع المكتوبة.
+  if (typed && typed !== buildTextFromFilters(filters)) {
+    const parsed = parseQueryFilters(typed);
+    filters.areas = parsed.area;
+    filters.governorate = "";
+    filters.transaction = parsed.transaction;
+    filters.propertyType = parsed.propertyType;
+  }
   state.chatSubmitting = true;
   const platformScope = selectedBoardPlatforms();
   const sourceMode = platformScope.sourceMode;
@@ -878,12 +958,18 @@ function renderSources(report) {
     const trustLine = trust.label
       ? `<em class="trust-badge ${toneClass(trust.tone)}">${escapeHtml(trust.label)} ${trust.score !== undefined ? `(${trust.score}%)` : ""}</em>`
       : "";
+    // شفافية آلية الجلب: كيف جُلبت البيانات فعلًا (JSON مضمّن / بيانات منظمة / فحص HTML / تغذية رسمية)
+    // ونقطة النهاية الحقيقية — فلا يظهر رقم بلا مصدر قابل للتتبع
+    const mechLine = source.fetchMethod
+      ? `<span class="source-mech" dir="auto">🔎 آلية الجلب: ${escapeHtml(source.fetchMethod)}${source.endpoint ? ` · <code dir="ltr">${escapeHtml(source.endpoint)}</code>` : ""}</span>`
+      : "";
     const item = document.createElement("div");
     item.className = `source-card ${source.status}`;
     item.innerHTML = `
       <strong>${escapeHtml(source.name)}</strong>
       <span>${escapeHtml(sourceStatusLabel(source.status))} | دخل التقييم: ${escapeHtml(source.records)}${escapeHtml(candidates)}${escapeHtml(response)}${escapeHtml(available)}</span>
       ${trustLine}
+      ${mechLine}
       <p>${escapeHtml(source.note)}</p>
       ${trust.reason ? `<p class="source-trust-reason">${escapeHtml(trust.reason)}</p>` : ""}
       ${url}
@@ -1229,6 +1315,7 @@ function renderReport(report) {
   renderProfitOpportunities(report);
   renderSimilarExternal(report);
   renderMethod(report);    const results = report.results || [];
+  setTabCount("tabCountSearch", results.length);
   const exactResults = results.filter((item) => !(item.warnings || []).some((warning) => String(warning).includes("خارج المنطقة المطلوبة")));
   const expandedResults = results.filter((item) => (item.warnings || []).some((warning) => String(warning).includes("خارج المنطقة المطلوبة")));
   const resultCountEl = $("resultCount");
@@ -1438,6 +1525,95 @@ function downloadReport() {
   URL.revokeObjectURL(url);
 }
 
+// تقرير PDF داخل المتصفح للوضع الثابت: يبني HTML مطبوعًا بأقسام التقرير ويفتح نافذة الطباعة (حفظ PDF)
+function staticDownloadPdf() {
+  const report = state.report;
+  if (!report) return;
+  const results = (report.results || []).slice(0, 20);
+  const rowsHtml = results.map((item, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${escapeHtml(item.code || "")}</td>
+      <td>${escapeHtml(item.area || "")}</td>
+      <td>${escapeHtml(item.priceText || (item.price ? formatMoney(item.price) : "غير معلن"))}</td>
+      <td>${item.space ? `${escapeHtml(String(item.space))} م²` : "غير مذكورة"}</td>
+      <td>${escapeHtml(item.source || "")}</td>
+      <td>${Math.round(item.recommendationScore || 0)}/100</td>
+      <td>${escapeHtml(item.valuationLabel || "")}</td>
+    </tr>`).join("");
+  const top = results[0];
+  const compsRows = top && top.comparables && top.comparables.length
+    ? top.comparables.map((comp) => `
+        <tr>
+          <td>${escapeHtml(comp.code || "")}</td>
+          <td>${escapeHtml(comp.area || "")}</td>
+          <td>${escapeHtml(comp.priceText || (comp.price ? formatMoney(comp.price) : "غير معلن"))}</td>
+          <td>${comp.space ? `${escapeHtml(String(comp.space))} م²` : "غير مذكورة"}</td>
+          <td>${escapeHtml(comp.source || "")}</td>
+          <td>${comp.url ? `<a href="${escapeHtml(comp.url)}">فتح الإعلان</a>` : "—"}</td>
+        </tr>`).join("")
+    : '<tr><td colspan="6" style="text-align:center">لا توجد مقارنات سعرية في اللقطة الحالية.</td></tr>';
+  const reasons = top && top.reasons && top.reasons.length
+    ? top.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")
+    : "";
+  const win = window.open("", "_blank", "width=900,height=700");
+  if (!win) {
+    alert("اسمح بالنوافذ المنبثقة لتوليد تقرير PDF داخل المتصفح، أو شغّل خادم الـ API.");
+    return;
+  }
+  win.document.write(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>تقرير تقييم عقاري — النسخة الثابتة</title>
+<style>
+  body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#0F172A;margin:24px;line-height:1.6}
+  h1{color:#1457A8;font-size:20px;margin:0 0 4px}
+  .meta{color:#64748B;font-size:12px;margin-bottom:16px}
+  h2{color:#1457A8;font-size:15px;border-bottom:2px solid #1457A8;padding-bottom:4px;margin:20px 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
+  th{background:#0F172A;color:#fff;padding:6px 8px;text-align:right}
+  td{border:1px solid #CBD5E1;padding:6px 8px}
+  .badge{display:inline-block;background:#EFF6FF;color:#1457A8;border:1px solid #BFDBFE;border-radius:999px;padding:2px 10px;font-size:12px}
+  ul{margin:4px 0}
+  .note{background:#FFF7ED;border:1px solid #FDBA74;border-radius:8px;padding:8px 12px;font-size:12px;color:#7C2D12}
+  @media print{body{margin:12mm}}
+</style>
+</head>
+<body>
+  <h1>تقرير تقييم عقاري</h1>
+  <p class="meta">${escapeHtml(report.generatedAt || new Date().toLocaleString("ar-KW"))} · تحليل من لقطة البيانات المنشورة · احفظ الصفحة PDF من نافذة الطباعة</p>
+  <div class="note">${escapeHtml((report.searchScope && report.searchScope.note) || "النسخة الثابتة تستخدم لقطة بيانات منشورة؛ التحديث الحي يتطلب تشغيل خادم الـ API.")}</div>
+  <h2>النتائج المرتبة حسب درجة التوصية</h2>
+  <table>
+    <thead><tr><th>#</th><th>الإعلان</th><th>المنطقة</th><th>السعر</th><th>المساحة</th><th>المصدر</th><th>التوصية</th><th>الحكم</th></tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+  ${top ? `
+  <h2>التفاصيل التحليلية لأفضل نتيجة: ${escapeHtml(top.code)} — ${escapeHtml(top.area || "")}</h2>
+  <table>
+    <tbody>
+      <tr><td>حكم السعر</td><td>${escapeHtml(top.valuationLabel || "")}</td></tr>
+      <tr><td>درجة التوصية</td><td>${Math.round(top.recommendationScore || 0)} / 100</td></tr>
+      <tr><td>الثقة</td><td>${top.numberSources && top.numberSources.confidence ? `${Math.round(top.numberSources.confidence.value || 0)}%` : "—"}</td></tr>
+      <tr><td>السبب</td><td>${escapeHtml(top.valuationReason || "")}</td></tr>
+      ${top.originalUrl ? `<tr><td>رابط الإعلان</td><td><a href="${escapeHtml(top.originalUrl)}">${escapeHtml(top.originalUrl)}</a></td></tr>` : ""}
+      ${top.numberSources && top.numberSources.marketMedian && top.numberSources.marketMedian.value ? `<tr><td>وسيط سعر المنطقة</td><td>${escapeHtml(formatMoney(top.numberSources.marketMedian.value))} (${escapeHtml(top.numberSources.marketMedian.note || "")})</td></tr>` : ""}
+    </tbody>
+  </table>
+  ${reasons ? `<p><strong>أسباب التوصية:</strong></p><ul>${reasons}</ul>` : ""}
+  <h2>المقارنات السعرية الداخلة في التقييم</h2>
+  <table>
+    <thead><tr><th>الكود</th><th>المنطقة</th><th>السعر</th><th>المساحة</th><th>المصدر</th><th>الرابط</th></tr></thead>
+    <tbody>${compsRows}</tbody>
+  </table>` : ""}
+  <p class="meta">تقرير مولّد داخل المتصفح من لقطة البيانات المنشورة — للتحليل الحي والمصادر المباشرة شغّل خادم الـ API.</p>
+</body>
+</html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 250);
+}
+
 async function downloadPdfReport(btnId) {
   if (!state.report) return;
   const btn = btnId ? $(btnId) : null;
@@ -1447,6 +1623,10 @@ async function downloadPdfReport(btnId) {
     btn.textContent = "جاري توليد PDF...";
   }
   try {
+    if (STATIC_SNAPSHOT_MODE) {
+      staticDownloadPdf();
+      return;
+    }
     const response = await fetch(apiUrl("/api/report-pdf"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1463,8 +1643,9 @@ async function downloadPdfReport(btnId) {
     link.remove();
     URL.revokeObjectURL(url);
   } catch (err) {
-    console.error(err);
-    alert("تعذر توليد تقرير PDF: " + err.message);
+    // على مضيف بلا API (خادم ثابت محلي مثلًا): توليد التقرير داخل المتصفح
+    console.warn("live PDF failed, falling back to in-browser print report:", err);
+    staticDownloadPdf();
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -2245,9 +2426,9 @@ function renderOppTier() {
   if (!root || !oppState.data) return;
   // مرشّح المصدر ونوع الإعلان (مباشر/مكتب) خاص بتبويبات الفرص (الأفضل + الفئات الزمنية)
   setOppSourceRowVisible(["best", "daily", "weekly", "monthly", "yearly"].includes(oppState.tier));
-  if (oppState.tier === "clients") { renderClientsTab(root); return; }
-  if (oppState.tier === "alerts") { renderAlertsTab(root); return; }
-  if (oppState.tier === "history") { renderHistoryTab(root); return; }
+  if (oppState.tier === "clients") { renderClientsTab(root); updateOppTabCount(); return; }
+  if (oppState.tier === "alerts") { renderAlertsTab(root); updateOppTabCount(); return; }
+  if (oppState.tier === "history") { renderHistoryTab(root); updateOppTabCount(); return; }
   if (oppState.tier === "forecast") {
     const total = oppState.data.forecast || [];
     const items = total.filter((item) => {
@@ -2263,6 +2444,7 @@ function renderOppTier() {
     root.innerHTML = hint + (items.length
       ? items.map(oppForecastCard).join("")
       : '<div class="empty">لا توجد توقعات كافية بعد.</div>');
+    updateOppTabCount();
     return;
   }
   let items;
@@ -2286,6 +2468,7 @@ function renderOppTier() {
     const tier = (oppState.data.tiers || {})[oppState.tier];
     if (!tier) {
       root.innerHTML = '<div class="empty">لا توجد بيانات.</div>';
+      updateOppTabCount();
       return;
     }
     renderOppSourceCounts(tier.items || []);
@@ -2321,6 +2504,7 @@ function renderOppTier() {
       }));
     });
   });
+  updateOppTabCount();
 }
 
 function renderOppMeta() {
@@ -2515,6 +2699,7 @@ async function loadOpportunities(forceRefresh = false) {
     loadDailyUpdateNotice();
     loadDailyAgentStatus();
     renderOppTier();
+    updateOppTabCount();
   } catch (err) {
     console.error(err);
     root.innerHTML = `<div class="empty">تعذر تحميل الفرص: ${escapeHtml(err.message)}</div>`;
@@ -2554,6 +2739,7 @@ async function loadOpportunityTab(tier) {
       oppState.delta = await getJson("/api/opportunity-delta");
       renderDeltaTab(root);
     }
+    updateOppTabCount();
   } catch (err) {
     console.error(err);
     root.innerHTML = `<div class="empty">تعذر التحميل: ${escapeHtml(err.message)}</div>`;
@@ -2617,10 +2803,11 @@ function bind() {
   on("officialImportBtn", importOfficialTransactions);
   on("runDailyAgentBtnInline", runDailyAgentNow);
   on("toggleCustomSearchBtn", () => {
+    switchMainTab("search");
     const panel = $("customSearchPanel");
-    if (!panel) return;
-    panel.hidden = !panel.hidden;
-    if (!panel.hidden) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    const input = $("chatInput");
+    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (input) setTimeout(() => input.focus(), 400);
   });
   on("boardRunSearchBtn", () => runBoardAnalysis());
   on("boardClearFiltersBtn", () => {
@@ -2637,8 +2824,9 @@ function bind() {
     loadDashboardBoard();
   });
   on("openEvidenceQuick", () => {
+    switchMainTab("sources");
     const target = document.querySelector(".sources-panel");
-    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (target) setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   });
   ["boardMetricFilter", "boardGovernorateFilter", "boardTransactionFilter", "boardPropertyTypeFilter", "boardListingModeFilter", "boardAreaFilter"].forEach((id) => {
     const el = $(id);
@@ -2742,8 +2930,60 @@ function scheduleDailySixAM() {
   }, 30 * 1000);
 }
 
+// ── عدّادات حجم المحتوى داخل أزرار التبويبات (تظهر قبل الدخول) ──
+function setTabCount(id, count) {
+  const el = $(id);
+  if (!el) return;
+  const n = Number(count);
+  if (!Number.isFinite(n) || n <= 0) {
+    el.textContent = "";
+    return;
+  }
+  el.textContent = n > 999 ? "999+" : String(n);
+}
+
+function updateOppTabCount() {
+  // عدّاد تبويب «أفضل الفرص» = إجمالي الفرص المتاحة (مدمجة من كل الفئات الزمنية بلا تكرار)
+  // ثابت بغض النظر عن التبويب الفرعي المفتوح — يعكس حجم المحتوى قبل الدخول.
+  if (!oppState.data) {
+    setTabCount("tabCountOpp", 0);
+    return;
+  }
+  const seen = new Set();
+  let count = 0;
+  const tierItems = oppState.data.tiers || {};
+  for (const key of ["daily", "weekly", "monthly", "yearly"]) {
+    for (const item of (tierItems[key]?.items) || []) {
+      if (item.code && seen.has(item.code)) continue;
+      if (item.code) seen.add(item.code);
+      count += 1;
+    }
+  }
+  setTabCount("tabCountOpp", count);
+}
+
+// ── التبويبات الرئيسية: يعرض قسمًا واحدًا في كل مرة بدل تكديس كل الأقسام تحت بعض ──
+function switchMainTab(name) {
+  document.querySelectorAll(".main-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.mainTab === name);
+  });
+  document.querySelectorAll("[data-main-panel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.mainPanel === name);
+  });
+  if (name === "opportunities") loadOpportunities(false);
+  if (name === "board") loadDashboardBoard();
+}
+
+function bindMainTabs() {
+  document.querySelectorAll(".main-tab").forEach((btn) => {
+    btn.addEventListener("click", () => switchMainTab(btn.dataset.mainTab));
+  });
+}
+
 async function boot() {
   bind();
+  bindMainTabs();
+  switchMainTab("search");
   bindOppEvents();
   loadDashboardBoard();
   loadOpportunities();
@@ -2757,6 +2997,8 @@ async function boot() {
     const health = await getJson("/api/health");
     const aiStatus = health.aiAnalysis ? "التحليل الذكي متاح" : "تحليل محلي";
     setStatus(`البيانات: ${health.records} إعلان | قاعدة البيانات: ${health.supabase ? "متصلة" : "غير مضبوطة"} | ${aiStatus}`);
+    const tableCount = Object.keys((health.dataSummary && health.dataSummary.tables) || {}).length;
+    setTabCount("tabCountSources", tableCount);
   } catch {
     setStatus("تعذر فحص البيانات");
   }

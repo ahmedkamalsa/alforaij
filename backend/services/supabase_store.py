@@ -316,6 +316,7 @@ def supabase_data_summary(local_records: int = 0) -> dict[str, Any]:
     """خريطة مختصرة لمصادر البيانات الفعلية والمخططة داخل Supabase."""
     tables = {
         "listings": "إعلانات الفريج/المصادر المحفوظة",
+        "market_listings": "إعلانات السوق الخارجية المحصودة من كل المواقع",
         "market_ads": "إعلانات السوق الحية من المواقع/لوحات العرض",
         "official_transactions": "صفقات رسمية مستوردة",
         "official_market_indicators": "مؤشرات سعرية رسمية/مرجعية",
@@ -455,6 +456,71 @@ def fetch_market_ads(
 def save_market_ads(rows: list[dict[str, Any]]) -> None:
     """حفظ إعلانات جديدة في market_ads (upsert على source_listing_id)."""
     _post("market_ads", rows, upsert=True, conflict="source_listing_id")
+
+
+def save_market_listings(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """حفظ إعلانات السوق الخارجية المحصودة في جدول market_listings (upsert على code).
+
+    متسامح تمامًا: غياب الجدول أو تعذر الكتابة لا يكسر التشغيل اليومي — يُسجَّل السبب
+    ويعود status حتى يظهر في تقرير الوكيل (خطوة persist_market_listings).
+    """
+    if not rows:
+        return {"status": "empty", "count": 0, "error": ""}
+    if not is_configured():
+        return {"status": "not_configured", "count": 0, "error": ""}
+    try:
+        for index in range(0, len(rows), 250):
+            _post("market_listings", rows[index:index + 250], upsert=True, conflict="code")
+        return {"status": "saved", "count": len(rows), "error": ""}
+    except RuntimeError as exc:
+        logger.warning("market_listings save failed: %s", exc)
+        return {"status": "failed", "count": 0, "error": str(exc)}
+    except Exception:
+        logger.exception("market_listings save failed")
+        return {"status": "failed", "count": 0, "error": "unexpected error"}
+
+
+def market_listings_table_available() -> bool:
+    """هل جدول market_listings موجود فعلًا؟ (فحص خفيف دون كشف الأخطاء)."""
+    if not is_configured():
+        return False
+    request = urllib.request.Request(
+        f"{SUPABASE_URL}/rest/v1/market_listings?select=code&limit=1",
+        method="GET",
+        headers=_headers(),
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return response.status == 200
+    except Exception:
+        return False
+
+
+def fetch_market_listings(
+    area: str | None = None,
+    transaction: str | None = None,
+    property_type: str | None = None,
+    source: str | None = None,
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    """قراءة إعلانات السوق الخارجية المحصودة من جدول market_listings.
+
+    الفلاتر اختيارية وتُطبق في REST API لتقليل البيانات المنقولة.
+    """
+    if not is_configured():
+        return []
+    params: list[str] = [f"limit={int(limit)}"]
+    if area:
+        params.append(f"area=ilike.*{urllib.parse.quote(area)}*")
+    if transaction:
+        params.append(f"transaction=ilike.*{urllib.parse.quote(transaction)}*")
+    if property_type:
+        params.append(f"property_type=ilike.*{urllib.parse.quote(property_type)}*")
+    if source:
+        params.append(f"source=ilike.*{urllib.parse.quote(source)}*")
+    params.append("order=fetched_at.desc")
+    endpoint = f"{SUPABASE_URL}/rest/v1/market_listings?{'&'.join(params)}"
+    return _fetch_rows(endpoint)
 
 
 def fetch_official_indicators(region: str | None = None, limit: int = 50) -> list[dict[str, Any]]:

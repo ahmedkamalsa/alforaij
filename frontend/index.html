@@ -32,7 +32,14 @@
   </header>
 
   <main class="workspace">
-    <section class="action-toolbar">
+    <nav class="main-tabs" id="mainTabs" aria-label="الأقسام الرئيسية">
+      <button class="main-tab active" data-main-tab="search" type="button">🔍 البحث والتقييم <b class="main-tab-count" id="tabCountSearch"></b></button>
+      <button class="main-tab" data-main-tab="opportunities" type="button">💎 أفضل الفرص <b class="main-tab-count" id="tabCountOpp"></b></button>
+      <button class="main-tab" data-main-tab="board" type="button">📊 <span class="tab-full">لوحة السوق</span><span class="tab-short">السوق</span> <b class="main-tab-count" id="tabCountBoard"></b></button>
+      <button class="main-tab" data-main-tab="sources" type="button">🔗 <span class="tab-full">المصادر والتشغيل</span><span class="tab-short">المصادر</span> <b class="main-tab-count" id="tabCountSources"></b></button>
+    </nav>
+
+    <section class="action-toolbar" data-main-panel="search">
       <div>
         <strong>مركز البحث والتقييم</strong>
         <span>اكتب الطلب، اختر نطاق المصدر، ثم راجع النتائج والمصادر والأدلة من نفس الصفحة.</span>
@@ -45,7 +52,7 @@
       </div>
     </section>
 
-    <section class="board-panel">
+    <section class="board-panel" data-main-panel="board">
       <div class="section-title">
         <div>
           <h2>لوحة الأرقام والعروض</h2>
@@ -154,7 +161,7 @@
       </div>
     </section>
 
-    <section id="customSearchPanel" class="request-panel chat-panel custom-search-panel" hidden>
+    <section id="customSearchPanel" class="request-panel chat-panel custom-search-panel" data-main-panel="search">
       <div class="section-title">
         <h2>بحث وتقييم الفرص</h2>
         <span>اكتب وصف الطلب، اختر نطاق المصدر، ثم راجع النتائج والأدلة من نفس المكان</span>
@@ -214,7 +221,7 @@
       </details>
     </section>
 
-    <section class="main-panel">
+    <section class="main-panel" data-main-panel="search">
       <section class="summary-strip">
         <div>
           <span class="metric-label">النتائج</span>
@@ -276,8 +283,9 @@
         <p id="similarExternalNote" class="scope-note"></p>
         <div id="similarExternalList" class="similar-external-list"></div>
       </section>
+    </section>
 
-      <section class="opportunities-panel">
+    <section class="opportunities-panel" data-main-panel="opportunities">
         <div class="section-title opp-head">
           <div>
             <h2>أفضل الفرص والتوقعات</h2>
@@ -351,7 +359,7 @@
         <div id="oppList" class="results"></div>
       </section>
 
-      <section class="sources-panel">
+      <section class="sources-panel" data-main-panel="sources">
         <div class="section-title">
           <h2>تشغيل المنصة والبيانات</h2>
           <span>تحديث آلي يومي للمصادر والفرص مع إشعارات تشغيل واضحة</span>
@@ -400,14 +408,13 @@
         <div id="externalLinks" class="external-links"></div>
       </section>
 
-      <section class="results-panel">
+    <section class="results-panel" data-main-panel="search">
         <div class="section-title">
           <h2>النتائج المرتبة</h2>
           <span>حسب درجة التوصية</span>
         </div>
         <div id="results" class="results"></div>
       </section>
-    </section>
   </main>
 
   <template id="resultTemplate">

@@ -33,7 +33,9 @@ supabase/setup_all.sql
 1. `supabase/migrations/001_initial_schema.sql`
 2. `supabase/migrations/002_source_quality_and_runs.sql`
 3. `supabase/seed_source_registry.sql`
-… إلخ (كل ملفات `supabase/migrations/` بالترتيب، منها `007_outreach_clicks.sql` لتتبع نقرات التسويق)
+… إلخ (كل ملفات `supabase/migrations/` بالترتيب، منها:
+   - `007_outreach_clicks.sql` لتتبع نقرات التسويق
+   - `010_market_listings.sql` **لإعلانات السوق الخارجية المحصودة** — الوكيل اليومي يحفظ فيها كل إعلانات Mourjan/OpenSooq/Q8Aqar/… يوميًا (خطوة `persist_market_listings`) فتراكم قاعدة المعرفة مثل بيانات الفريج المحلية تمامًا)
 
 أو بعد وضع مفاتيح البيئة يمكن مزامنة سجل المصادر بالكود:
 

@@ -171,6 +171,99 @@ textarea {
   padding: 28px;
 }
 
+/* ========== التبويبات الرئيسية (أعلى الموقع) ========== */
+.main-tabs {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  padding: 10px 12px;
+  margin: -12px -12px 4px;
+  background: rgba(243, 246, 251, .96);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.main-tab {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.main-tab:hover {
+  border-color: var(--blue);
+}
+
+.main-tab.active {
+  background: #101828;
+  border-color: #101828;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, .18);
+}
+
+/* عدّاد حجم المحتوى داخل زر التبويب — يظهر حجم الفرص/النتائج قبل الدخول */
+.main-tab-count {
+  display: inline-block;
+  min-width: 22px;
+  margin-inline-start: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--blue, #1457A8);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.55;
+  vertical-align: middle;
+}
+
+.main-tab.active .main-tab-count {
+  background: #fff;
+  color: #101828;
+}
+
+.main-tab-count:empty {
+  display: none;
+}
+
+/* اسم التبويب القصير للجوال — يظهر بدل الطويل عندما لا يتسع عمود الشبكة */
+.tab-short {
+  display: none;
+}
+
+/* لوحة واحدة ظاهرة لكل تبويب — كل قسم ينتمي لتبويب عبر data-main-panel */
+[data-main-panel]:not(.active) {
+  display: none !important;
+}
+
+/* ضمان أن خاصية hidden (المستخدمة في عناصر كثيرة) تخفي فعليًا */
+[hidden] {
+  display: none !important;
+}
+
+/* الأقسام المنقولة خارج main-panel تحافظ على شكل البطاقة */
+.sources-panel,
+.results-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.sources-panel,
+.results-panel {
+  padding: 16px;
+}
+
 .action-toolbar {
   grid-column: 1 / -1;
   display: flex;
@@ -260,7 +353,9 @@ textarea {
 }
 
 .board-platform-field {
-  grid-column: span 2;
+  /* يمتد عبر كل الأعمدة بغض النظر عن عددها — «span 2» كان يخلق عمودًا ضمنيًا
+     ثانيًا على الجوال (عندما تصبح الشبكة عمودًا واحدًا) فيتفجر عرض اللوحة */
+  grid-column: 1 / -1;
 }
 
 .field-caption {
@@ -1337,6 +1432,24 @@ button:hover {
   font-weight: 800;
 }
 
+/* شفافية آلية الجلب لكل مصدر: كيف جُلبت البيانات + نقطة النهاية */
+.source-mech {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.source-mech code {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 6px;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
 .source-card.success {
   border-color: #b7dfc2;
   border-right-color: var(--green);
@@ -1474,6 +1587,9 @@ button:hover {
 
 .results {
   display: grid;
+  /* minmax(0, 1fr) — يمنع أي طفل بعرض أدنى كبير (جداول/صفوف عريضة) من
+     تمديد عمود auto ودفع الصفحة للتجاوز الأفقي — نفس نمط إصلاح لوحة السوق */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -2681,6 +2797,13 @@ summary {
   font-weight: 800;
 }
 
+/* رموز LTR طويلة (أرقام هواتف/مسارات migration) — لا تدعها تدفع العمود للتجاوز */
+.client-row code,
+.scope-note code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
 .wa-open {
   display: inline-block;
   padding: 6px 12px;
@@ -2899,7 +3022,9 @@ summary {
   .hero-content,
   .board-filter-grid,
   .board-layout {
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr) — يسمح للعمود بالانكماش تحت المحتوى (قوائم طويلة)
+       بدل «1fr» الذي يفرض minmax(auto, 1fr) فيفجّر العرض على الجوال */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .board-metrics {
@@ -2918,6 +3043,115 @@ summary {
 @media (max-width: 720px) {
   .result-head {
     display: block;
+  }
+
+  /* على الجوال وسادة workspace 10px — نحاذي حواف شريط التبويبات معها بلا تجاوز أفقي */
+  .main-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0 -10px 4px;
+  }
+
+  /* أزرار متساوية العرض (عمودان متساويان) وارتفاع موحد — بدل أحجام متباينة
+     حسب طول النص؛ التسمية الطويلة (المصادر والتشغيل) تلتف داخليًا والعدّاد
+     يبقى معها — وكل الأزرار متطابقة الأبعاد */
+  .main-tab {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-content: center;
+    align-items: center;
+    justify-content: center;
+    gap: 2px 6px;
+    min-height: 58px;
+    padding: 8px 10px;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .main-tab-count {
+    margin-inline-start: 0;
+  }
+
+  /* الاسم القصير على الجوال (السوق / المصادر) بدل الطويل الذي لا يتسع */
+  .tab-short {
+    display: inline;
+  }
+
+  .tab-full {
+    display: none;
+  }
+
+  /* صف العميل (5 أعمدة بحدود أدنى كبيرة) يتراص عمودًا واحدًا على الجوال */
+  .client-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  /* ── أهداف لمس ≥ 44px لكل عناصر التحكم على الجوال (أزرار/روابط/شرائح) ── */
+  .opp-copy-btn,
+  .wa-share,
+  .wa-client,
+  .wa-open {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .opp-source-chip {
+    min-height: 44px;
+  }
+
+  /* روابط فتح الإعلان — تتحول لزر لمس مريح (inline-flex لتوسيط النص) */
+  .open-link,
+  .comp-open {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* زر «عرض المزيد» داخل السبب: مساحة لمس 44px بحواف سالبة حتى لا يضخّم البطاقة */
+  .clamp-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin: -14px 0;
+    padding: 14px 0;
+  }
+
+  .count-button {
+    min-height: 44px;
+  }
+
+  .gov-toggle {
+    width: 44px;
+    min-height: 44px;
+  }
+
+  .companion-actions button,
+  .companion-actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  /* روابط المصادر المستقلة (فتح المصدر/الموقع) وروابط المرجع الرسمي — أهداف لمس مريحة */
+  .source-card a,
+  .similar-external-card a,
+  .external-link-card a,
+  .official-reference-strip a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* رؤوس الطي (collapsible) — هدف لمس مريح بدل سطر نص رفيع */
+  summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .topbar {

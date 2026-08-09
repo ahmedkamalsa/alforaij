@@ -36,6 +36,27 @@ from backend.services.valuation import comparable_pool, price_label
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 CLIENTS_PATH = DATA_DIR / "potential_leads.csv"
 
+
+def _listing_row(listing: Any) -> dict[str, Any]:
+    """تمثيل JSON خفيف للإعلان المحصود من السوق الخارجي لحفظه في قاعدة المعرفة."""
+    return {
+        "code": listing.code,
+        "source": listing.source,
+        "transaction": listing.transaction,
+        "governorate": listing.governorate,
+        "area": listing.area,
+        "property_type": listing.property_type,
+        "detail_class": listing.detail_class,
+        "price": listing.price,
+        "price_text": listing.price_text,
+        "space": listing.space,
+        "listing_mode": listing.listing_mode,
+        "summary": listing.summary,
+        "features": listing.features,
+        "published_date": listing.published_date or None,
+        "original_url": listing.original_url,
+    }
+
 # مصداقية المصادر (ثابتة من السجل الرسمي للمصادر)
 SOURCE_TRUST: dict[str, float] = {
     "الفريج": 0.95,
@@ -876,15 +897,19 @@ def build_history_series(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
     return {"dates": dates, "series": output[:15], "snapshotCount": len(snapshots)}
 
 
-def build_opportunities(limit_per_tier: int = 30, include_external: bool = True) -> dict[str, Any]:
+def build_opportunities(limit_per_tier: int = 30, include_external: bool = True, return_external: bool = False) -> dict[str, Any]:
     """يبني لقطة الفرص الحالية: فئات زمنية + توقعات + عملاء محتملون، مع مصادر وأدلة وثقة حتمية.
 
     include_external: يدمج الإعلانات الحية من المصادر الخارجية المتصلة (الفريج محليًا +
     Mourjan/OpenSooq/... عبر الإنترنت) مع الإفصاح عن المصادر التي أسهمت.
+    return_external: يعيد أيضًا إعلانات السوق الخارجية المحصودة (مسلسلة) تحت مفتاح
+    `externalListings` ليتسنى حفظها في قاعدة المعرفة (market_listings) — قاعدة البيانات
+    تتراكم كل إعلانات المواقع مثل بيانات الفريج المحلية تمامًا.
     """
     listings = load_listings()
     clients = _load_clients()
     external_statuses: list[dict[str, Any]] = []
+    external_rows: list[dict[str, Any]] = []
     if include_external:
         try:
             external_listings, external_statuses = search_external_sources(_broad_request())
@@ -901,6 +926,8 @@ def build_opportunities(limit_per_tier: int = 30, include_external: bool = True)
                     continue
                 seen_codes.add(listing.code)
                 listings.append(listing)
+                if return_external:
+                    external_rows.append(_listing_row(listing))
         except Exception as exc:
             logger.warning("External sources scan failed: %s", exc)
             external_statuses = [{"name": "المصادر الخارجية", "status": "failed", "records": 0, "note": str(exc)}]
@@ -922,7 +949,7 @@ def build_opportunities(limit_per_tier: int = 30, include_external: bool = True)
         for s in external_statuses
         if s.get("status") in ("success", "connected") or s.get("records")
     ))
-    return {
+    result = {
         "generatedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "generatedDate": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "totalListings": len(listings),
@@ -945,6 +972,9 @@ def build_opportunities(limit_per_tier: int = 30, include_external: bool = True)
         "tiers": tiers,
         "forecast": _area_forecast(scored),
     }
+    if return_external:
+        result["externalListings"] = external_rows
+    return result
 
 
 def build_weekly_digest(snapshot: dict[str, Any], top_n: int = 10) -> dict[str, Any]:

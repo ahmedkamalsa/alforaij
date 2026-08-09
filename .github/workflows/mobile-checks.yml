@@ -1,0 +1,41 @@
+name: Mobile layout checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "tests/playwright/**"
+      - "scripts/run_mobile_checks.py"
+      - ".github/workflows/mobile-checks.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "tests/playwright/**"
+      - "scripts/run_mobile_checks.py"
+      - ".github/workflows/mobile-checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-checks
+  cancel-in-progress: true
+
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install playwright
+          playwright install --with-deps chromium
+      - name: Run mobile layout checks
+        run: python scripts/run_mobile_checks.py

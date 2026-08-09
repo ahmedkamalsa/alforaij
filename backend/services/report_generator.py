@@ -521,10 +521,11 @@ def build_report(
         )
 
     external_plan = [
+        {"name": "آلية الجلب لكل منصة (شفافية)", "status": "منفذ ✓", "action": "كل مصدر يعرض الآن آلية جلبه الفعلية ونقطة نهايته في «تفاصيل المصادر» (JSON مضمّن / بيانات منظمة / فحص HTML / تغذية رسمية). لا توجد REST APIs عامة لهذه البوابات — تحققنا: api.4sale.com.kw غير متاح وwp-json لـ Q8Aqar محجوب."},
         {"name": "توسيع Q8Aqar", "status": "منفذ ✓", "action": "يقرأ الآن صفحات التفاصيل نفسها لتحسين السعر والمساحة بدل الرابط فقط، مع الإبقاء على العنوان كأساس."},
         {"name": "Sakan", "status": "منفذ جزئيًا", "action": "يحاول الآن استخراج الإعلانات من الحالة المضمّنة في الصفحة عند توفرها، وإلا يبقى دليل توفر وعدد متاح."},
         {"name": "الصفقات الرسمية", "status": "منفذ ✓", "action": "تُقرأ من جدول official_transactions في Supabase وملف محلي، وتُستخدم كوسيط سوق مرجّح أعلى من الإعلانات في التقييم (أعلى مصداقية)."},
-        {"name": "منصات توسعة جديدة", "status": "منفذ ✓", "action": "أُضيف Aqarat و4Sale كموصلين حيين بنفس قواعد الفلترة والدليل، ومرورهما بسجل تشغيل المصادر."},
+        {"name": "قاعدة المعرفة المتراكمة", "status": "منفذ ✓", "action": "الوكيل اليومي يحصاد كل إعلانات المواقع ويحفظها في market_listings مع رابط الإعلان الأصلي ووقت الجلب (original_url + fetched_at) — كل رقم قابل للتتبع إلى مصدره."},
         {"name": "مصادر مكاتب / API شريك", "status": "الخطوة التالية", "action": "ربط API أو Feed من مكاتب عقارية عند توفره، ثم تمريره بنفس فلاتر الدليل وتسجيل التشغيل."},
     ]
 
@@ -607,6 +608,8 @@ def build_report(
                     "url": status.get("url"),
                     "note": status.get("note", ""),
                     "availableCount": status.get("availableCount"),
+                    "fetchMethod": status.get("fetchMethod", ""),
+                    "endpoint": status.get("endpoint", ""),
                     "trust": _source_trust(status),
                 }
                 for status in (external_statuses or [])

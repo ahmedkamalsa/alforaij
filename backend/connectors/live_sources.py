@@ -82,6 +82,67 @@ KNOWN_AREAS = list(dict.fromkeys(list(AREA_SLUGS.keys()) + REQUEST_KNOWN_AREAS +
     "الدوحة", "مشرف", "الجهراء", "الأندلس", "الاندلس",
 ]))
 
+# سجل آلية الجلب لكل مصدر — شفافية كاملة في التقرير: كيف تُجلب البيانات فعلًا وما
+# نقطة النهاية الحقيقية. الحقيقة التقنية: لا توجد REST APIs عامة لهذه البوابات
+# (جرّبنا api.4sale.com.kw وwp-json لـ Q8Aqar — غير متاحة)، فالمتاح هو ما تسمح
+# الصفحة العامة بقراءته: حمولة JSON مضمّنة (بيانات التطبيق نفسها) أو بيانات منظمة
+# (JSON-LD) أو فحص روابط HTML — وهذا ما نستهلكه، مع حفظ الرابط الأصلي لكل إعلان
+# كدليل في قاعدة المعرفة (market_listings.original_url).
+SOURCE_MECHANISMS: dict[str, dict[str, str]] = {
+    "OpenSooq": {
+        "method": "حمولة JSON مضمّنة (بيانات التطبيق __NEXT_DATA__) من صفحة البحث",
+        "endpoint": "https://kw.opensooq.com/en/find?term=…",
+    },
+    "Mourjan": {
+        "method": "بيانات منظمة JSON-LD + فحص روابط الصفحة",
+        "endpoint": "https://www.mourjan.com/kw/kuwait/properties/…",
+    },
+    "Q8Aqar": {
+        "method": "JSON مضمّن + فحص روابط + صفحات التفاصيل للسعر/المساحة",
+        "endpoint": "https://q8aqar.com/… (لا REST عام — wp-json محجوب)",
+    },
+    "4Sale": {
+        "method": "فحص روابط HTML (لا API عام — api.4sale.com.kw غير متاح)",
+        "endpoint": "https://kuwait.4sale.com/real-estate?search_text=…",
+    },
+    "Waseet": {
+        "method": "فحص روابط HTML وصفحات التفاصيل",
+        "endpoint": "https://www.waseet.net/kw/ar/search/?q=…",
+    },
+    "Nabdaqar": {
+        "method": "فحص روابط HTML",
+        "endpoint": "https://nabdaqar.com/?qr=…",
+    },
+    "Sakan": {
+        "method": "الحالة المضمّنة في الصفحة عند توفرها (وإلا فحص روابط)",
+        "endpoint": "https://sakan.co/en/…",
+    },
+    "Aqarat": {
+        "method": "فحص روابط HTML",
+        "endpoint": "https://aqarat.com/search?q=…",
+    },
+    "Bu3qar": {
+        "method": "فحص روابط HTML",
+        "endpoint": "https://www.bu3qar.com/?s=…",
+    },
+    "الحسبة العامة": {
+        "method": "تغذية رسمية من موقع الحسبة (صفقات موثقة بمواعيد وأرقام قسائم)",
+        "endpoint": "https://alhisba.com/…",
+    },
+    "الصفقات الرسمية": {
+        "method": "تغذية رسمية CSV/JSON عبر OFFICIAL_TRANSACTIONS_SOURCE + الحسبة العامة",
+        "endpoint": "متغير — يُضبط عبر OFFICIAL_TRANSACTIONS_SOURCE",
+    },
+}
+
+
+def source_mechanism(name: str) -> dict[str, str]:
+    """آلية الجلب المعروفة لمصدر (method + endpoint) أو افتراض شفاف عند عدم التصنيف."""
+    return SOURCE_MECHANISMS.get(name, {
+        "method": "فحص HTML للصفحة العامة (لا REST API عام)",
+        "endpoint": "رابط البحث الفعلي المستخدم وقت التشغيل",
+    })
+
 
 def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[str, int, float, str | None, int]:
     """جلب رابط مع إعادة محاولة ودعم gzip وكاش قصير ووكيل متصفح حديث.
@@ -1331,6 +1392,7 @@ def search_combo_sources(
         )
         if detail_notes:
             summary += " | " + " — ".join(detail_notes)
+        mech = source_mechanism(name)
         statuses.append({
             "name": name,
             "status": (
@@ -1344,6 +1406,8 @@ def search_combo_sources(
             "responseMs": max_ms,
             "url": first_url,
             "note": summary,
+            "fetchMethod": mech["method"],
+            "endpoint": mech["endpoint"],
         })
         listings.extend(merged)
     return listings, statuses
@@ -1431,6 +1495,8 @@ def search_external_sources(
                     "note": f"خطأ غير متوقع: {exc}",
                 }
             listings.extend(source_listings)
-            statuses.append(status)
+            # شفافية آلية الجلب: إرفاق fetchMethod + endpoint باسم المصدر لكل حالة
+            mech = source_mechanism(name)
+            statuses.append({**status, "fetchMethod": mech["method"], "endpoint": mech["endpoint"]})
             log_source_run(status)
     return listings, statuses

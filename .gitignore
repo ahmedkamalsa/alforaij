@@ -15,6 +15,7 @@ data/refined_*
 data/top10_similar_leads.*
 test-results/
 playwright-report/
+tests/playwright/*.png
 .cache/
 .coverage
 coverage/
