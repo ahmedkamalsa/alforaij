@@ -1,85 +1,55 @@
-# نشر منصة الفريج على Netlify وGitHub Pages
+# نشر منصة الفريج على Netlify وGitHub
 
-## الفكرة
+## القرار الحالي
 
-الواجهة `frontend/` تنشر كنسخة static على Netlify وGitHub Pages.
-الباك إند Python يبقى API مستقلًا، والواجهة تتصل به عبر:
+الريبو خاص، وهذا هو الاختيار الصحيح لحماية مفاتيح المشروع والكود. لذلك:
 
-```js
-window.ALFORAIJ_API_BASE
-```
+- GitHub Pages لا يعمل للريبو الخاص على الخطة الحالية.
+- النشر العام المناسب الآن هو Netlify مع بقاء الريبو خاصًا.
+- الواجهة فقط تنشر كملفات static من `frontend/`.
+- الباك إند Python يحتاج عنوان API مستقل تضبطه في `ALFORAIJ_API_BASE`.
 
-محليًا يظل فارغًا ويستخدم نفس النطاق:
-
-```text
-http://127.0.0.1:8000
-```
-
-## GitHub Actions Variables
-
-من GitHub repo:
-
-`Settings -> Secrets and variables -> Actions -> Variables`
-
-أضف:
-
-```text
-ALFORAIJ_API_BASE=https://your-backend-domain.example.com
-OFFICIAL_TRANSACTIONS_SOURCE=data/moj_transactions.csv
-```
-
-`ALFORAIJ_API_BASE` ليس سرًا. هو عنوان API الذي ستتصل به واجهة Netlify/GitHub Pages.
-
-## GitHub Actions Secrets
+## المطلوب في GitHub Actions
 
 من:
 
-`Settings -> Secrets and variables -> Actions -> Secrets`
+`Settings -> Secrets and variables -> Actions`
 
-أضف:
+أضف Variable واحدًا:
+
+```text
+ALFORAIJ_API_BASE=https://your-backend-domain.example.com
+```
+
+وأضف Secretين للنشر على Netlify:
+
+```text
+NETLIFY_AUTH_TOKEN
+NETLIFY_SITE_ID
+```
+
+بدون هذين السرّين سيفشل Workflow النشر عمدًا برسالة واضحة، حتى لا يظهر نجاح وهمي بدون رابط منشور.
+
+## مفاتيح الباك إند والتحديث اليومي
+
+هذه تبقى Secrets ولا توضع أبدًا في الواجهة:
 
 ```text
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 AGENT_ROUTER_API_KEY
-NETLIFY_AUTH_TOKEN
-NETLIFY_SITE_ID
-```
-
-`NETLIFY_AUTH_TOKEN` و`NETLIFY_SITE_ID` مطلوبان فقط لو تريد نشر Netlify من GitHub Actions.
-
-## Workflows
-
-- `.github/workflows/deploy-static.yml`
-  - ينشر `frontend/` على GitHub Pages.
-  - ينشر Netlify إذا كانت أسرار Netlify موجودة.
-  - ينشئ `frontend/config.js` تلقائيًا بقيمة `ALFORAIJ_API_BASE`.
-
-- `.github/workflows/daily-data-update.yml`
-  - يعمل يوميًا 06:00 بتوقيت القاهرة.
-  - يشغل وكيل التحديث اليومي.
-  - يحدث Supabase والفرص والإشعارات.
-
-## شاشة التشغيل داخل المنصة
-
-من نفس الواجهة:
-
-- ارفع CSV/JSON لصفقات وزارة العدل.
-- اضغط `استيراد الصفقات`.
-- سيحفظها في `official_transactions`.
-- سيشغل الوكيل لإعادة بناء الفرص.
-
-الاستيراد اليدوي من الواجهة ليس المسار الوحيد. وكيل التحديث اليومي يستورد تلقائيًا من:
-
-```text
 OFFICIAL_TRANSACTIONS_SOURCE
 ```
 
-إذا كانت القيمة ملفًا داخل المشروع أو رابط CSV/JSON. الرفع من الواجهة يستخدم فقط عندما يصل ملف جديد وتريد إدخاله فورًا بدون انتظار التشغيل المجدول.
+`OFFICIAL_TRANSACTIONS_SOURCE` يمكن أن يكون ملف CSV/JSON داخل المشروع أو رابط CSV/JSON رسمي. وكيل التحديث اليومي يقرأه تلقائيًا عند التشغيل المجدول.
 
-## ملاحظات مهمة
+## Workflows
 
-- GitHub Pages وNetlify لا يشغلان باك إند Python مباشرة.
-- لذلك يجب توفير API backend مستقر وضبط `ALFORAIJ_API_BASE`.
-- لا تضع `SUPABASE_SERVICE_ROLE_KEY` في الواجهة أو `config.js`.
-- الصفقات الرسمية لا تدخل التقييم إلا بعد استيراد CSV/JSON منظم وموثق.
+- `deploy-static.yml`: يبني الواجهة، يضبط `frontend/config.js`، وينشر على Netlify عند وجود الأسرار.
+- `daily-data-update.yml`: يشغل وكيل تحديث البيانات يوميًا الساعة 06:00 بتوقيت القاهرة.
+
+## ملاحظات تشغيل
+
+- لا تضع `SUPABASE_SERVICE_ROLE_KEY` في `frontend/config.js`.
+- GitHub Pages سيظل متوقفًا طالما الريبو خاص والخطة لا تدعمه.
+- عند توفير Netlify secrets يمكن تشغيل `Deploy static frontend` يدويًا من تبويب Actions.

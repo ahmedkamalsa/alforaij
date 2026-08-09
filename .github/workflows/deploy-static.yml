@@ -71,8 +71,9 @@ jobs:
       - name: Deploy to Netlify
         run: |
           if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
-            echo "NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID are not configured; skipping Netlify deploy."
-            exit 0
+            echo "::error::Netlify deploy is not configured. Add NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID as GitHub Actions secrets, or keep using local preview only."
+            echo "GitHub Pages is intentionally unavailable for this private repository on the current GitHub plan."
+            exit 1
           fi
           npx --yes netlify-cli deploy --prod --dir=frontend --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
         env:
