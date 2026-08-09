@@ -178,6 +178,80 @@ on conflict (id) do update set
   scoring_policy = excluded.scoring_policy,
   evidence_policy = excluded.evidence_policy,
   status = excluded.status,
-  updated_at = now();
+  updated_at = now();
+
+-- supabase\migrations\007_outreach_clicks.sql
+
+-- تتبع نقرات التسويق: كل نقرة «نسخ ملخص» أو «إرسال واتساب» على فرصة/عميل تُسجَّل هنا،
+-- وتُجمَّع عدادات التفاعل لكل عميل في تبويب الأداء.
+-- سياسات RLS: القراءة والكتابة لدور service_role فقط (أرقام العملاء بيانات خاصة).
+
+create table if not exists outreach_clicks (
+  id bigint generated always as identity primary key,
+  client_phone text not null default '',
+  client_area text not null default '',
+  client_type text not null default '',
+  opportunity_code text not null default '',
+  action text not null default 'copy',
+  channel text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists outreach_clicks_phone_idx on outreach_clicks (client_phone);
+create index if not exists outreach_clicks_created_idx on outreach_clicks (created_at desc);
+create index if not exists outreach_clicks_code_idx on outreach_clicks (opportunity_code);
+
+alter table outreach_clicks enable row level security;
+
+create policy "service read outreach_clicks"
+  on outreach_clicks for select to service_role
+  using (true);
+
+create policy "service write outreach_clicks"
+  on outreach_clicks for insert to service_role
+  with check (true);
+
+create policy "service update outreach_clicks"
+  on outreach_clicks for update to service_role
+  using (true);
+
+create policy "service delete outreach_clicks"
+  on outreach_clicks for delete to service_role
+  using (true);
 
+-- supabase\migrations\008_search_history.sql
 
+create table if not exists search_history (
+  id bigserial primary key,
+  created_at timestamptz not null default now(),
+  request_text text not null,
+  transaction_type text,
+  property_type text,
+  areas text[] not null default '{}',
+  governorates text[] not null default '{}',
+  result_count integer not null default 0,
+  top_code text,
+  top_source text,
+  top_area text,
+  top_price numeric,
+  top_recommendation numeric,
+  top_data_quality jsonb not null default '{}'::jsonb,
+  source_summary jsonb not null default '[]'::jsonb,
+  report_summary text
+);
+
+create index if not exists search_history_created_at_idx
+  on search_history (created_at desc);
+
+create index if not exists search_history_area_idx
+  on search_history using gin (areas);
+
+alter table search_history enable row level security;
+
+create policy "service write search history"
+  on search_history for insert to service_role
+  with check (true);
+
+create policy "service read search history"
+  on search_history for select to service_role
+  using (true);

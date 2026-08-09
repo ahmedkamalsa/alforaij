@@ -106,6 +106,16 @@ AREA_ALIASES: dict[str, list[str]] = {
     "النهضة": ["نزهة", "النزهه", "نزهه", "النهضه", "nuzha", "al-nuzha", "النزهة"],
 }
 
+GOVERNORATE_AREA_NAMES = {
+    "العاصمة",
+    "حولي",
+    "الفروانية",
+    "مبارك الكبير",
+    "الأحمدي",
+    "الاحمدي",
+    "الجهراء",
+}
+
 PROPERTY_TYPES = {
     "بيت":   ["بيت", "منزل", "فيلا", "قسيمة", "هدام", "دور", "house", "villa"],
     "شقة":   ["شقة", "شقه", "دوبلكس", "apartment", "flat"],
@@ -141,6 +151,7 @@ SELLER_TYPES = {
 
 def normalize_text(text: str) -> str:
     text = (text or "").translate(AR_DIGITS)
+    text = re.sub(r"[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]", "", text)
     text = re.sub(r"[إأآا]", "ا", text)
     text = re.sub(r"ى", "ي", text)
     text = re.sub(r"ة", "ه", text)
@@ -201,6 +212,15 @@ def parse_money(text: str) -> float | None:
     return None
 
 
+def _first_pos(area: str, normalized_text: str) -> int:
+    """أول موضع تظهر فيه المنطقة (أو أحد أسمائها البديلة) داخل نص مُطبَّع."""
+    for term in area_terms(area):
+        index = normalized_text.find(normalize_text(term))
+        if index >= 0:
+            return index
+    return -1
+
+
 def excluded_numbers(text: str) -> dict[str, float]:
     """استخراج أرقام المستثناة من المساحة (ارتداد، واجهة، عرض شارع)."""
     text = normalize_text(text)
@@ -220,6 +240,14 @@ def _follows_exclusion(text: str, pos: int, spans: list[tuple[int, int]]) -> boo
         if pos > end and not text[end:pos].strip():
             return True
     return False
+
+
+def _is_governorate_mention(area: str, normalized_text: str) -> bool:
+    if area not in GOVERNORATE_AREA_NAMES:
+        return False
+    area_norm = normalize_text(area)
+    gov_norm = normalize_text("محافظة")
+    return bool(re.search(rf"{gov_norm}\s+{re.escape(area_norm)}", normalized_text))
 
 
 def extract_area_range(text: str) -> tuple[float | None, float | None, dict[str, float]]:
@@ -251,16 +279,21 @@ def extract_area_range(text: str) -> tuple[float | None, float | None, dict[str,
 def parse_request(raw_text: str) -> PropertyRequest:
     normalized = normalize_text(raw_text)
 
-    # نوع العملية
+    # نوع العملية — الأولوية للعلامة القاطعة: «للبيع» إعلان بيع يسبق أي ذكر عابر للإيجار
+    # في النص المختلط (مثل بقايا رسالة سابقة «ايجار شقة في السالمية» قبل إعلان البيع)
     transaction = ""
-    if any(word in normalized for word in ("ابي", "ابغى", "مطلوب", "نشتري", "شراء")):
-        transaction = "مطلوب للشراء"
-    if any(word in normalized for word in ("ايجار", "استأجر", "استاجر")):
-        transaction = "للإيجار" if "عندي" in normalized or "اعرض" in normalized else "مطلوب للإيجار"
-    if any(word in normalized for word in ("للبيع", "بيع", "عندي", "اعرض")) and "ايجار" not in normalized:
-        transaction = "للبيع"
     if "بدل" in normalized:
         transaction = "بدل"
+    elif "للبيع" in normalized:
+        transaction = "للبيع"
+    elif any(word in normalized for word in ("عندي", "اعرض")) and any(word in normalized for word in ("ايجار", "استأجر", "استاجر")):
+        transaction = "للإيجار"
+    elif any(word in normalized for word in ("ايجار", "استأجر", "استاجر")):
+        transaction = "مطلوب للإيجار"
+    elif any(word in normalized for word in ("ابي", "ابغى", "مطلوب", "نشتري", "شراء")):
+        transaction = "مطلوب للشراء"
+    elif any(word in normalized for word in ("بيع", "عندي", "اعرض")):
+        transaction = "للبيع"
 
     # نوع العقار
     property_type = ""
@@ -272,8 +305,22 @@ def parse_request(raw_text: str) -> PropertyRequest:
     # المناطق
     areas = []
     for area in KNOWN_AREAS:
+        if _is_governorate_mention(area, normalized):
+            continue
         if text_has_area(area, raw_text) and area not in areas:
             areas.append(area)
+    # في النص المختلط (بقايا رسالة سابقة + إعلان) تُعطى الأولوية لمنطقة الإعلان:
+    # المنطقة الواردة بعد علامة العملية القاطعة («للبيع»/«للإيجار») تُفضَّل وتُحصر النتائج فيها
+    marker = "للبيع" if transaction == "للبيع" else ("للايجار" if transaction == "للإيجار" else "")
+    if marker and len(areas) > 1:
+        pos = normalized.find(marker)
+        if pos >= 0:
+            positioned = [(area, _first_pos(area, normalized)) for area in areas]
+            after = [area for area, p in positioned if p >= 0 and p >= pos]
+            if after:
+                # حصر المناطق في منطقة الإعلان نفسها فقط (خلف العلامة القاطعة) —
+                # لا تُطابق النتائج مناطق بقايا رسالة سابقة في نص مختلط
+                areas = after
 
     # المساحة
     min_area, max_area, excluded = extract_area_range(raw_text)
@@ -313,6 +360,7 @@ def parse_request(raw_text: str) -> PropertyRequest:
         transaction=transaction,
         property_type=property_type,
         areas=areas,
+        governorates=[area for area in GOVERNORATE_AREA_NAMES if _is_governorate_mention(area, normalized)],
         min_area=min_area,
         max_area=max_area,
         budget=budget if transaction != "مطلوب للإيجار" else None,

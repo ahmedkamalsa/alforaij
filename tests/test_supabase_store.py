@@ -46,6 +46,36 @@ class SupabaseStoreTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "not_configured")
 
+    def test_persist_analysis_tolerates_missing_search_history_table(self) -> None:
+        request = parse_request("\u0634\u0642\u0629 \u0644\u0644\u0628\u064a\u0639 \u0641\u064a \u0628\u0646\u064a\u062f \u0627\u0644\u0642\u0627\u0631")
+        report = {
+            "summary": "\u062a\u0642\u0631\u064a\u0631 \u062a\u062c\u0631\u064a\u0628\u064a",
+            "results": [
+                {
+                    "code": "AF-1",
+                    "source": "\u0627\u0644\u0641\u0631\u064a\u062c",
+                    "area": "\u0628\u0646\u064a\u062f \u0627\u0644\u0642\u0627\u0631",
+                    "price": 145000,
+                    "recommendationScore": 80,
+                    "dataQuality": {"score": 90, "label": "\u0642\u0648\u064a\u0629"},
+                    "numberSources": {},
+                }
+            ],
+        }
+        statuses = [{"name": "\u0627\u0644\u0641\u0631\u064a\u062c", "status": "success", "records": 1}]
+
+        def fake_post(table, rows, **kwargs):
+            if table == "search_history":
+                raise RuntimeError("HTTP 404 relation does not exist")
+
+        with mock.patch("backend.services.supabase_store.SUPABASE_URL", "https://example.supabase.co"), mock.patch(
+            "backend.services.supabase_store.SUPABASE_SERVICE_ROLE_KEY", "service-key"
+        ), mock.patch("backend.services.supabase_store._post", side_effect=fake_post) as post:
+            result = persist_analysis(request, report, statuses)
+
+        self.assertEqual(result["status"], "saved")
+        self.assertIn("search_history", [call.args[0] for call in post.call_args_list])
+
 
 if __name__ == "__main__":
     unittest.main()

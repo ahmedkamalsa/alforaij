@@ -9,7 +9,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from backend.config import load_local_env  # noqa: E402
 from backend.services.source_registry import source_registry  # noqa: E402
+
+# تحميل .env إن لم تكن المتغيرات مضبوطة في البيئة (نفس سلوك باقي السكربتات)
+load_local_env()
 
 
 def require_env(name: str) -> str:

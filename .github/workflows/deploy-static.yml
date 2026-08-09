@@ -1,0 +1,68 @@
+name: Deploy static frontend
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "netlify.toml"
+      - ".github/workflows/deploy-static.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy-static
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure API base
+        run: |
+          cat > frontend/config.js <<'EOF'
+          window.ALFORAIJ_API_BASE = "${{ vars.ALFORAIJ_API_BASE }}";
+          EOF
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend
+      - name: Upload Netlify artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netlify-frontend
+          path: frontend
+
+  github-pages:
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  netlify:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: netlify-frontend
+          path: frontend
+      - name: Deploy to Netlify
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID are not configured; skipping Netlify deploy."
+            exit 0
+          fi
+          npx --yes netlify-cli deploy --prod --dir=frontend --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}

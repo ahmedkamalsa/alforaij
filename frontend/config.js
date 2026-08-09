@@ -1,0 +1,1 @@
+window.ALFORAIJ_API_BASE = window.ALFORAIJ_API_BASE || "";

@@ -240,8 +240,9 @@ def search(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
         note += ". تُستخدم كمرجع سوق مرجّح أعلى من الإعلانات عند توفر صفقات بنفس المنطقة."
     else:
         note = (
-            "لا توجد صفقات رسمية مستوردة بعد. أضف صفقات عبر scripts/import_official_transactions.py "
-            "أو املأ data/official_transactions.json ليُستخدم هذا المصدر كمرجع تقييم مرجّح."
+            "لا توجد صفقات رسمية مستوردة بعد. المسار الأساسي هو الوكيل اليومي عبر "
+            "OFFICIAL_TRANSACTIONS_SOURCE عند ضبط ملف أو رابط CSV/JSON موثق، والرفع من الواجهة بديل سريع "
+            "لإدخال نفس البيانات المنظمة فورًا. لا تدخل الصفقات في التقييم إلا بعد حفظها في official_transactions."
         )
     return transactions, {
         "name": "الصفقات الرسمية",

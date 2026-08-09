@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import gzip
 import html
+import http.client
 import json
+import logging
 import re
+import socket
+import ssl
 import threading
 import time
 import urllib.parse
@@ -11,7 +15,11 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
+from backend.connectors.market_ads import search as search_market_ads
 from backend.connectors.official_data import search as search_official_transactions
+from backend.connectors.official_indicators import search as search_official_indicators
 from backend.models import Listing, PropertyRequest
 from backend.services.request_parser import KNOWN_AREAS as REQUEST_KNOWN_AREAS
 from backend.services.request_parser import PROPERTY_TYPES, normalize_text, detect_seller_type, extract_area_range, excluded_numbers, text_has_area
@@ -25,8 +33,10 @@ USER_AGENT = (
 TIMEOUT = 12
 MAX_ATTEMPTS = 2
 RETRY_DELAY = 0.6
+TRANSIENT_EXTRA_ATTEMPTS = 2  # الأخطاء العابرة (DNS/مهلة/قطع اتصال) تحصل على محاولتين إضافيتين
+TRANSIENT_RETRY_DELAY = 0.8  # مهلة متصاعدة إضافية لكل محاولة عابرة
 
-_FetchResult = tuple[str, int, float, str | None]
+_FetchResult = tuple[str, int, float, str | None, int]  # (body, status, ms, error, attempts)
 _fetch_cache: dict[tuple[str, tuple[tuple[str, str], ...]], tuple[float, _FetchResult]] = {}
 _fetch_cache_lock = threading.Lock()
 CACHE_TTL_SECONDS = 900  # 15 دقيقة
@@ -72,8 +82,12 @@ KNOWN_AREAS = list(dict.fromkeys(list(AREA_SLUGS.keys()) + REQUEST_KNOWN_AREAS +
 ]))
 
 
-def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[str, int, float, str | None]:
-    """Fetch URL with retries, gzip support, a short cache, and a modern browser User-Agent."""
+def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[str, int, float, str | None, int]:
+    """جلب رابط مع إعادة محاولة ودعم gzip وكاش قصير ووكيل متصفح حديث.
+
+    يعيد (body, status, ms, error, attempts): آخر عنصر هو عدد المحاولات الفعلية
+    التي جرت (يشمل الناجحة — يُسجَّل في حالة المصدر للسجل الدوري).
+    """
     # مفتاح التخزين يتضمن الرؤوس حتى لا تتصادم طلبات مختلفة لنفس الرابط
     cache_key = (url, tuple(sorted((extra_headers or {}).items())))
     # Cache hit (يمنع إعادة جلب نفس الصفحة في نفس الجلسة)
@@ -95,10 +109,17 @@ def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[st
 
     last_error: str | None = None
     last_ms = round((time.perf_counter() - started) * 1000, 1)
-    for attempt in range(MAX_ATTEMPTS):
+    attempts_made = 0
+    # الأخطاء العابرة تُعاد محاولتها أكثر من غيرها (حتى 4 مرات بمهلة متصاعدة)
+    # لأنها غالبًا لحظية (انقطاع DNS/مهلة/قطع اتصال) وتنجح عند الإعادة،
+    # بينما الخطأ الحقيقي (HTTP 403/404...) لا يتحسن بإعادة المحاولة المطولة.
+    for attempt in range(MAX_ATTEMPTS + TRANSIENT_EXTRA_ATTEMPTS):
+        attempts_made += 1
         request = urllib.request.Request(url, headers=headers)
+        # مهلة متناقصة مع كل إعادة محاولة حتى لا يطول انتظار المصدر المتعثر كثيرًا
+        attempt_timeout = max(3, TIMEOUT - (3 * attempt))
         try:
-            with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+            with urllib.request.urlopen(request, timeout=attempt_timeout) as response:
                 raw = response.read()
                 ce = response.headers.get("Content-Encoding", "")
                 if ce == "gzip" or (raw and raw[:2] == b"\x1f\x8b"):
@@ -107,17 +128,39 @@ def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[st
                     except Exception:
                         pass
                 body = raw.decode("utf-8", errors="replace")
-                result = (body, response.status, round((time.perf_counter() - started) * 1000, 1), None)
+                ms = round((time.perf_counter() - started) * 1000, 1)
+                result = (body, response.status, ms, None, attempts_made)
                 with _fetch_cache_lock:
                     _fetch_cache[cache_key] = (time.time(), result)
+                logger.debug("Fetch OK %s (%.0fms، %d محاولات)", url, ms, attempts_made)
                 return result
         except Exception as exc:
             last_error = str(exc)
             last_ms = round((time.perf_counter() - started) * 1000, 1)
-            if attempt < MAX_ATTEMPTS - 1:
-                time.sleep(RETRY_DELAY)
-    result = ("", 0, last_ms, last_error)
+            transient = _is_transient_error(exc)
+            attempts_for_type = MAX_ATTEMPTS + (TRANSIENT_EXTRA_ATTEMPTS if transient else 0)
+            logger.debug("Fetch attempt %d/%d failed for %s: %s", attempts_made, attempts_for_type, url, last_error)
+            if attempt >= attempts_for_type - 1:
+                break
+            time.sleep(RETRY_DELAY + (TRANSIENT_RETRY_DELAY * attempt if transient else 0))
+    result = ("", 0, last_ms, last_error, attempts_made)
     return result
+
+
+def _is_transient_error(exc: BaseException) -> bool:
+    """هل الخطأ عابر (يستحق إعادة محاولة إضافية) أم حقيقي (لا يتحسن بالإعادة)؟"""
+    # استجابة فعلية من الخادم (403/404...) — لا نعيد محاولة طويلة عليها
+    if isinstance(exc, urllib.error.HTTPError):
+        return False
+    # DNS (getaddrinfo)، مهلة، قطع/رفض اتصال، خطأ مقبس/نظام
+    if isinstance(exc, (socket.gaierror, socket.timeout, TimeoutError, ConnectionError, OSError)):
+        return True
+    if isinstance(exc, urllib.error.URLError):
+        reason = exc.reason
+        return _is_transient_error(reason) if isinstance(reason, BaseException) else False
+    if isinstance(exc, (http.client.RemoteDisconnected, http.client.HTTPException, ssl.SSLError)):
+        return True
+    return False
 
 
 def clean_text(value: str) -> str:
@@ -236,7 +279,7 @@ def property_slug(request: PropertyRequest, source: str) -> str:
 
 
 def first_area_meta(request: PropertyRequest) -> dict[str, str]:
-    for area in request.areas:
+    for area in sorted(request.areas, key=len, reverse=True):
         if area in AREA_SLUGS:
             return AREA_SLUGS[area]
     return {}
@@ -375,7 +418,7 @@ def search_opensooq(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
     else:
         path = "property/property-for-rent" if transaction_from_request(request) == "للإيجار" else "property/property-for-sale"
         url = f"https://kw.opensooq.com/en/{path}"
-    body, status, ms, error = fetch_url(url)
+    body, status, ms, error, attempts = fetch_url(url)
     listings: list[Listing] = []
     candidates = 0
     if body:
@@ -443,11 +486,12 @@ def search_opensooq(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
                     )
                     if request_matches_listing(request, listing):
                         listings.append(listing)
-    return listings[:30], {
+    return listings[:50], {
         "name": "OpenSooq",
         "status": "success" if listings else ("no_results" if not error else "failed"),
         "records": len(listings),
         "candidates": candidates,
+        "attempts": attempts,
         "responseMs": ms,
         "url": url,
         "note": error or "تم البحث بعبارة الطلب واستخراج النتائج القابلة للقراءة من بيانات الصفحة.",
@@ -460,7 +504,7 @@ def search_mourjan(request: PropertyRequest) -> tuple[list[Listing], dict[str, A
     mourjan_q = area_meta.get("mourjan_q") or (" ".join(request.areas) if request.areas else request.raw_text)
     query = urllib.parse.urlencode({"q": mourjan_q})
     url = f"https://www.mourjan.com/kw/kuwait/properties/{mode}/?{query}"
-    body, status, ms, error = fetch_url(url)
+    body, status, ms, error, attempts = fetch_url(url)
     listings: list[Listing] = []
     candidates = 0
 
@@ -515,11 +559,12 @@ def search_mourjan(request: PropertyRequest) -> tuple[list[Listing], dict[str, A
             if request_matches_listing(request, listing):
                 listings.append(listing)
 
-    return listings[:30], {
+    return listings[:50], {
         "name": "Mourjan",
         "status": "success" if listings else ("no_results" if not error else "failed"),
         "records": len(listings),
         "candidates": candidates,
+        "attempts": attempts,
         "responseMs": ms,
         "url": url,
         "note": error or "تم استخراج كروت إعلانات عامة من HTML الصفحة مع استخراج السعر من النص.",
@@ -541,7 +586,7 @@ def search_q8aqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
         if area_slug
         else f"https://q8aqar.com/{mode}/{part}/"
     )
-    body, status, ms, error = fetch_url(url)
+    body, status, ms, error, attempts = fetch_url(url)
     listings: list[Listing] = []
     candidates = 0
 
@@ -599,11 +644,12 @@ def search_q8aqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
     if detail:
         note += f"، وقراءة {len(detail)} صفحة تفاصيل (تحسين السعر/المساحة في {detail_linked} حالة)"
     note += ". السعر والمساحة تُستخرج من العنوان ثم تُحسَّن من صفحات التفاصيل عند توفرها."
-    return listings[:20], {
+    return listings[:50], {
         "name": "Q8Aqar",
         "status": "success" if listings else ("no_results" if not error else "failed"),
         "records": len(listings),
         "candidates": candidates,
+        "attempts": attempts,
         "responseMs": ms,
         "url": url,
         "note": error or note,
@@ -620,7 +666,7 @@ def search_waseet(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
     area_query = " ".join(request.areas) if request.areas else ""
     search_q = f"{prop_slug} {transaction_word} {area_query}".strip()
     url = f"https://www.waseet.net/kw/ar/search/?q={urllib.parse.quote(search_q)}&category=real-estate"
-    body, status, ms, error = fetch_url(url)
+    body, status, ms, error, attempts = fetch_url(url)
     listings: list[Listing] = []
     candidates = 0
 
@@ -688,14 +734,91 @@ def search_waseet(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
                 if request_matches_listing(request, listing):
                     listings.append(listing)
 
-    return listings[:20], {
+    return listings[:50], {
         "name": "Waseet",
         "status": "success" if listings else ("no_results" if (body and not error) else "failed"),
         "records": len(listings),
         "candidates": candidates,
+        "attempts": attempts,
         "responseMs": ms,
         "url": url,
         "note": error or f"تم البحث في وسيط الكويت. فحص {candidates} كرت إعلان.",
+    }
+
+
+def _scan_link_listings(
+    request: PropertyRequest,
+    *,
+    source: str,
+    base_url: str,
+    body: str,
+    href_pattern: str,
+    code_prefix: str,
+    code_part: int | None = None,
+    min_title_len: int = 5,
+    flags: int = re.S | re.I,
+) -> tuple[list[Listing], int]:
+    """فحص روابط إعلانات (نمط <a href>…</a>) في صفحة مصدر رابطي.
+
+    يستخرج العنوان والسعر والمساحة من نص الرابط، يبني Listing مطابقًا للطلب،
+    ويزيل التكرار بالكود. code_part: عند None يُستخدم آخر جزء من الرابط ككود،
+    وإلا الجزء المحدد (مع سقوط لعداد المرشحين عند غيابه كما في NabdAqar).
+    """
+    listings: list[Listing] = []
+    seen_codes: set[str] = set()
+    candidates = 0
+    for href, title_html in re.findall(href_pattern, body, flags):
+        candidates += 1
+        title_clean = clean_text(title_html)
+        if not title_clean or len(title_clean) < min_title_len:
+            continue
+        parts = href.rstrip("/").split("/")
+        if code_part is not None:
+            code = f"{code_prefix}-{parts[code_part] if len(parts) > code_part else candidates}"
+        else:
+            code = f"{code_prefix}-{parts[-1]}"
+        if code in seen_codes:
+            continue
+        seen_codes.add(code)
+        price = extract_price_from_title(title_clean) or parse_price(title_clean)
+        space = extract_space_from_title(title_clean)
+        listing = listing_from_text(
+            source=source,
+            code=code,
+            url=urllib.parse.urljoin(base_url, href),
+            title=title_clean,
+            description=title_clean,
+            price=price,
+            transaction=detect_transaction(title_clean, transaction_from_request(request)),
+            fallback_type=request.property_type,
+            space_override=space,
+        )
+        if request_matches_listing(request, listing):
+            listings.append(listing)
+    return listings, candidates
+
+
+def _link_search_result(
+    name: str,
+    listings: list[Listing],
+    candidates: int,
+    ms: float,
+    url: str,
+    error: str | None,
+    body: str,
+    note: str,
+    attempts: int = 1,
+) -> dict[str, Any]:
+    """بنية الحالة الموحدة للمصادر الرابطية (نجاح/لا نتائج/فشل)."""
+    return {
+        "name": name,
+        "status": "success" if listings else ("no_results" if (body and not error) else "failed"),
+        "records": len(listings),
+        "candidates": candidates,
+        "attempts": attempts,
+        "responseMs": ms,
+        "url": url,
+        "note": error or note,
     }
 
 
@@ -708,52 +831,23 @@ def search_nabdaqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
     transaction_word = transaction_from_request(request)
     search_q = f"{prop_word} {transaction_word} {area_query}".strip()
     url = f"https://nabdaqar.com/?qr={urllib.parse.quote(search_q)}"
-    body, status, ms, error = fetch_url(url)
-    listings: list[Listing] = []
-    candidates = 0
+    body, status, ms, error, attempts = fetch_url(url)
+    listings, candidates = _scan_link_listings(
+        request,
+        source="نبض عقار (NabdAqar)",
+        base_url="https://nabdaqar.com",
+        body=body,
+        href_pattern=r'<a\s+href="(/ad-details/[^"]+)"[^>]*>(.*?)</a>',
+        code_prefix="NABD",
+        code_part=2,
+        min_title_len=4,
+        flags=re.S,
+    )
 
-    if body:
-        seen_codes: set[str] = set()
-        for href, title_html in re.findall(
-            r'<a\s+href="(/ad-details/[^"]+)"[^>]*>(.*?)</a>',
-            body,
-            re.S,
-        ):
-            candidates += 1
-            title_clean = clean_text(title_html)
-            if not title_clean or len(title_clean) < 4:
-                continue
-            parts = href.rstrip("/").split("/")
-            code = "NABD-" + (parts[2] if len(parts) > 2 else str(candidates))
-            if code in seen_codes:
-                continue
-            seen_codes.add(code)
-            full_url = urllib.parse.urljoin("https://nabdaqar.com", href)
-            price = extract_price_from_title(title_clean) or parse_price(title_clean)
-            space = extract_space_from_title(title_clean)
-            listing = listing_from_text(
-                source="نبض عقار (NabdAqar)",
-                code=code,
-                url=full_url,
-                title=title_clean,
-                description=title_clean,
-                price=price,
-                transaction=detect_transaction(title_clean, transaction_from_request(request)),
-                fallback_type=request.property_type,
-                space_override=space,
-            )
-            if request_matches_listing(request, listing):
-                listings.append(listing)
-
-    return listings[:20], {
-        "name": "نبض عقار (NabdAqar)",
-        "status": "success" if listings else ("no_results" if (body and not error) else "failed"),
-        "records": len(listings),
-        "candidates": candidates,
-        "responseMs": ms,
-        "url": url,
-        "note": error or f"تم فحص {candidates} إعلان في نبض عقار.",
-    }
+    return listings[:50], _link_search_result(
+        "نبض عقار (NabdAqar)", listings, candidates, ms, url, error, body,
+        f"تم فحص {candidates} إعلان في نبض عقار.", attempts,
+    )
 
 
 def _detail_price_space(body: str) -> tuple[float | None, float | None]:
@@ -820,7 +914,7 @@ def search_q8aqar_details(hrefs: list[str]) -> dict[str, tuple[float | None, flo
         return detail
 
     def _fetch_one(href: str) -> tuple[str, float | None, float | None]:
-        body, _status, _ms, error = fetch_url(href)
+        body, _status, _ms, error, _attempts = fetch_url(href)
         if not body or error:
             return href, None, None
         price, space = _detail_price_space(body)
@@ -882,7 +976,7 @@ def search_sakan(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any
         url = f"https://sakan.co/en/{buy_or_rent}/{part}/{gov}"
     else:
         url = f"https://sakan.co/en/{buy_or_rent}/{part}"
-    body, status, ms, error = fetch_url(url)
+    body, status, ms, error, attempts = fetch_url(url)
     listings: list[Listing] = []
     embedded = _extract_sakan_embedded(body) if body else []
     seen: set[str] = set()
@@ -936,6 +1030,7 @@ def search_sakan(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any
         "status": status_name,
         "records": len(listings),
         "candidates": len(embedded),
+        "attempts": attempts,
         "availableCount": count,
         "responseMs": ms,
         "url": url,
@@ -950,100 +1045,80 @@ def search_aqarat(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
     transaction_word = transaction_from_request(request)
     search_q = f"{prop_word} {transaction_word} {area_query}".strip()
     url = f"https://aqarat.com/search?q={urllib.parse.quote(search_q)}"
-    body, status, ms, error = fetch_url(url)
-    listings: list[Listing] = []
-    candidates = 0
-    if body:
-        seen_codes: set[str] = set()
-        for href, title_html in re.findall(
-            r'<a\s+href="([^"]*(?:property|listing|real-estate|detail)[^"]*)"[^>]*>(.*?)</a>',
-            body,
-            re.S | re.I,
-        ):
-            candidates += 1
-            title_clean = clean_text(title_html)
-            if not title_clean or len(title_clean) < 5:
-                continue
-            code = "AQR-" + href.rstrip("/").split("/")[-1]
-            if code in seen_codes:
-                continue
-            seen_codes.add(code)
-            full_url = urllib.parse.urljoin("https://aqarat.com", href)
-            price = extract_price_from_title(title_clean) or parse_price(title_clean)
-            space = extract_space_from_title(title_clean)
-            listing = listing_from_text(
-                source="Aqarat",
-                code=code,
-                url=full_url,
-                title=title_clean,
-                description=title_clean,
-                price=price,
-                transaction=detect_transaction(title_clean, transaction_from_request(request)),
-                fallback_type=request.property_type,
-                space_override=space,
-            )
-            if request_matches_listing(request, listing):
-                listings.append(listing)
-    return listings[:20], {
-        "name": "Aqarat",
-        "status": "success" if listings else ("no_results" if (body and not error) else "failed"),
-        "records": len(listings),
-        "candidates": candidates,
-        "responseMs": ms,
-        "url": url,
-        "note": error or f"تم فحص {candidates} إعلانًا في Aqarat.",
-    }
+    body, status, ms, error, attempts = fetch_url(url)
+    listings, candidates = _scan_link_listings(
+        request,
+        source="Aqarat",
+        base_url="https://aqarat.com",
+        body=body,
+        href_pattern=r'<a\s+href="([^"]*(?:property|listing|real-estate|detail)[^"]*)"[^>]*>(.*?)</a>',
+        code_prefix="AQR",
+    )
+    return listings[:50], _link_search_result(
+        "Aqarat", listings, candidates, ms, url, error, body,
+        f"تم فحص {candidates} إعلانًا في Aqarat.", attempts,
+    )
 
 
 def search_four_sale(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
-    """منصة 4Sale الكويتية (مصدر توسعة جديد في الخطة)."""
+    """منصة 4Sale الكويتية، مع مصدر بديل (OpenSooq الكويت) عند تعذر الوصول.
+
+    عند فشل الاتصال (خطأ عابر مثل DNS أو مهلة أو حظر) تُعاد المحاولة تلقائيًا
+    داخل fetch_url، ثم يُجرَّب المصدر البديل OpenSooq بنفس شروط الطلب حتى لا
+    يضيع هذا الموقع من التقييم، مع إفصاح شفاف في حالة المصدر عن السبب والبديل.
+    """
     area_query = " ".join(request.areas) if request.areas else ""
     prop_word = request.property_type or "عقار"
     search_q = f"{prop_word} {area_query}".strip()
     url = f"https://kuwait.4sale.com/real-estate?search_text={urllib.parse.quote(search_q)}"
-    body, status, ms, error = fetch_url(url)
-    listings: list[Listing] = []
-    candidates = 0
-    if body:
-        seen_codes: set[str] = set()
-        for href, title_html in re.findall(
-            r'<a\s+href="([^"]*(?:real-estate/|listing/|properties/)[^"]*)"[^>]*>(.*?)</a>',
-            body,
-            re.S | re.I,
-        ):
-            candidates += 1
-            title_clean = clean_text(title_html)
-            if not title_clean or len(title_clean) < 5:
-                continue
-            code = "4S-" + href.rstrip("/").split("/")[-1]
-            if code in seen_codes:
-                continue
-            seen_codes.add(code)
-            full_url = urllib.parse.urljoin("https://kuwait.4sale.com", href)
-            price = extract_price_from_title(title_clean) or parse_price(title_clean)
-            space = extract_space_from_title(title_clean)
-            listing = listing_from_text(
-                source="4Sale",
-                code=code,
-                url=full_url,
-                title=title_clean,
-                description=title_clean,
-                price=price,
-                transaction=detect_transaction(title_clean, transaction_from_request(request)),
-                fallback_type=request.property_type,
-                space_override=space,
-            )
-            if request_matches_listing(request, listing):
-                listings.append(listing)
-    return listings[:20], {
-        "name": "4Sale",
-        "status": "success" if listings else ("no_results" if (body and not error) else "failed"),
-        "records": len(listings),
-        "candidates": candidates,
-        "responseMs": ms,
-        "url": url,
-        "note": error or f"تم فحص {candidates} إعلانًا في 4Sale.",
-    }
+    body, status, ms, error, attempts = fetch_url(url)
+    listings, candidates = _scan_link_listings(
+        request,
+        source="4Sale",
+        base_url="https://kuwait.4sale.com",
+        body=body,
+        href_pattern=r'<a\s+href="([^"]*(?:real-estate/|listing/|properties/)[^"]*)"[^>]*>(.*?)</a>',
+        code_prefix="4S",
+    )
+    if error and not listings:
+        # تعذر الوصول إلى 4Sale: جرّب المصدر البديل OpenSooq الكويت بنفس شروط الطلب
+        fb_listings, fb_status = search_opensooq(request)
+        fb_name = fb_status.get("name", "OpenSooq")
+        for listing in fb_listings:
+            listing.raw["fallbackFor"] = "4Sale"
+        if fb_listings:
+            return fb_listings[:50], {
+                "name": "4Sale",
+                "status": "fallback",
+                "records": len(fb_listings),
+                "candidates": fb_status.get("candidates", 0),
+                "attempts": attempts,
+                "responseMs": fb_status.get("responseMs", ms),
+                "url": url,
+                "note": (
+                    f"تعذر الوصول إلى 4Sale ({error}) حتى بعد إعادة المحاولة — "
+                    f"استُخدم المصدر البديل {fb_name} بنفس شروط البحث وأسفر عن "
+                    f"{len(fb_listings)} نتيجة مطابقة (معلّمة في بيانات النتيجة)."
+                ),
+            }
+        # البديل فشل أيضًا: تقرير شفاف بفشل الموقعين
+        return [], {
+            "name": "4Sale",
+            "status": "failed",
+            "records": 0,
+            "candidates": 0,
+            "attempts": attempts,
+            "responseMs": ms,
+            "url": url,
+            "note": (
+                f"تعذر الوصول إلى 4Sale ({error})، وجرّبنا المصدر البديل {fb_name} "
+                f"لكنه فشل أيضًا ({fb_status.get('note', '')})."
+            ),
+        }
+    return listings[:50], _link_search_result(
+        "4Sale", listings, candidates, ms, url, error, body,
+        f"تم فحص {candidates} إعلانًا في 4Sale.", attempts,
+    )
 
 
 def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
@@ -1055,7 +1130,7 @@ def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
     transaction_word = transaction_from_request(request)
     search_q = f"{prop_word} {transaction_word} {area_query}".strip()
     url = f"https://www.bu3qar.com/?s={urllib.parse.quote(search_q)}"
-    body, status, ms, error = fetch_url(url)
+    body, status, ms, error, attempts = fetch_url(url)
     listings: list[Listing] = []
     candidates = 0
 
@@ -1087,15 +1162,10 @@ def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
             if request_matches_listing(request, listing):
                 listings.append(listing)
 
-    return listings[:20], {
-        "name": "بوعقار / بوشملان (Bu3qar)",
-        "status": "success" if listings else ("no_results" if (body and not error) else "failed"),
-        "records": len(listings),
-        "candidates": candidates,
-        "responseMs": ms,
-        "url": url,
-        "note": error or f"تم فحص {candidates} إعلان في بوعقار / بوشملان.",
-    }
+    return listings[:50], _link_search_result(
+        "بوعقار / بوشملان (Bu3qar)", listings, candidates, ms, url, error, body,
+        f"تم فحص {candidates} إعلان في بوعقار / بوشملان.", attempts,
+    )
 
 
 SEARCHERS: list[tuple[str, Any]] = [
@@ -1108,20 +1178,210 @@ SEARCHERS: list[tuple[str, Any]] = [
     ("Bu3qar", search_bu3qar),
     ("Aqarat", search_aqarat),
     ("4Sale", search_four_sale),
+    ("السوق المباشر", search_market_ads),
+    ("مؤشرات رسمية", search_official_indicators),
     ("الصفقات الرسمية", search_official_transactions),
 ]
 
+# التركيبات العريضة للفحص المركّب: أنواع العقار الرئيسية × المعاملات.
+# الطلب الفارغ كان يفحص بيوت البيع فقط عبر Q8Aqar وبيوعات OpenSooq ويُسقط
+# شققهم وأراضيهم وإيجاراتهم — هذه التركيبات تصل بفرص كل منصة لأقصى عدد ممكن.
+BROAD_COMBOS: list[tuple[str, str]] = [
+    ("بيت", "للبيع"),
+    ("شقة", "للبيع"),
+    ("أرض", "للبيع"),
+    ("بيت", "للإيجار"),
+    ("شقة", "للإيجار"),
+    ("أرض", "للإيجار"),
+]
 
-def search_external_sources(request: PropertyRequest) -> tuple[list[Listing], list[dict[str, Any]]]:
-    """تشغيل كل المصادر بالتوازي لتقليل زمن الانتظار الإجمالي بدل التسلسل (حتى 84 ثانية سابقًا)."""
+
+def broad_combo_requests() -> list[PropertyRequest]:
+    """طلبات عريضة مركّبة: بيت/شقة/أرض × بيع/إيجار بدل طلب فارغ واحد.
+
+    كل طلب يحدد النوع والمعاملة فيوجه المصادر ذات البنية النوعية
+    (Q8Aqar/OpenSooq) لصفحات كل فئة على حدة.
+    """
+    return [
+        PropertyRequest(raw_text="", property_type=ptype, transaction=transaction)
+        for ptype, transaction in BROAD_COMBOS
+    ]
+
+
+def search_combo_sources(
+    combos: list[PropertyRequest] | None = None,
+    source_names: list[str] | None = None,
+) -> tuple[list[Listing], list[dict[str, Any]]]:
+    """مسح عريض مركّب: يفحص عدة أنواع/معاملات عبر المصادر ذات البنية النوعية.
+
+    يشغّل كل مصدر على كل تركيبة (بيت/شقة/أرض × بيع/إيجار) بالتوازي، يدمج
+    الإعلانات الفريدة فقط (إزالة التكرار بالكود — الصفحات المتقاطعة تُجلب مرة
+    واحدة عبر الكاش)، ويسجّل تشغيل كل تركيبة، ويعيد حالة مجمّعة واحدة لكل
+    مصدر بعدد النتائج الفريدة والتركيبات الناجحة/الفاشلة.
+    """
+    if combos is None:
+        combos = broad_combo_requests()
+    if source_names is None:
+        source_names = ["Q8Aqar", "OpenSooq"]
+    search_by_name = dict(SEARCHERS)
+    tasks = [
+        (name, search_by_name[name], combo)
+        for name in source_names
+        if name in search_by_name
+        for combo in combos
+    ]
+    if not tasks:
+        return [], []
+
+    raw: dict[str, list[tuple[list[Listing], dict[str, Any]]]] = {name: [] for name in source_names}
+    with ThreadPoolExecutor(max_workers=min(6, max(1, len(tasks)))) as pool:
+        futures = {pool.submit(search, combo): (name, combo) for name, search, combo in tasks}
+        for future, (name, combo) in futures.items():
+            try:
+                combo_listings, status = future.result()
+            except Exception as exc:  # فشل تركيبة واحدة لا يوقف بقية المسح
+                logger.warning("Broad combo %s (%s/%s) failed: %s", name, combo.property_type, combo.transaction, exc)
+                combo_listings, status = [], {
+                    "name": name, "status": "failed", "records": 0, "candidates": 0,
+                    "responseMs": 0, "note": f"خطأ غير متوقع: {exc}",
+                }
+            raw[name].append((combo_listings, status))
+            # سجل دقيق لكل تركيب — منع التكرار الدوري يمنع تضخم السجل
+            combo_log = dict(status)
+            combo_log["name"] = f"{name} ({combo.property_type} {combo.transaction})"
+            log_source_run(combo_log)
+
+    listings: list[Listing] = []
+    seen_codes: set[str] = set()
+    statuses: list[dict[str, Any]] = []
+    for name in source_names:
+        results = raw.get(name) or []
+        if not results:
+            continue
+        merged: list[Listing] = []
+        ok = failed = no_results = 0
+        candidates = 0
+        max_attempts = 0
+        max_ms = 0.0
+        first_url = ""
+        detail_notes: list[str] = []
+        for combo_listings, status in results:
+            st = status.get("status")
+            if st == "success":
+                ok += 1
+            elif st == "failed":
+                failed += 1
+            else:
+                no_results += 1
+            candidates += status.get("candidates", 0) or 0
+            max_attempts = max(max_attempts, status.get("attempts") or 0)
+            max_ms = max(max_ms, status.get("responseMs") or 0)
+            first_url = first_url or status.get("url") or ""
+            note = status.get("note")
+            if note and len(detail_notes) < 2:
+                detail_notes.append(str(note)[:80])
+            for listing in combo_listings:
+                if listing.code in seen_codes:
+                    continue
+                seen_codes.add(listing.code)
+                merged.append(listing)
+        summary = (
+            f"مسح عريض {len(results)} تركيبات (بيت/شقة/أرض × بيع/إيجار): "
+            f"{ok} نجحت، {no_results} بلا نتائج، {failed} فشلت — {len(merged)} إعلانًا فريدًا."
+        )
+        if detail_notes:
+            summary += " | " + " — ".join(detail_notes)
+        statuses.append({
+            "name": name,
+            "status": (
+                "failed"
+                if ok == 0 and failed and no_results == 0
+                else ("success" if ok else "no_results")
+            ),
+            "records": len(merged),
+            "candidates": candidates,
+            "attempts": max_attempts,
+            "responseMs": max_ms,
+            "url": first_url,
+            "note": summary,
+        })
+        listings.extend(merged)
+    return listings, statuses
+
+
+# المفتاح (اسم المصدر، الحالة) فقط — محدد العدد (عدد المصادر × الحالات) فلا ينمو بلا حدود
+# ولا يتأثر بتغير النصوص/الأعداد في الملاحظات بين الطلبات.
+_SOURCE_LOG_MEM: dict[tuple[str, str], tuple[float, int]] = {}
+_SOURCE_LOG_LOCK = threading.Lock()
+SOURCE_LOG_DEBOUNCE_SECONDS = 300  # نفس المصدر بنفس النتيجة لا يُسجل أكثر من مرة في هذه النافذة
+
+
+def log_source_run(status: dict[str, Any]) -> None:
+    """تسجيل تشغيل مصدر واحد (نجاح/فشل + السبب + المدة + عدد المحاولات).
+
+    منع التكرار الدوري: داخل نافذة زمنية تُحتسب التكرارات نفسها دون تسجيل،
+    وعند انتهاء النافذة يُسجل سطر واحد فقط يحمل عدد المرات التي كُتمت
+    (فلا يتضخم السجل في الفحص الدوري كل 5 دقائق أو في كل تحليل).
+    """
+    name = str(status.get("name") or "مصدر")
+    st = str(status.get("status") or "unknown")
+    ms = status.get("responseMs")
+    attempts = status.get("attempts")
+    attempts_text = f"{attempts}" if attempts is not None else "—"  # المصادر المحلية بلا جلب HTTP
+    records = status.get("records", 0)
+    note = str(status.get("note") or "")[:120]
+    key = (name, st)
+    now = time.time()
+    with _SOURCE_LOG_LOCK:
+        prev = _SOURCE_LOG_MEM.get(key)
+        if prev:
+            when, count = prev
+            if now - when < SOURCE_LOG_DEBOUNCE_SECONDS:
+                _SOURCE_LOG_MEM[key] = (when, count + 1)
+                return  # مكرر داخل النافذة — يُحتسب ولا يُسجل
+            suppressed = count
+        else:
+            suppressed = 0
+        _SOURCE_LOG_MEM[key] = (now, 0)
+    suffix = f" (كرر نفسه {suppressed} مرة في النافذة الأخيرة دون تسجيل)" if suppressed else ""
+    level = logging.WARNING if st == "failed" else logging.INFO
+    logger.log(
+        level,
+        "مصدر %s → %s | %dms | محاولات %s | نتائج %d | %s%s",
+        name, st, ms or 0, attempts_text, records, note, suffix,
+    )
+
+
+def search_external_sources(
+    request: PropertyRequest,
+    selected_sources: list[str] | None = None,
+) -> tuple[list[Listing], list[dict[str, Any]]]:
+    """تشغيل كل المصادر بالتوازي لتقليل زمن الانتظار الإجمالي بدل التسلسل (حتى 84 ثانية سابقًا).
+
+    يسجّل نتيجة كل مصدر (الحالة + السبب + المدة + عدد المحاولات) مرة واحدة لكل تشغيل
+    عبر log_source_run مع منع تكرار الرسالة نفسها في الفحص الدوري.
+    """
     listings: list[Listing] = []
     statuses: list[dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=len(SEARCHERS)) as pool:
-        futures = {pool.submit(search, request): name for name, search in SEARCHERS}
+    selected = {name.strip() for name in (selected_sources or []) if name.strip()}
+    searchers = [(name, search) for name, search in SEARCHERS if not selected or name in selected]
+    if not searchers:
+        return [], [
+            {
+                "name": "مصادر خارجية",
+                "status": "no_data",
+                "records": 0,
+                "candidates": 0,
+                "note": f"لا يوجد مصدر مطابق للاختيار: {', '.join(sorted(selected))}",
+            }
+        ]
+    with ThreadPoolExecutor(max_workers=len(searchers)) as pool:
+        futures = {pool.submit(search, request): name for name, search in searchers}
         for future, name in futures.items():
             try:
                 source_listings, status = future.result()
             except Exception as exc:  # حماية: أي خطأ غير متوقع في مصدر لا يوقف التحليل
+                logger.warning("External source '%s' failed unexpectedly: %s", name, exc)
                 source_listings = []
                 status = {
                     "name": name,
@@ -1132,4 +1392,5 @@ def search_external_sources(request: PropertyRequest) -> tuple[list[Listing], li
                 }
             listings.extend(source_listings)
             statuses.append(status)
+            log_source_run(status)
     return listings, statuses

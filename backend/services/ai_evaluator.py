@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import urllib.request
 from dataclasses import asdict
 from statistics import median
+
+logger = logging.getLogger(__name__)
 
 from backend.config import AGENT_ROUTER_API_KEY, AGENT_ROUTER_API_URL
 from backend.models import PropertyRequest, RankedListing
@@ -86,7 +89,7 @@ def _call_ai_analysis(
                 if isinstance(parsed, dict) and parsed.get("executive_summary"):
                     return parsed
     except Exception as e:
-        print(f"AI Evaluator Error: {e}")
+        logger.warning("AI evaluator call failed: %s", e)
     return None
 
 
@@ -99,21 +102,31 @@ def fallback_professional_analysis(
     top = top_listings[:5]
     areas = "، ".join(dict.fromkeys(item.listing.area for item in top if item.listing.area)) or "غير محددة"
 
+    # هل النتائج إيجار؟ الصياغة تختلف: إيجار شهري مقابل وسيط إيجارات (وليست أسعار شراء).
+    # الملخص يخص أفضل نتيجة (top[0]) تحديدًا — نشتق الوضع من نفس النتيجة التي تُوصف.
+    rental_mode = bool(
+        top_listings
+        and (top_listings[0].number_sources or {}).get("rental", {}).get("value") is True
+    )
+    price_word = "الإيجار" if rental_mode else "السعر"
+
     summary_parts: list[str] = []
     if top:
         best = top[0]
         price_display = best.listing.price_text or "غير معلن"
         summary_parts.append(
             f"أفضل توصية حسب البيانات المتاحة هي {best.listing.code} في {best.listing.area or areas} "
-            f"بسعر {price_display}، وحكم السعر «{best.valuation_label}» بثقة {int(best.confidence * 100)}%."
+            f"بـ{price_word} {price_display}، وحكم التقييم «{best.valuation_label}» بثقة {int(best.confidence * 100)}%."
         )
     else:
-        summary_parts.append("لم تتوفر عروض مطابقة كافية داخل البيانات الحالية لتكوين توصية سعرية موثوقة.")
+        summary_parts.append("لم تتوفر عروض مطابقة كافية داخل البيانات الحالية لتكوين توصية موثوقة.")
 
     medians = [item.market_median for item in top if item.market_median]
     if medians:
         representative = median(medians)
-        summary_parts.append(f"وسيط أسعار المقارنات المتاح يقارب {representative:,.0f} د.ك.")
+        summary_parts.append(
+            f"وسيط {'الإيجارات الشهرية' if rental_mode else 'أسعار المقارنات'} المتاح يقارب {representative:,.0f} د.ك."
+        )
     summary_parts.append("التقييم استرشادي مبني على العروض المتاحة وقت البحث وليس تقييمًا رسميًا.")
 
     evidence_parts: list[str] = []
@@ -141,9 +154,9 @@ def fallback_professional_analysis(
         missing_parts.append("عروض مطابقة إضافية (توسيع نطاق المناطق أو تعديل الفلاتر)")
 
     suggestions_parts = [
-        "التحقق من الصفقات الرسمية الأحدث قبل اتخاذ قرار الشراء",
+        "التحقق من الصفقات الرسمية الأحدث قبل اتخاذ قرار الشراء" if not rental_mode else "التحقق من عروض الإيجار الأحدث في المنطقة قبل اتخاذ القرار",
         "معاينة العقار فعليًا والتأكد من الواجهة والمساحة والموقع",
-        "التفاوض على السعر استنادًا إلى وسيط المقارنات المعروض في كل نتيجة",
+        f"التفاوض على {'الإيجار' if rental_mode else 'السعر'} استنادًا إلى وسيط المقارنات المعروض في كل نتيجة",
     ]
     if request.budget:
         suggestions_parts.append("متابعة الإعلانات الجديدة ضمن الميزانية المحددة في التقرير")

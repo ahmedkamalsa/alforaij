@@ -11,7 +11,22 @@ def add_component(breakdown: list[dict[str, Any]], name: str, points: float, rea
     breakdown.append({"name": name, "points": round(points, 1), "reason": reason})
 
 
-def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, list[str], list[str], list[dict[str, Any]]]:
+GOV_EXPAND_WARNING = "خارج المنطقة المطلوبة (من نفس المحافظة)"
+ANY_EXPAND_WARNING = "خارج المنطقة المطلوبة (توسعة استرشادية)"
+
+
+def score_listing(
+    request: PropertyRequest,
+    listing: Listing,
+    expansion: str = "none",
+    allowed_govs: set[str] | None = None,
+) -> tuple[float, list[str], list[str], list[dict[str, Any]]]:
+    """تسجيل مطابقة إعلان لطلب.
+
+    expansion: "none" (صارم — مناطق الطلب فقط)، "governorate" (يسمح بنفس المحافظة
+    عند ندرة النتائج بنقاط جزئية ووسم واضح)، أو "any" (توسعة استرشادية أخيرة حتى
+    لا يبقى البحث فارغًا في المناطق النادرة).
+    """
     score = 0.0
     reasons: list[str] = []
     warnings: list[str] = []
@@ -65,6 +80,18 @@ def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, li
             reason = f"منطقة الإعلان {shown_area} ضمن مناطق الطلب."
             reasons.append("المنطقة مطابقة")
             add_component(breakdown, "المنطقة", 25, reason)
+        elif expansion == "governorate" and listing.governorate and allowed_govs and listing.governorate in allowed_govs:
+            # توسعة محسوبة لنفس المحافظة عند ندرة نتائج المنطقة: نقاط جزئية + وسم واضح
+            score += 10
+            reason = f"منطقة الإعلان {listing.area} خارج المناطق المطلوبة لكنها من نفس المحافظة ({listing.governorate})."
+            warnings.append(GOV_EXPAND_WARNING)
+            add_component(breakdown, "المنطقة", 10, reason)
+        elif expansion == "any":
+            # توسعة استرشادية أخيرة حتى لا يبقى البحث فارغًا في المناطق النادرة
+            score += 5
+            reason = f"منطقة الإعلان {listing.area} خارج المناطق المطلوبة — نتيجة استرشادية لتعويض ندرة الإعلانات."
+            warnings.append(ANY_EXPAND_WARNING)
+            add_component(breakdown, "المنطقة", 5, reason)
         else:
             reason = f"لا يوجد دليل أن الإعلان داخل {', '.join(request.areas)}."
             warnings.append(reason)
@@ -80,20 +107,32 @@ def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, li
         if listing.space:
             min_area = request.min_area or 0
             max_area = request.max_area or 10**9
-            # If user requested an exact space (e.g. 400m2), apply a strict tolerance (e.g., +/- 10%)
+            # If user requested an exact space (e.g. 400m2), apply a graded tolerance:
+            # exact (±10%) keeps full points; nearby (±25%) partial; acceptable (±50%) low;
+            # beyond that 0 points — but never hides the listing so similar sale ads stay visible
             if min_area == max_area and min_area > 0:
-                tolerance = 0.10 * min_area
-                if abs(listing.space - min_area) <= tolerance:
-                     score += 15
-                     reason = f"المساحة {listing.space:g} م² مطابقة تقريباً للمطلوب ({min_area:g} م²)."
-                     reasons.append("المساحة مطابقة للمطلوب")
-                     add_component(breakdown, "المساحة", 15, reason)
+                diff_ratio = abs(listing.space - min_area) / min_area
+                # المساحة خاصية جوهرية للعقار: وزنها عند كل فئة يعلو على وزن تقارب السعر
+                # في الفئة المقابلة حتى لا يتفوق إعلان بعيد المساحة أقرب سعرًا على الأقرب مساحةً
+                if diff_ratio <= 0.10:
+                    score += 15
+                    reason = f"المساحة {listing.space:g} م² مطابقة تقريباً للمطلوب ({min_area:g} م²)."
+                    reasons.append("المساحة مطابقة للمطلوب")
+                    add_component(breakdown, "المساحة", 15, reason)
+                elif diff_ratio <= 0.25:
+                    score += 10
+                    reason = f"المساحة {listing.space:g} م² قريبة من المطلوب ({min_area:g} م²)."
+                    warnings.append("المساحة قريبة وليست مطابقة بالضبط")
+                    add_component(breakdown, "المساحة", 10, reason)
+                elif diff_ratio <= 0.50:
+                    score += 5
+                    reason = f"المساحة {listing.space:g} م² ضمن نطاق مقبول قريب من المطلوب ({min_area:g} م²)."
+                    warnings.append("المساحة أكبر أو أصغر بوضوح من المطلوب")
+                    add_component(breakdown, "المساحة", 5, reason)
                 else:
-                     reason = f"مساحة الإعلان {listing.space:g} م² لا تتطابق بدقة مع المطلوب ({min_area:g} م²)."
-                     warnings.append("المساحة غير مطابقة")
-                     add_component(breakdown, "المساحة", 0, reason)
-                     # For exact space requests, this is a strong rejection criteria
-                     return 0, reasons, warnings, breakdown
+                    reason = f"مساحة الإعلان {listing.space:g} م² مختلفة بوضوح عن المطلوب ({min_area:g} م²)."
+                    warnings.append("المساحة مختلفة بوضوح عن المطلوب")
+                    add_component(breakdown, "المساحة", 0, reason)
             elif min_area <= listing.space <= max_area:
                 score += 15
                 reason = f"مساحة الإعلان {listing.space:g} م² داخل النطاق المطلوب {min_area:g}-{max_area:g} م²."
@@ -111,16 +150,18 @@ def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, li
     target_budget = request.rent_budget or request.budget
     if target_budget and listing.price:
         delta = abs(listing.price - target_budget) / max(target_budget, 1)
+        # وزن الميزانية عند كل فئة أقل من وزن المساحة في الفئة المقابلة:
+        # المساحة خاصية جوهرية (15/10/5) بينما تقارب السعر عامل تفضيلي (8/4/4)
         if delta <= 0.08:
-            score += 10
+            score += 8
             reason = f"السعر {listing.price:,.0f} د.ك قريب جدًا من الميزانية {target_budget:,.0f} د.ك."
             reasons.append("السعر قريب جدًا من الميزانية")
-            add_component(breakdown, "الميزانية", 10, reason)
+            add_component(breakdown, "الميزانية", 8, reason)
         elif delta <= 0.2:
-            score += 5
+            score += 4
             reason = f"السعر {listing.price:,.0f} د.ك قريب من الميزانية {target_budget:,.0f} د.ك."
             reasons.append("السعر قريب من الميزانية")
-            add_component(breakdown, "الميزانية", 5, reason)
+            add_component(breakdown, "الميزانية", 4, reason)
         elif listing.price > target_budget:
             reason = f"السعر {listing.price:,.0f} د.ك أعلى من الميزانية {target_budget:,.0f} د.ك."
             warnings.append("السعر أعلى من الميزانية")
@@ -128,8 +169,8 @@ def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, li
         else:
             reason = f"السعر {listing.price:,.0f} د.ك أقل من الميزانية {target_budget:,.0f} د.ك."
             reasons.append("السعر أقل من الميزانية")
-            add_component(breakdown, "الميزانية", 8, reason)
-            score += 8
+            add_component(breakdown, "الميزانية", 4, reason)
+            score += 4
 
     searchable = normalize_text(" ".join([listing.summary, listing.features, listing.detail_class]))
     
@@ -170,16 +211,45 @@ def score_listing(request: PropertyRequest, listing: Listing) -> tuple[float, li
     return min(score, 100), reasons, warnings, breakdown
 
 
-def top_matches(
+def _score_all(
     request: PropertyRequest,
     listings: list[Listing],
-    limit: int = 20,
+    expansion: str = "none",
+    allowed_govs: set[str] | None = None,
 ) -> list[tuple[Listing, float, list[str], list[str], list[dict[str, Any]]]]:
     ranked = []
     for listing in listings:
-        score, reasons, warnings, breakdown = score_listing(request, listing)
+        score, reasons, warnings, breakdown = score_listing(request, listing, expansion=expansion, allowed_govs=allowed_govs)
         if score > 0:
             ranked.append((listing, score, reasons, warnings, breakdown))
-    # Sort by score, then by published date if available
     ranked.sort(key=lambda item: (item[1], item[0].published_date or ""), reverse=True)
+    return ranked
+
+
+def top_matches(
+    request: PropertyRequest,
+    listings: list[Listing],
+    limit: int = 50,
+    min_results: int = 3,
+) -> list[tuple[Listing, float, list[str], list[str], list[dict[str, Any]]]]:
+    """مطابقة على ثلاث مراحل حتى لا يبقى البحث فارغًا في المناطق النادرة:
+
+    1) صارمة: مناطق الطلب فقط (كما كانت دائمًا).
+    2) إذا نقصت النتائج (< min_results): توسعة لنفس المحافظة بنقاط جزئية ووسم واضح.
+    3) إذا ما زالت ناقصة: توسعة استرشادية لكل المناطق بوسم أقوى وترتيب أدنى.
+    """
+    ranked = _score_all(request, listings, expansion="none")
+    if request.areas and len(ranked) < min_results:
+        requested_govs = {
+            item.governorate
+            for item in listings
+            if item.area in set(request.areas) and item.governorate
+        }
+        gov_ranked = _score_all(request, listings, expansion="governorate", allowed_govs=requested_govs)
+        if len(gov_ranked) > len(ranked):
+            ranked = gov_ranked
+        if len(ranked) < min_results:
+            any_ranked = _score_all(request, listings, expansion="any")
+            if len(any_ranked) > len(ranked):
+                ranked = any_ranked
     return ranked[:limit]

@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
 .env
+.env.*
+!.env.example
 .server.pid
 .pytest_cache/
 .venv/
@@ -8,3 +10,14 @@ node_modules/
 dist/
 build/
 *.log
+data/refined_*
+data/top10_similar_leads.*
+test-results/
+playwright-report/
+.cache/
+.coverage
+coverage/
+*.sqlite
+*.sqlite3
+Thumbs.db
+.DS_Store

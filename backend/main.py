@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import mimetypes
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
+
+logger = logging.getLogger(__name__)
 
 from backend.config import FRONTEND_DIR, HOST, PORT, AGENT_ROUTER_API_KEY
 from backend.connectors.alforaij import load_listings
@@ -16,7 +19,12 @@ from backend.services.report_generator import build_report
 from backend.services.request_parser import parse_request
 from backend.services.source_registry import source_registry
 from backend.services.supabase_store import is_configured as supabase_is_configured
-from backend.services.supabase_store import persist_analysis
+from backend.services.supabase_store import (
+    persist_analysis,
+    save_valuation_request,
+    save_client_property_request,
+    supabase_data_summary,
+)
 from backend.services.valuation import enrich_rankings
 
 
@@ -32,16 +40,358 @@ _OPPORTUNITIES_CACHE_AT = 0.0
 _OPPORTUNITIES_TTL_SECONDS = 300
 
 
+def _dashboard_record(listing) -> dict:
+    return {
+        "code": listing.code,
+        "transaction": listing.transaction,
+        "governorate": listing.governorate,
+        "area": listing.area,
+        "propertyType": listing.property_type,
+        "detailClass": listing.detail_class,
+        "price": listing.price,
+        "priceText": listing.price_text,
+        "space": listing.space,
+        "listingMode": listing.listing_mode,
+        "publishedDate": listing.published_date,
+        "source": listing.source or "الفريج",
+        "summary": listing.summary,
+        "features": listing.features,
+        "originalUrl": listing.original_url,
+    }
+
+
+def _area_governorate_map(listings) -> dict[str, str]:
+    mapping = {}
+    for row in listings:
+        if row.area and row.governorate and row.area not in mapping:
+            mapping[row.area] = row.governorate
+    return mapping
+
+
+_GOVERNORATE_ALIASES = {
+    "الأحمدي": "محافظة الأحمدي",
+    "احمدي": "محافظة الأحمدي",
+    "الاحمدي": "محافظة الأحمدي",
+    "محافظة الاحمدي": "محافظة الأحمدي",
+    "حولي": "محافظة حولي",
+    "الجهراء": "محافظة الجهراء",
+    "العاصمة": "محافظة العاصمة",
+    "الفروانية": "محافظة الفروانية",
+    "مبارك الكبير": "محافظة مبارك الكبير",
+}
+
+
+def _normalize_governorate_name(value: str) -> str:
+    clean = str(value or "").strip()
+    if not clean:
+        return ""
+    if clean in _GOVERNORATE_ALIASES:
+        return _GOVERNORATE_ALIASES[clean]
+    if clean.startswith("محافظة "):
+        return clean
+    return clean
+
+
+def _normalize_dashboard_place(record: dict, area_map: dict[str, str]) -> None:
+    area = str(record.get("area") or "").strip()
+    governorate = str(record.get("governorate") or "").strip()
+    if governorate:
+        record["governorate"] = _normalize_governorate_name(governorate)
+    if not record.get("governorate") and area in area_map:
+        record["governorate"] = area_map[area]
+    elif not record.get("governorate") and area in _GOVERNORATE_ALIASES:
+        record["governorate"] = _normalize_governorate_name(area)
+        record["area"] = ""
+
+
+def _platform_match(source: str, selected: set[str]) -> bool:
+    if not selected:
+        return True
+    normalized = str(source or "")
+    aliases = {
+        "الفريج": {"الفريج", "alforaij", "Alforaij", "الفريج المحلي"},
+        "alforaij": {"الفريج", "alforaij", "Alforaij", "الفريج المحلي"},
+        "بوشملان": {"بوشملان", "Bu3qar", "بوعقار", "السوق المباشر"},
+        "Bu3qar": {"بوشملان", "Bu3qar", "بوعقار"},
+    }
+    expanded: set[str] = set()
+    for name in selected:
+        expanded.add(name)
+        expanded.update(aliases.get(name, set()))
+    return any(name == normalized or name in normalized or normalized in name for name in expanded)
+
+
+def _is_local_platform_selected(selected: set[str]) -> bool:
+    local_names = {"الفريج", "alforaij", "Alforaij", "الفريج المحلي"}
+    return bool(selected & local_names)
+
+
+def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> list[dict]:
+    market_names = {"السوق المباشر", "بوشملان", "OpenSooq", "Mourjan", "Q8Aqar", "Sakan", "Waseet", "4Sale", "Bu3qar", "Aqarat", "NabdAqar"}
+    if not selected or selected & market_names:
+        try:
+            from backend.connectors.market_ads import search as search_market_ads
+            from backend.models import PropertyRequest
+
+            listings, _status = search_market_ads(PropertyRequest(raw_text=""))
+        except Exception as exc:
+            logger.warning("Dashboard market records skipped: %s", exc)
+            return []
+        records = []
+        for listing in listings:
+            raw_source = str((listing.raw or {}).get("source_name") or listing.source or "السوق المباشر")
+            if selected and not _platform_match(raw_source, selected) and "السوق المباشر" not in selected:
+                continue
+            record = _dashboard_record(listing)
+            _normalize_dashboard_place(record, area_map)
+            record["source"] = raw_source
+            records.append(record)
+        return records
+    return []
+
+
+def _record_from_opportunity(item: dict, area_map: dict[str, str]) -> dict:
+    record = {
+        "code": item.get("code"),
+        "transaction": item.get("transaction") or ("للإيجار" if item.get("rental") else "للبيع"),
+        "governorate": item.get("governorate") or "",
+        "area": item.get("area") or "",
+        "propertyType": item.get("propertyType") or "",
+        "detailClass": item.get("propertyType") or "",
+        "price": item.get("price"),
+        "priceText": item.get("priceText"),
+        "space": item.get("space"),
+        "listingMode": item.get("listingType") or "فرصة",
+        "publishedDate": item.get("publishedDate"),
+        "source": item.get("source") or "فرصة محفوظة",
+        "summary": item.get("summary") or item.get("valuationReason") or "",
+        "features": item.get("valuationReason") or "",
+        "originalUrl": item.get("url") or "",
+        "recordKind": "opportunity_snapshot",
+        "opportunityScore": item.get("score"),
+        "opportunityLabel": item.get("valuationLabel"),
+        "opportunityReason": item.get("valuationReason"),
+        "opportunityComparablesCount": item.get("comparablesCount"),
+        "opportunityEvidenceCount": item.get("evidenceCount"),
+        "opportunityClientsCount": item.get("clientsCount"),
+    }
+    _normalize_dashboard_place(record, area_map)
+    return record
+
+
+def _flat_dashboard_opportunities(selected: set[str], include_local: bool, area_map: dict[str, str]) -> tuple[list[dict], dict[str, dict]]:
+    try:
+        from backend.services.supabase_store import fetch_latest_opportunities
+
+        snapshot = fetch_latest_opportunities()
+    except Exception as exc:
+        logger.warning("Dashboard opportunities skipped: %s", exc)
+        snapshot = None
+    if not snapshot:
+        return [], {}
+
+    by_code: dict[str, dict] = {}
+    for tier in (snapshot.get("tiers") or {}).values():
+        for item in tier.get("items") or []:
+            code = str(item.get("code") or "")
+            if not code or code in by_code:
+                continue
+            source = str(item.get("source") or "")
+            is_local = _platform_match(source, {"الفريج"}) or source in {"الفريج", "alforaij"}
+            if not include_local and is_local:
+                continue
+            external_selected = selected - {"الفريج", "alforaij", "Alforaij", "الفريج المحلي", "__all"}
+            if selected and "__all" not in selected:
+                if is_local and not _is_local_platform_selected(selected):
+                    continue
+                if external_selected and not _platform_match(source, external_selected):
+                    continue
+                if not is_local and not external_selected:
+                    continue
+            clean = dict(item)
+            _normalize_dashboard_place(clean, area_map)
+            clean["evidenceCount"] = len(clean.get("evidence") or [])
+            clean["clientsCount"] = len(clean.get("clients") or [])
+            by_code[code] = clean
+    return list(by_code.values()), by_code
+
+
+def _dashboard_summary(listings, selected_platforms: set[str] | None = None, include_local: bool = True) -> dict:
+    selected_platforms = selected_platforms or set()
+    area_map = _area_governorate_map(listings)
+    local_records = [_dashboard_record(row) for row in listings] if include_local else []
+    for record in local_records:
+        _normalize_dashboard_place(record, area_map)
+    if selected_platforms and "__all" not in selected_platforms and not _is_local_platform_selected(selected_platforms):
+        local_records = []
+    external_platforms = selected_platforms - {"الفريج", "alforaij", "Alforaij", "الفريج المحلي", "__all"}
+    if not selected_platforms or "__all" in selected_platforms:
+        market_records = _dashboard_market_records(set(), area_map)
+    elif external_platforms:
+        market_records = _dashboard_market_records(external_platforms, area_map)
+    else:
+        market_records = []
+    records = local_records + market_records
+    raw_count = len(records)
+    opportunity_items, opportunities_by_code = _flat_dashboard_opportunities(selected_platforms, include_local, area_map)
+    existing_codes = {str(record.get("code") or "") for record in records}
+    for record in records:
+        opp = opportunities_by_code.get(str(record.get("code") or ""))
+        if not opp:
+            continue
+        record["opportunityScore"] = opp.get("score")
+        record["opportunityLabel"] = opp.get("valuationLabel")
+        record["opportunityReason"] = opp.get("valuationReason")
+        record["opportunityComparablesCount"] = opp.get("comparablesCount")
+        record["opportunityEvidenceCount"] = opp.get("evidenceCount")
+        record["opportunityClientsCount"] = opp.get("clientsCount")
+    for opp in opportunity_items:
+        code = str(opp.get("code") or "")
+        if code and code not in existing_codes:
+            records.append(_record_from_opportunity(opp, area_map))
+            existing_codes.add(code)
+    return {
+        "count": len(records),
+        "rawRecordCount": raw_count,
+        "records": records,
+        "opportunities": {
+            "count": len(opportunity_items),
+            "items": opportunity_items[:60],
+            "calculation": "الفرصة = إعلان عرض بسعر صالح تم تقييمه في لقطة الفرص، ويُحسب بعد نفس فلاتر المنصة والمحافظة والمنطقة. الدرجة = 65% جاذبية السعر + 35% الثقة، والثقة مبنية على مصداقية المصدر وعدد المقارنات/الأدلة.",
+        },
+        "platforms": sorted({row["source"] for row in records if row["source"]}),
+        "selectedPlatforms": sorted(selected_platforms),
+        "options": {
+            "governorates": sorted({row["governorate"] for row in records if row["governorate"]}),
+            "areas": sorted({row["area"] for row in records if row["area"]}),
+            "propertyTypes": sorted({row["propertyType"] for row in records if row["propertyType"]}),
+            "listingModes": sorted({row["listingMode"] for row in records if row["listingMode"]}),
+        },
+        "metrics": [
+            {"key": "movement", "label": "حركة الدلال"},
+            {"key": "saleOffers", "label": "عروض للبيع"},
+            {"key": "buyRequests", "label": "طلبات شراء"},
+            {"key": "rentOffers", "label": "عروض الإيجار"},
+            {"key": "rentRequests", "label": "طلبات الإيجار"},
+        ],
+    }
+
+
 def json_response(handler: BaseHTTPRequestHandler, payload: dict, status: int = 200) -> None:
     body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type")
+    handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
     handler.end_headers()
     handler.wfile.write(body)
 
 
+def _default_sale_when_unspecified(request) -> None:
+    text = f"{request.raw_text or ''}"
+    if request.transaction:
+        return
+    rental_words = ("إيجار", "ايجار", "للايجار", "للإيجار", "استأجر")
+    if request.property_type and request.areas and not any(word in text for word in rental_words):
+        request.transaction = "للبيع"
+
+
+def _apply_filter_overrides(request, filters: dict) -> None:
+    if not isinstance(filters, dict):
+        return
+    transaction = str(filters.get("transaction") or "").strip()
+    property_type = str(filters.get("propertyType") or "").strip()
+    areas = str(filters.get("areas") or "").strip()
+    governorate = str(filters.get("governorate") or "").strip()
+    if transaction:
+        request.transaction = transaction
+    if property_type:
+        request.property_type = property_type
+    if governorate:
+        request.governorates = [part.strip() for part in re.split(r"[ØŒ,|]+", governorate) if part.strip()]
+    if areas:
+        request.areas = [part.strip() for part in re.split(r"[،,|]+", areas) if part.strip()]
+
+    def number(name: str):
+        value = filters.get(name)
+        if value in (None, ""):
+            return None
+        try:
+            return float(str(value).replace(",", "").strip())
+        except ValueError:
+            return None
+
+    min_area = number("minArea")
+    max_area = number("maxArea")
+    budget = number("budget")
+    rent_budget = number("rentBudget")
+    bedrooms = number("bedrooms")
+    if min_area is not None:
+        request.min_area = min_area
+    if max_area is not None:
+        request.max_area = max_area
+    if budget is not None:
+        request.budget = budget
+    if rent_budget is not None:
+        request.rent_budget = rent_budget
+    if bedrooms is not None:
+        request.bedrooms = int(bedrooms)
+
+
+def _profit_opportunities(report: dict) -> dict:
+    rows = []
+    seen: set[tuple[str, str]] = set()
+    sources = [
+        *list(report.get("results") or []),
+        *list((report.get("similarExternal") or {}).get("items") or []),
+    ]
+    for item in sources:
+        for client in item.get("clients") or []:
+            profit = client.get("potentialProfitKwd")
+            if profit is None or profit <= 0:
+                continue
+            key = (str(item.get("code") or ""), str(client.get("phones") or ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({
+                "listingCode": item.get("code"),
+                "listingSource": item.get("source"),
+                "area": item.get("area"),
+                "propertyType": item.get("propertyType") or item.get("detailClass"),
+                "listingPrice": item.get("price"),
+                "listingPriceText": item.get("priceText"),
+                "clientSource": client.get("source"),
+                "clientBudget": client.get("clientBudget"),
+                "potentialProfitKwd": profit,
+                "matchScore": client.get("matchScore"),
+                "phones": client.get("phones"),
+                "reason": client.get("profitReason"),
+                "url": item.get("originalUrl") or item.get("url"),
+            })
+    rows.sort(key=lambda row: (row.get("potentialProfitKwd") or 0, row.get("matchScore") or 0), reverse=True)
+    return {
+        "count": len(rows),
+        "totalPotentialProfitKwd": round(sum(row.get("potentialProfitKwd") or 0 for row in rows), 0),
+        "note": (
+            "هذه فرص مكسب مؤكدة حسابيًا: إعلان بيع + عميل/طلب شراء مطابق لنفس المنطقة + فرق إيجابي بين ميزانية العميل وسعر الإعلان."
+            if rows
+            else "لا توجد فرصة مكسب مؤكدة لنفس المنطقة الآن. أضف/استورد طلبات شراء لنفس المنطقة أو فعّل مصادر طلب شراء خارجية قابلة للقراءة."
+        ),
+        "items": rows[:10],
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.end_headers()
+
     def do_GET(self) -> None:
         path = urlparse(self.path).path
         if path == "/api/health":
@@ -49,16 +399,40 @@ class Handler(BaseHTTPRequestHandler):
             json_response(self, {
                 "status": "ok",
                 "records": len(listings),
+                "recordsMeaning": "عدد إعلانات الفريج المحلية المحملة كخط أساس، وليس إجمالي كل المصادر.",
                 "supabase": supabase_is_configured(),
+                "dataSummary": supabase_data_summary(len(listings)),
                 "aiAnalysis": bool(AGENT_ROUTER_API_KEY),
             })
             return
         if path == "/api/sources":
             json_response(self, {"sources": source_registry()})
             return
+        if path == "/api/dashboard/summary":
+            params = parse_qs(urlparse(self.path).query)
+            selected = {
+                item.strip()
+                for raw in params.get("platform", [])
+                for item in raw.split(",")
+                if item.strip()
+            }
+            include_local = params.get("includeLocal", ["1"])[0] != "0"
+            json_response(self, _dashboard_summary(load_listings(), selected_platforms=selected, include_local=include_local))
+            return
+        if path == "/api/update-notifications":
+            from backend.services.update_notifications import load_update_notifications
+            json_response(self, load_update_notifications())
+            return
+        if path == "/api/daily-agent/status":
+            from backend.services.daily_update_agent import load_daily_agent_status
+            json_response(self, load_daily_agent_status())
+            return
+        if path == "/api/official-reference-sources":
+            from backend.services.official_source_agent import check_official_reference_sources
+            json_response(self, check_official_reference_sources(timeout=8))
+            return
         if path == "/api/opportunities":
             import time
-            from urllib.parse import parse_qs
             from backend.services.opportunities import build_opportunities
             from backend.services.supabase_store import save_opportunities
 
@@ -72,9 +446,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             with _OPPORTUNITIES_LOCK:
                 try:
-                    # الفحص الحي للمصادر الخارجية فقط عند طلب صريح (?refresh=1) أو أول بناء
-                    # حتى لا يتكرر سحب المواقع كل دقائق (حماية من الحظر/Rate limiting)
-                    include_external = force_refresh or _OPPORTUNITIES_CACHE is None
+                    # الصفحة تعتمد على الفرص الفعلية من كل المواقع: يُفحص المصادر الخارجية
+                    # في كل إعادة بناء (كل 5 دقائق) حتى لا تقتصر الفرص على الفريج المحلي.
+                    include_external = True
                     snapshot = build_opportunities(include_external=include_external)
                     if _OPPORTUNITIES_CACHE is not None and snapshot.get("generatedAt") != _OPPORTUNITIES_CACHE.get("generatedAt"):
                         _OPPORTUNITIES_PREVIOUS = _OPPORTUNITIES_CACHE
@@ -83,10 +457,9 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         save_opportunities(snapshot)
                     except Exception as exc:
-                        print(f"Supabase opportunities save skipped: {exc}")
+                        logger.warning("Supabase opportunities save skipped: %s", exc)
                 except Exception as exc:
-                    import traceback
-                    traceback.print_exc()
+                    logger.exception("Opportunities build failed")
                     # احتياط: عرض آخر لقطة محفوظة في Supabase بدل فشل الطلب
                     from backend.services.supabase_store import fetch_latest_opportunities
                     fallback = fetch_latest_opportunities()
@@ -108,9 +481,45 @@ class Handler(BaseHTTPRequestHandler):
                 snapshots.reverse()  # أقدم أولًا كما يتوقع build_history_series
                 json_response(self, build_history_series(snapshots))
             except Exception as exc:
-                import traceback
-                traceback.print_exc()
+                logger.exception("Opportunities history build failed")
                 json_response(self, {"error": "History build failed", "detail": str(exc)}, status=500)
+            return
+        if path == "/api/market-matching":
+            # العرض والطلب: التوفيق العملي بين طلبات «مطلوب للشراء/للإيجار» وأفضل الفرص المقيّمة
+            from backend.services.opportunities import build_market_matching, build_opportunities
+            try:
+                snapshot = _OPPORTUNITIES_CACHE
+                if snapshot is None:
+                    snapshot = build_opportunities(include_external=True)
+                json_response(self, build_market_matching(snapshot))
+            except Exception as exc:
+                logger.exception("Market matching build failed")
+                json_response(self, {"error": "Market matching build failed", "detail": str(exc)}, status=500)
+            return
+        if path == "/api/opportunity-delta":
+            # ما الجديد وما حذف وما انخفض سعره بين آخر لقطتين + إرشاد التعامل مع كل حالة
+            from backend.services.opportunities import build_opportunity_delta, build_opportunities
+            try:
+                current = _OPPORTUNITIES_CACHE
+                previous = _OPPORTUNITIES_PREVIOUS
+                if current is None:
+                    current = build_opportunities(include_external=True)
+                json_response(self, build_opportunity_delta(previous, current))
+            except Exception as exc:
+                logger.exception("Opportunity delta build failed")
+                json_response(self, {"error": "Opportunity delta build failed", "detail": str(exc)}, status=500)
+            return
+        if path == "/api/weekly-digest":
+            # الموجز الأسبوعي: أفضل 10 فرص بيع لكل عميل محتمل مع رسالة واتساب جاهزة
+            from backend.services.opportunities import build_opportunities, build_weekly_digest
+            try:
+                snapshot = _OPPORTUNITIES_CACHE
+                if snapshot is None:
+                    snapshot = build_opportunities(include_external=True)
+                json_response(self, build_weekly_digest(snapshot))
+            except Exception as exc:
+                logger.exception("Weekly digest build failed")
+                json_response(self, {"error": "Weekly digest build failed", "detail": str(exc)}, status=500)
             return
         if path == "/api/whatsapp-alerts":
             # تنبيهات واتساب: مقارنة آخر لقطتين (الحالية مقابل السابقة) لكل عميل مطابق
@@ -132,9 +541,17 @@ class Handler(BaseHTTPRequestHandler):
                         previous = snapshots[1]
                 json_response(self, build_whatsapp_alerts(previous, current or {}))
             except Exception as exc:
-                import traceback
-                traceback.print_exc()
+                logger.exception("WhatsApp alerts build failed")
                 json_response(self, {"error": "WhatsApp alerts build failed", "detail": str(exc)}, status=500)
+            return
+        if path == "/api/outreach/stats":
+            # عدّادات تفاعل العملاء مع فرص التسويق (نسخ/إرسال) من جدول outreach_clicks
+            from backend.services.supabase_store import fetch_outreach_stats
+            try:
+                json_response(self, fetch_outreach_stats())
+            except Exception as exc:
+                logger.exception("Outreach stats failed")
+                json_response(self, {"error": "Outreach stats failed", "detail": str(exc)}, status=500)
             return
         if path == "/api/clients":
             # قائمة العملاء المحتملين: ملف CSV + قاعدة Supabase مدمجة + روابط واتساب جاهزة
@@ -185,20 +602,75 @@ class Handler(BaseHTTPRequestHandler):
                 request = parse_request(text)
                 if payload.get("mode") in {"search", "valuation", "search_and_value"}:
                     request.intent = str(payload["mode"])
-                listings = load_listings()
+                _apply_filter_overrides(request, payload.get("filters") or {})
+                _default_sale_when_unspecified(request)
+                source_mode = str(payload.get("sourceMode") or "local").strip()
+                selected_source = str(payload.get("selectedSource") or "").strip()
+                selected_sources_payload = payload.get("selectedSources") or []
+                if isinstance(selected_sources_payload, str):
+                    selected_sources_payload = [selected_sources_payload]
+                selected_sources_payload = [
+                    str(name).strip() for name in selected_sources_payload
+                    if str(name or "").strip()
+                ]
+                use_local = bool(payload.get("includeLocal", source_mode in {"local", "all"}))
+                use_external = source_mode in {"all", "source", "custom"} and bool(payload.get("includeExternal", True))
+                listings = load_listings() if use_local else []
                 local_count = len(listings)
                 external_statuses = []
-                if payload.get("includeExternal", True):
-                    external_listings, external_statuses = search_external_sources(request)
+                if use_external:
+                    selected_sources = selected_sources_payload or ([selected_source] if source_mode == "source" and selected_source else None)
+                    external_listings, external_statuses = search_external_sources(request, selected_sources=selected_sources)
                     listings.extend(external_listings)
-                ranked = top_matches(request, listings, limit=40)
+                if request.governorates and not request.areas:
+                    allowed_governorates = set(request.governorates)
+                    listings = [
+                        item for item in listings
+                        if item.governorate in allowed_governorates
+                    ]
+                ranked = top_matches(request, listings, limit=100)
                 enriched = enrich_rankings(request, ranked, listings)
-                deduped = deduplicate_ranked(enriched)[:20]
+                deduped = deduplicate_ranked(enriched)[:50]
                 
                 # Fetch AI professional analysis
                 ai_insights = generate_professional_analysis(request, deduped, external_statuses)
                 
-                report = build_report(request, deduped, local_count, external_statuses, ai_insights)
+                report = build_report(
+                    request,
+                    deduped,
+                    local_count,
+                    external_statuses,
+                    ai_insights,
+                    include_local_source=use_local,
+                )
+
+                # ربط العملاء المحتملين بنتائج التحليل: ما دام العرض بيعًا، يُعرض من يبحث عن شراء
+                # في نفس المنطقة/النوع/النطاق السعري (من ملف العملاء + Supabase) — الإيجار يُستثنى.
+                try:
+                    from backend.services.opportunities import _load_clients, clients_from_demand_listings, match_clients_for_listing
+                    analyze_clients = _load_clients() + clients_from_demand_listings(listings)
+                    for result in report.get("results", []):
+                        if result.get("rental"):
+                            result["clients"] = []
+                            continue
+                        result["clients"] = match_clients_for_listing(
+                            analyze_clients,
+                            str(result.get("area") or ""),
+                            str(result.get("propertyType") or result.get("detailClass") or ""),
+                            result.get("price"),
+                        )
+                    for result in (report.get("similarExternal") or {}).get("items", []):
+                        result["clients"] = match_clients_for_listing(
+                            analyze_clients,
+                            str(result.get("area") or ""),
+                            str(result.get("propertyType") or ""),
+                            result.get("price"),
+                        )
+                    report["profitOpportunities"] = _profit_opportunities(report)
+                except Exception as clients_error:
+                    logger.warning("Clients attach failed: %s", clients_error)
+                    report["profitOpportunities"] = _profit_opportunities(report)
+
                 try:
                     report["persistence"] = persist_analysis(request, report, report["sourceStatus"])
                 except Exception as persist_error:
@@ -207,10 +679,28 @@ class Handler(BaseHTTPRequestHandler):
                         "status": "failed",
                         "error": str(persist_error),
                     }
+
+                # حفظ طلب التقييم في user_valuation_requests (يظهر فورًا في لوحة العرض)
+                try:
+                    if supabase_is_configured() and request.areas:
+                        fair_value = report.get("valuation", {}).get("fairValue") or report.get("fairValue")
+                        valuation_result = report.get("valuation") or {}
+                        save_valuation_request(
+                            region=request.areas[0],
+                            property_type=request.property_type or "",
+                            land_area_m2=request.min_area or request.max_area,
+                            offered_price=request.budget,
+                            fair_value_estimated=fair_value or valuation_result.get("marketValue"),
+                            # الثقة كسر بين 0 و1 → تحويلها إلى نسبة مئوية صحيحة لعمود score (integer)
+                            score=round((getattr(deduped[0], "confidence", 0) or 0) * 100) if deduped else None,
+                            lang="ar",
+                        )
+                except Exception as ve:
+                    logger.warning("Could not save valuation request: %s", ve)
+
                 json_response(self, report)
             except Exception as exc:
-                import traceback
-                traceback.print_exc()
+                logger.exception("Analysis failed")
                 json_response(self, {"error": "Analysis failed", "detail": str(exc)}, status=500)
             return
         if path == "/api/report-pdf":
@@ -222,12 +712,31 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Disposition", 'attachment; filename="alforaij-report.pdf"')
                 self.send_header("Content-Length", str(len(pdf_bytes)))
                 self.send_header("Cache-Control", "no-store")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
                 self.end_headers()
                 self.wfile.write(pdf_bytes)
             except Exception as exc:
-                import traceback
-                traceback.print_exc()
+                logger.exception("PDF generation failed")
                 json_response(self, {"error": "PDF generation failed", "detail": str(exc)}, status=500)
+            return
+        if path == "/api/outreach-click":
+            # تتبع نقرات التسويق (نسخ/إرسال فرصة أو عميل) → يُسجَّل في outreach_clicks
+            from backend.services.supabase_store import save_outreach_click
+            try:
+                result = save_outreach_click({
+                    "clientPhone": payload.get("clientPhone"),
+                    "clientArea": payload.get("clientArea"),
+                    "clientType": payload.get("clientType"),
+                    "opportunityCode": payload.get("opportunityCode"),
+                    "action": payload.get("action"),
+                    "channel": payload.get("channel"),
+                })
+                json_response(self, result)
+            except Exception as exc:
+                logger.warning("Outreach click save failed: %s", exc)
+                json_response(self, {"status": "failed", "error": str(exc)})
             return
         if path == "/api/clients":
             # إضافة/تحديث عميل محتمل: يُحفظ في Supabase (إن مضبوط) + الملف المحلي دائمًا
@@ -240,11 +749,47 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         supabase_save_client(payload)
                         supabase_status = "saved"
+                        # سينك مع client_property_requests للوحة العرض
+                        try:
+                            save_client_property_request(
+                                phone=str(payload.get("phone") or ""),
+                                request_text=str(payload.get("note") or ""),
+                                transaction_type="للبيع",
+                                property_type=payload.get("type") or "",
+                                regions=[payload.get("area", "")] if payload.get("area") else None,
+                                max_budget=payload.get("price"),
+                            )
+                        except Exception:
+                            pass
                     except Exception as exc:
                         supabase_status = f"failed: {exc}"
                 json_response(self, {"status": result.get("status"), "code": result.get("code"), "supabase": supabase_status})
             except Exception as exc:
                 json_response(self, {"error": "Client save failed", "detail": str(exc)}, status=500)
+            return
+        if path == "/api/daily-agent/run":
+            from backend.services.daily_update_agent import run_daily_update_agent
+            try:
+                result = run_daily_update_agent(
+                    official_source=str(payload.get("officialSource") or ""),
+                    include_external=bool(payload.get("includeExternal", True)),
+                )
+                json_response(self, result, status=200 if result.get("status") != "failed" else 500)
+            except Exception as exc:
+                logger.exception("Daily agent run failed")
+                json_response(self, {"status": "failed", "error": str(exc)}, status=500)
+            return
+        if path == "/api/official-transactions/import":
+            from backend.services.official_import import import_official_transactions_content
+            try:
+                result = import_official_transactions_content(
+                    str(payload.get("filename") or "official_transactions.csv"),
+                    str(payload.get("content") or ""),
+                )
+                json_response(self, result, status=200 if result.get("status") == "saved" else 400)
+            except Exception as exc:
+                logger.exception("Official transactions import failed")
+                json_response(self, {"status": "failed", "error": str(exc)}, status=500)
             return
         json_response(self, {"error": "Unknown endpoint"}, status=404)
 
@@ -254,7 +799,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"Alforaij Research Assistant running on http://{HOST}:{PORT}")
+    logger.info("Alforaij Research Assistant running on http://%s:%s", HOST, PORT)
     server.serve_forever()
 
 

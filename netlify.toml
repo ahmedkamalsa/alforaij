@@ -1,0 +1,13 @@
+[build]
+  publish = "frontend"
+  command = "echo Static frontend ready"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

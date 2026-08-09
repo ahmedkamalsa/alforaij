@@ -13,14 +13,22 @@
 from __future__ import annotations
 
 import csv
+import logging
 import re
+from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 from statistics import median
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 from backend.connectors.alforaij import load_listings
-from backend.connectors.live_sources import search_external_sources
+from backend.connectors.live_sources import (
+    broad_combo_requests,
+    search_combo_sources,
+    search_external_sources,
+)
 from backend.models import PropertyRequest
 from backend.services.official_valuation import get_area_benchmark
 from backend.services.valuation import comparable_pool, price_label
@@ -44,7 +52,8 @@ SOURCE_TRUST: dict[str, float] = {
     "Bu3qar": 0.75,
     "Aqarat": 0.6,
     "4Sale": 0.55,
-    "Sakan": 0.5,
+    "السوق المباشر": 0.75,
+    "مؤشرات رسمية": 1.0,
     "الصفقات الرسمية": 1.0,
 }
 
@@ -56,6 +65,20 @@ TIERS = [
 ]
 
 
+def _listing_kind(listing) -> str:
+    """تصنيف الإعلان: مباشر / مكتب / غير محدد (من listing_mode).
+
+    يقسم السوق إلى إعلانات مباشرة (المالك/الوسيط المباشر) وإعلانات مكاتب عقارية،
+    حتى يفصل المستخدم بينهما بفلتر ويقارن وساطة كل نوع.
+    """
+    mode = str(getattr(listing, "listing_mode", "") or "")
+    if "مباشر" in mode:
+        return "مباشر"
+    if "مكتب" in mode:
+        return "مكتب"
+    return "غير محدد"
+
+
 def _days_ago(published: str) -> int | None:
     try:
         day = datetime.strptime(str(published)[:10], "%Y-%m-%d").date()
@@ -64,14 +87,23 @@ def _days_ago(published: str) -> int | None:
         return None
 
 
-def _evidence_count(valuation) -> int:
-    return valuation.comparables_count
+def _source_trust(source: str) -> float:
+    """مصداقية المصدر مع مطابقة الجذر قبل القوسين: «السوق المباشر (بوشملان)» ← «السوق المباشر».
+
+    الأسماء الحية تحمل تفاصيل المصدر الداخلي بين قوسين (مثل اسم الموقع الفعلي)
+    فلا تطابق حرفيًا مفاتيح SOURCE_TRUST.
+    """
+    trust = SOURCE_TRUST.get(source)
+    if trust is not None:
+        return trust
+    base = source.split(" (")[0].strip()
+    return SOURCE_TRUST.get(base, 0.5)
 
 
 def _confidence(source: str, valuation) -> float:
     """ثقة حتمية: 50% مصداقية المصدر + 30% ثقة التقييم + 20% قوة الأدلة."""
-    trust = SOURCE_TRUST.get(source, 0.5)
-    evidence_factor = min(1.0, 0.35 + _evidence_count(valuation) * 0.13)
+    trust = _source_trust(source)
+    evidence_factor = min(1.0, 0.35 + valuation.comparables_count * 0.13)
     return round(min(1.0, trust * 0.5 + valuation.confidence * 0.3 + evidence_factor * 0.2), 2)
 
 
@@ -98,7 +130,8 @@ def _load_supabase_clients() -> list[dict[str, Any]]:
     try:
         from backend.services.supabase_store import fetch_clients
         rows = fetch_clients()
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to load clients from Supabase: %s", exc)
         return []
     clients: list[dict[str, Any]] = []
     for row in rows:
@@ -157,20 +190,122 @@ def _client_score(client: dict[str, Any], listing_area: str, listing_type: str, 
     return round(min(100.0, points), 1), reasons
 
 
+def _client_budget(client: dict[str, Any]) -> float | None:
+    try:
+        value = float(str(client.get("price") or "").replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+    return value or None
+
+
+def _deal_profit(client: dict[str, Any], listing_price: float | None) -> dict[str, Any]:
+    budget = _client_budget(client)
+    if not budget or not listing_price:
+        return {
+            "clientBudget": budget,
+            "potentialProfitKwd": None,
+            "profitReason": "لا يمكن حساب المكسب لأن ميزانية العميل أو سعر الإعلان غير مكتمل.",
+        }
+    spread = budget - listing_price
+    if spread <= 0:
+        return {
+            "clientBudget": budget,
+            "potentialProfitKwd": 0,
+            "profitReason": "سعر الإعلان ليس أقل من ميزانية العميل، لذلك لا يوجد هامش شراء مباشر.",
+        }
+    return {
+        "clientBudget": budget,
+        "potentialProfitKwd": round(spread, 0),
+        "profitReason": f"ميزانية العميل {budget:,.0f} د.ك ناقص سعر الإعلان {listing_price:,.0f} د.ك.",
+    }
+
+
+def clients_from_demand_listings(listings: list[Any]) -> list[dict[str, Any]]:
+    """حوّل إعلانات الطلب (مطلوب للشراء) من الفريج أو المواقع الخارجية إلى عملاء محتملين."""
+    clients: list[dict[str, Any]] = []
+    phone_pattern = re.compile(r"(?:\+?965)?\s?[24569]\d{7}")
+    for listing in listings:
+        tx = str(getattr(listing, "transaction", "") or "")
+        if "مطلوب" not in tx or "شراء" not in tx:
+            continue
+        text = " ".join([
+            str(getattr(listing, "summary", "") or ""),
+            str(getattr(listing, "features", "") or ""),
+            str(getattr(listing, "seller_info", "") or ""),
+        ])
+        phones = "|".join(dict.fromkeys(match.replace(" ", "") for match in phone_pattern.findall(text)))
+        if not phones:
+            continue
+        clients.append({
+            "code": f"DEMAND-{getattr(listing, 'code', '')}",
+            "area": getattr(listing, "area", "") or "",
+            "type": getattr(listing, "property_type", "") or getattr(listing, "detail_class", "") or "",
+            "price": f"{float(getattr(listing, 'price', 0)):,.0f}" if getattr(listing, "price", None) else "",
+            "phones": phones,
+            "message": text[:300],
+            "source": getattr(listing, "source", "") or "market_demand",
+        })
+    return clients
+
+
+def match_clients_for_listing(
+    clients: list[dict[str, Any]],
+    listing_area: str,
+    listing_type: str,
+    price: float | None,
+) -> list[dict[str, Any]]:
+    """ربط العملاء المحتملين بفرصة/نتيجة بيعية (المنطقة 40 + النوع 30 + تقارب السعر 30).
+
+    دالة مشتركة تُستخدم في الفرص وفي نتائج التحليل الفردي حتى يتسق الربط في كل مكان.
+    تُرجع الأفضل 3 فقط.
+    """
+    matched: list[dict[str, Any]] = []
+    for client in clients:
+        if not client.get("phones"):
+            continue
+        client_area = str(client.get("area") or "").strip()
+        if client_area and listing_area and client_area != listing_area and listing_area not in client_area:
+            continue
+        c_score, c_reasons = _client_score(client, listing_area, listing_type, price)
+        if c_score >= 40:
+            profit = _deal_profit(client, price)
+            matched.append({
+                "area": client.get("area"),
+                "type": client.get("type"),
+                "price": client.get("price"),
+                "phones": client.get("phones"),
+                "message": client.get("message"),
+                "source": client.get("source") or "csv",
+                "matchScore": c_score,
+                "reasons": c_reasons,
+                **profit,
+            })
+    matched.sort(key=lambda m: m["matchScore"], reverse=True)
+    return matched[:3]
+
+
 def _listing_opportunity(listing, valuation, clients: list[dict[str, Any]]) -> dict[str, Any]:
     confidence = _confidence(listing.source, valuation)
+    rental = bool(getattr(valuation, "rental", False))
+    days_ago = _days_ago(listing.published_date)
+    # الإعلان الحي القادم من فحص المصادر الخارجية الآن بلا تاريخ يُعتبر حديثًا (يوم 0)
+    # حتى تدخل كل منصات المواقع/التطبيقات فئات الفرص اليومية وليس الفريج فقط.
+    if days_ago is None and listing.source != "الفريج":
+        days_ago = 0
     opportunity = {
         "code": listing.code,
         "source": listing.source,
+        "listingType": _listing_kind(listing),
         "governorate": listing.governorate,
         "area": listing.area,
         "propertyType": listing.property_type or listing.detail_class,
         "transaction": listing.transaction,
+        "rental": rental,
         "price": listing.price,
         "priceText": listing.price_text or f"{listing.price:,.0f} د.ك",
         "space": listing.space,
         "publishedDate": listing.published_date,
-        "daysAgo": _days_ago(listing.published_date),
+        "daysAgo": days_ago,
         "url": listing.original_url,
         "summary": listing.summary,
         "dealScore": valuation.deal_score,
@@ -184,33 +319,340 @@ def _listing_opportunity(listing, valuation, clients: list[dict[str, Any]]) -> d
         "comparablesCount": valuation.comparables_count,
         "comparableScope": valuation.comparable_scope,
         "score": _opportunity_score(valuation.deal_score, confidence),
-        "evidence": [{"code": e.get("code"), "area": e.get("area"), "price": e.get("price")} for e in valuation.evidence[:4]],
+        # كل دليل يحمل مصدره وسعره ورابطه حتى تُعرض صناديق دليل لكل موقع في بطاقة الفرصة
+        "evidence": [
+            {
+                "code": e.get("code"),
+                "area": e.get("area"),
+                "price": e.get("price"),
+                "priceText": e.get("priceText"),
+                "source": e.get("source"),
+                "url": e.get("url"),
+            }
+            for e in valuation.evidence[:4]
+        ],
     }
-    # ربط العملاء المحتملين
-    matched: list[dict[str, Any]] = []
-    for client in clients:
-        if not client.get("phones"):
-            continue
-        c_score, c_reasons = _client_score(client, listing.area, opportunity["propertyType"], listing.price)
-        if c_score >= 40:
-            matched.append({
-                "area": client.get("area"),
-                "type": client.get("type"),
-                "price": client.get("price"),
-                "phones": client.get("phones"),
-                "message": client.get("message"),
-                "matchScore": c_score,
-                "reasons": c_reasons,
-            })
-    matched.sort(key=lambda m: m["matchScore"], reverse=True)
-    opportunity["clients"] = matched[:3]
+    # حقول إضافية لعروض الإيجار (شهري/سنوي/متر/عائد) — تظهر في بطاقة الفرصة عند الإيجار
+    if rental:
+        opportunity["monthlyRent"] = valuation.monthly_rent
+        opportunity["annualRent"] = valuation.annual_rent
+        opportunity["rentPerSqm"] = round(valuation.rent_per_sqm, 1) if valuation.rent_per_sqm else None
+        opportunity["medianRent"] = valuation.median_rent
+        opportunity["capitalValue"] = valuation.capital_value
+        opportunity["rentalYieldPercent"] = valuation.rental_yield_percent
+    # ربط العملاء المحتملين — يُربط بعروض البيع فقط؛ ميزانية شراء العميل لا تُقارن بإيجار شهري
+    opportunity["clients"] = (
+        []
+        if rental
+        else match_clients_for_listing(clients, listing.area, opportunity["propertyType"], listing.price)
+    )
     return opportunity
+
+
+def _score_listings(listings, clients: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int, int]:
+    """تقييم كل إعلان عرض (بيع/إيجار) وترتيبه بخط حسابه المميز.
+
+    - طلبات «مطلوب…» (جانب الطلب) تُستبعد من الفرص لأنها إشارات طلب لا عروضًا —
+      لكنها تبقى متاحة لتبويب «العرض والطلب» عبر _demand_requests().
+    - حارس الجودة: السعر غير المنطقي (مثل «2 د.ك» لإيجار أو «500 د.ك» لبيع) إشارة
+      فشل استخراج من صفحة المصدر لا فرصة حقيقية — يُستبعد حتى لا يلوث «أفضل الفرص».
+    - عروض الإيجار تدخل بخط حسابها المميز (إيجار شهري/سنوي + عائد إيجاري)،
+      فلا يُخلط إيجار شهري بسعر بيع إجمالي أبدًا.
+    """
+    scored: list[dict[str, Any]] = []
+    skipped_demand = 0
+    skipped_unreal = 0
+    for listing in listings:
+        if not listing.price:
+            continue
+        tx = str(listing.transaction or "")
+        if tx.startswith("مطلوب"):
+            skipped_demand += 1
+            continue
+        if listing.price < (20 if tx.startswith("للإيجار") else 5000):
+            skipped_unreal += 1
+            continue
+        comps = comparable_pool(listing, listings)
+        valuation = price_label(listing, comps)
+        scored.append(_listing_opportunity(listing, valuation, clients))
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    return scored, skipped_demand, skipped_unreal
+
+
+def _market_supply() -> list[dict[str, Any]]:
+    """كل عروض السوق المتاحة المقيّمة (بيع + إيجار) — أساس التوفيق العملي مع الطلبات."""
+    scored, _skipped_demand, _skipped_unreal = _score_listings(load_listings(), _load_clients())
+    return scored
+
+
+_DEMAND_TYPE_HINTS = ["شقة", "أرض", "عمارة", "مكتب", "محل", "تجاري"]
+
+
+def _demand_property_type(listing) -> str:
+    """نوع العقار المطلوب من detail_class أو نص الطلب — فارغ يعني «أي نوع»."""
+    dc = str(listing.detail_class or "")
+    if "بيت" in dc or "فيلا" in dc:
+        return "بيت"
+    for hint in _DEMAND_TYPE_HINTS:
+        if hint in dc:
+            return hint
+    text = f"{listing.summary} {listing.features}"
+    for hint in ["بيت", "فيلا", "شقة", "أرض", "عمارة"]:
+        if hint in text:
+            return "بيت" if hint == "فيلا" else hint
+    return ""
+
+
+def _demand_requests() -> list[dict[str, Any]]:
+    """طلبات السوق «مطلوب…»: طلب شراء / طلب إيجار / طلب بيع — جانب الطلب في التوفيق العملي."""
+    out: list[dict[str, Any]] = []
+    for listing in load_listings():
+        tx = str(listing.transaction or "")
+        if not tx.startswith("مطلوب"):
+            continue
+        if "شراء" in tx:
+            kind = "buy"
+        elif "إيجار" in tx:
+            kind = "rent"
+        else:
+            kind = "sell"
+        out.append({
+            "code": listing.code,
+            "transaction": tx,
+            "kind": kind,
+            "area": listing.area,
+            "governorate": listing.governorate,
+            "propertyType": _demand_property_type(listing),
+            "budget": listing.price,
+            "budgetText": f"{listing.price:,.0f} د.ك" if listing.price else None,
+            "summary": (listing.summary or "")[:240],
+            "url": listing.original_url,
+            "source": listing.source,
+            "listingMode": listing.listing_mode,
+            "listingType": _listing_kind(listing),
+        })
+    return out
+
+
+def _demand_match_score(demand: dict[str, Any], item: dict[str, Any]) -> tuple[float, list[str]]:
+    """درجة التوفيق بين طلب السوق وفرصة متاحة: المنطقة 40 + النوع 30 + السعر 30. حتمية بلا عشوائية."""
+    points = 0.0
+    reasons: list[str] = []
+    area = item.get("area") or ""
+    if demand.get("area") and area and demand["area"] == area:
+        points += 40
+        reasons.append("نفس المنطقة")
+    elif (
+        demand.get("governorate")
+        and item.get("governorate")
+        and demand["governorate"] == item.get("governorate")
+    ):
+        points += 25
+        reasons.append("نفس المحافظة")
+    want_type = demand.get("propertyType") or ""
+    if want_type:
+        if want_type == (item.get("propertyType") or ""):
+            points += 30
+            reasons.append("نفس نوع العقار")
+        else:
+            points += 8
+            reasons.append("نوع عقار مختلف")
+    else:
+        points += 20
+        reasons.append("طلب دون تحديد نوع (أي نوع)")
+    budget = demand.get("budget")
+    price = item.get("price")
+    if budget and price:
+        try:
+            ratio = price / float(budget)
+            if 0.7 <= ratio <= 1.3:
+                points += 30
+                reasons.append("السعر ضمن الميزانية")
+            elif ratio <= 1.5:
+                points += 15
+                reasons.append("السعر قريب من الميزانية")
+        except (TypeError, ValueError, ZeroDivisionError):
+            pass
+    return round(min(100.0, points), 1), reasons
+
+
+def build_market_matching(
+    snapshot: dict[str, Any] | None = None,
+    demand_requests: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """التوفيق العملي بين العرض والطلب.
+
+    جانب العرض: الفرص المتاحة المقيّمة (بيع + إيجار) من اللقطة الحالية،
+    أو إعادة تقييم حية عند غيابها. جانب الطلب: طلبات «مطلوب للشراء / للإيجار».
+    كل طلب يُقابل بأفضل الفرص المطابقة (منطقة/محافظة + نوع + ميزانية) مع تقييم
+    كل فرصة ومصادرها، ويُبرز «الفرص الأكثر طلبًا» ليتصرف الوسيط بسرعة.
+    """
+    snapshot = snapshot or {}
+    pool: dict[str, dict[str, Any]] = {}
+    for tier in (snapshot.get("tiers") or {}).values():
+        for item in tier.get("items") or []:
+            code = item.get("code")
+            if code and code not in pool:
+                pool[code] = item
+    supply = list(pool.values())
+    if not supply:
+        supply = _market_supply()
+
+    requests: list[dict[str, Any]] = []
+    for demand in demand_requests if demand_requests is not None else _demand_requests():
+        matches: list[dict[str, Any]] = []
+        for item in supply:
+            if demand["kind"] == "buy" and item.get("rental"):
+                continue
+            if demand["kind"] == "rent" and not item.get("rental"):
+                continue
+            score, reasons = _demand_match_score(demand, item)
+            if score >= 40:
+                match = dict(item)
+                match["matchScore"] = score
+                match["matchReasons"] = reasons
+                matches.append(match)
+        matches.sort(key=lambda m: (m["matchScore"], m.get("score") or 0), reverse=True)
+        requests.append({**demand, "matchCount": len(matches), "matches": matches[:5]})
+
+    demand_counts: Counter = Counter()
+    for demand in requests:
+        for match in demand["matches"]:
+            demand_counts[match.get("code")] += 1
+    hot: list[dict[str, Any]] = []
+    for item in supply:
+        count = demand_counts.get(item.get("code"), 0)
+        if count:
+            hot_item = dict(item)
+            hot_item["demandCount"] = count
+            hot.append(hot_item)
+    hot.sort(key=lambda h: (h["demandCount"], h.get("score") or 0), reverse=True)
+
+    by_kind = {"buy": 0, "rent": 0, "sell": 0}
+    for demand in requests:
+        by_kind[demand["kind"]] = by_kind.get(demand["kind"], 0) + 1
+    return {
+        "generatedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "demandCount": len(requests),
+        "matchedDemandCount": sum(1 for r in requests if r["matchCount"]),
+        "byKind": by_kind,
+        "supplyCount": len(supply),
+        "requests": requests,
+        "hotOffers": hot[:15],
+        "note": (
+            "التوفيق العملي بين العرض والطلب: كل طلب «مطلوب للشراء/للإيجار» يُقابل بأفضل الفرص "
+            "المتاحة المقيّمة (نفس المنطقة/المحافظة + نوع العقار + الميزانية)، مع تقييم كل فرصة "
+            "ومصادرها — حتمي بلا عشوائية."
+        ),
+    }
+
+
+def _flat_tier_items(snapshot: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """كل الفرص من كل الفئات الزمنية (بإزالة التكرار بالكود) كقاموس بالكود."""
+    pool: dict[str, dict[str, Any]] = {}
+    for tier in ((snapshot or {}).get("tiers") or {}).values():
+        for item in tier.get("items") or []:
+            code = item.get("code")
+            if code and code not in pool:
+                pool[code] = item
+    return pool
+
+
+def build_opportunity_delta(
+    previous: dict[str, Any] | None,
+    current: dict[str, Any],
+) -> dict[str, Any]:
+    """ما الجديد وما حذف وما انخفض سعره بين آخر لقطتين — مع إرشاد التعامل مع كل حالة.
+
+    - الجديد: فرصة دخلت السوق → راسل العملاء المطابقين فورًا.
+    - المحذوف: اختفى إعلان → أزله من العروض المرسلة وأبلغ المهتمين.
+    - انخفاض السعر: تحسّنت الفرصة → أبلغ العملاء المطابقين بالفرصة المحسّنة.
+    """
+    prev_items = _flat_tier_items(previous)
+    curr_items = _flat_tier_items(current)
+
+    added: list[dict[str, Any]] = []
+    for code, item in curr_items.items():
+        if code in prev_items:
+            continue
+        added.append({
+            "code": code,
+            "area": item.get("area"),
+            "propertyType": item.get("propertyType"),
+            "priceText": item.get("priceText"),
+            "price": item.get("price"),
+            "valuationLabel": item.get("valuationLabel"),
+            "score": item.get("score"),
+            "url": item.get("url"),
+            "source": item.get("source"),
+            "listingType": item.get("listingType"),
+            "clients": (item.get("clients") or [])[:3],
+            "change": "new",
+            "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين.",
+        })
+
+    removed: list[dict[str, Any]] = []
+    for code, item in prev_items.items():
+        if code in curr_items:
+            continue
+        removed.append({
+            "code": code,
+            "area": item.get("area"),
+            "propertyType": item.get("propertyType"),
+            "priceText": item.get("priceText"),
+            "price": item.get("price"),
+            "valuationLabel": item.get("valuationLabel"),
+            "url": item.get("url"),
+            "source": item.get("source"),
+            "change": "removed",
+            "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب).",
+        })
+
+    price_drops: list[dict[str, Any]] = []
+    for code, item in curr_items.items():
+        prev = prev_items.get(code)
+        if not prev or not item.get("price") or not prev.get("price"):
+            continue
+        if item["price"] < prev["price"]:
+            price_drops.append({
+                "code": code,
+                "area": item.get("area"),
+                "propertyType": item.get("propertyType"),
+                "priceText": item.get("priceText"),
+                "price": item.get("price"),
+                "oldPrice": prev.get("price"),
+                "oldPriceText": prev.get("priceText"),
+                "valuationLabel": item.get("valuationLabel"),
+                "score": item.get("score"),
+                "url": item.get("url"),
+                "clients": (item.get("clients") or [])[:3],
+                "change": "price_drop",
+                "guidance": "انخفض السعر — أبلغ العملاء المطابقين بالفرصة المحسّنة فورًا.",
+            })
+
+    added.sort(key=lambda d: d.get("score") or 0, reverse=True)
+    price_drops.sort(key=lambda d: (d.get("oldPrice") or 0) - (d.get("price") or 0), reverse=True)
+    return {
+        "generatedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "hasPrevious": bool(prev_items),
+        "counts": {"added": len(added), "removed": len(removed), "priceDrops": len(price_drops)},
+        "added": added[:20],
+        "removed": removed[:20],
+        "priceDrops": price_drops[:20],
+        "note": (
+            "مقارنة آخر لقطتين للفرص: الجديد (فرصة دخلت السوق) والمحذوف (اختفى إعلان) "
+            "وانخفاض الأسعار — مع إرشاد التعامل مع كل حالة ليتصرف الوسيط بسرعة وباحترافية."
+        ),
+    }
 
 
 def _area_forecast(scored: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """توقعات لكل منطقة: وسيط سعر المتر حديث (≤30 يوم) مقابل قديم، واتجاه، وسعر المتر المتوقع."""
     buckets: dict[str, dict[str, list[float]]] = {}
     for item in scored:
+        # توقعات سعر المتر خاصة بسوق البيع/الشراء فقط — إيجار المتر الشهري لا يُخلط بسعر متر البيع
+        if item.get("rental"):
+            continue
         area = item["area"] or "غير محددة"
         rate = item.get("pricePerSqm")
         if not rate:
@@ -364,7 +806,7 @@ def build_whatsapp_alerts(previous: dict[str, Any] | None, current: dict[str, An
             )
         phone_clients = [c for c in clients if c.get("phones")]
         for client in phone_clients:
-            phones = [normalize_phone(p) for p in re.split(r"[|،,]+", str(client.get("phones") or "")) if normalize_phone(p)]
+            phones = [p for p in (normalize_phone(x) for x in re.split(r"[|،,]+", str(client.get("phones") or ""))) if p]
             if not phones:
                 continue
             alerts.append({
@@ -431,7 +873,7 @@ def build_history_series(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
     return {"dates": dates, "series": output[:15], "snapshotCount": len(snapshots)}
 
 
-def build_opportunities(limit_per_tier: int = 8, include_external: bool = True) -> dict[str, Any]:
+def build_opportunities(limit_per_tier: int = 30, include_external: bool = True) -> dict[str, Any]:
     """يبني لقطة الفرص الحالية: فئات زمنية + توقعات + عملاء محتملون، مع مصادر وأدلة وثقة حتمية.
 
     include_external: يدمج الإعلانات الحية من المصادر الخارجية المتصلة (الفريج محليًا +
@@ -443,24 +885,25 @@ def build_opportunities(limit_per_tier: int = 8, include_external: bool = True) 
     if include_external:
         try:
             external_listings, external_statuses = search_external_sources(_broad_request())
-            listings.extend(external_listings)
+            # توسيع الفحص العريض: أنواع ومعاملات متعددة (بيوت/شقق/أراضٍ × بيع/إيجار)
+            # عبر Q8Aqar/OpenSooq حتى تصل فرص كل منصة لأقصى عدد ممكن — الطلب الفارغ
+            # كان يفحص بيوت البيع فقط عبر Q8Aqar وبيوعات OpenSooq ويُسقط إيجاراتهم.
+            combo_listings, combo_statuses = search_combo_sources(broad_combo_requests(), ["Q8Aqar", "OpenSooq"])
+            external_listings.extend(combo_listings)
+            external_statuses.extend(combo_statuses)
+            # إزالة التكرار بالكود: نفس الإعلان قد يظهر في المسح العام والمسح المركّب
+            seen_codes = {listing.code for listing in listings}
+            for listing in external_listings:
+                if listing.code in seen_codes:
+                    continue
+                seen_codes.add(listing.code)
+                listings.append(listing)
         except Exception as exc:
+            logger.warning("External sources scan failed: %s", exc)
             external_statuses = [{"name": "المصادر الخارجية", "status": "failed", "records": 0, "note": str(exc)}]
 
-    scored: list[dict[str, Any]] = []
-    skipped_rentals = 0
-    for listing in listings:
-        if not listing.price:
-            continue
-        # خط التقييم الحالي يقارن السعر بوسيط الشراء (سعر المتر × المساحة)،
-        # فلا تدخل عروض الإيجار في الفرص حتى لا يظهر إيجار شهري بقيمة «عادلة» بالمئات الآلاف
-        if "للإيجار" in (listing.transaction or "") or "للإيجار" in (listing.listing_mode or ""):
-            skipped_rentals += 1
-            continue
-        comps = comparable_pool(listing, listings)
-        valuation = price_label(listing, comps)
-        scored.append(_listing_opportunity(listing, valuation, clients))
-    scored.sort(key=lambda item: item["score"], reverse=True)
+    clients = clients + clients_from_demand_listings(listings)
+    scored, skipped_demand, skipped_unreal = _score_listings(listings, clients)
 
     tiers: dict[str, dict[str, Any]] = {}
     for key, label, days, description in TIERS:
@@ -471,27 +914,25 @@ def build_opportunities(limit_per_tier: int = 8, include_external: bool = True) 
             "items": items[:limit_per_tier],
         }
 
-    contributing = [
+    contributing = list(dict.fromkeys(
         s.get("name")
         for s in external_statuses
         if s.get("status") in ("success", "connected") or s.get("records")
-    ]
+    ))
     return {
         "generatedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "generatedDate": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "totalListings": len(listings),
         "totalScored": len(scored),
-        "skippedRentals": skipped_rentals,
         "totalClients": len(clients),
         "includeExternal": bool(include_external),
         "contributingSources": contributing,
         "confidenceMethod": "الثقة = 50% مصداقية المصدر + 30% ثقة التقييم + 20% قوة الأدلة (حتمية بلا عشوائية)",
-        "rentalNote": (
-            "عروض الإيجار مستبعدة من الفرص لأن خط التقييم الحالي يقارن السعر بوسيط الشراء "
-            "(سعر المتر × المساحة) ولا يصلح لحكم أسعار الإيجار."
-            if skipped_rentals
-            else ""
-        ),
+        "rentalCount": sum(1 for item in scored if item.get("rental")),
+        "saleCount": sum(1 for item in scored if not item.get("rental")),
+        "skippedDemandCount": skipped_demand,
+        "skippedUnrealCount": skipped_unreal,
+        "rentalNote": "",
         "officialDataNote": (
             "لا توجد قاعدة بيانات رسمية حية تنشر سعر المتر لكل منطقة في الكويت؛ "
             "المصادر الرسمية المتاحة هي إحصاءات وزارة العدل (التسجيل العقاري) وتقارير بيت التمويل الكويتي "
@@ -500,4 +941,77 @@ def build_opportunities(limit_per_tier: int = 8, include_external: bool = True) 
         ),
         "tiers": tiers,
         "forecast": _area_forecast(scored),
+    }
+
+
+def build_weekly_digest(snapshot: dict[str, Any], top_n: int = 10) -> dict[str, Any]:
+    """موجز أسبوعي: أفضل 10 فرص بيع لكل عميل محتمل مع رسالة واتساب جاهزة للإرسال.
+
+    - تُجمع الفرص من كل الفئات الزمنية (بإزالة التكرار بالكود).
+    - تُقتصر على عروض البيع فقط: ميزانية شراء العميل لا تُقارن بإيجار شهري.
+    - لكل عميل تُحسب درجة المطابقة (المنطقة 40 + النوع 30 + تقارب السعر 30) لكل فرصة،
+      ويُؤخذ الأعلى 10 بترتيب (درجة المطابقة ثم درجة الفرصة).
+    - تُبنى رسالة واتساب مخصصة: تحية + سياق العميل + قائمة مرقمة بمصادر أدلة كل فرصة.
+    """
+    pool: dict[str, dict[str, Any]] = {}
+    for tier in (snapshot.get("tiers") or {}).values():
+        for item in tier.get("items") or []:
+            code = item.get("code")
+            if code and code not in pool:
+                pool[code] = item
+    sale_items = [item for item in pool.values() if not item.get("rental")]
+
+    digests: list[dict[str, Any]] = []
+    for client in _load_clients():
+        if not client.get("phones"):
+            continue
+        phones = [p for p in (normalize_phone(x) for x in re.split(r"[|،,]+", str(client.get("phones") or ""))) if p]
+        if not phones:
+            continue
+        scored: list[tuple[float, dict[str, Any]]] = []
+        for item in sale_items:
+            match, _reasons = _client_score(client, item.get("area"), item.get("propertyType"), item.get("price"))
+            if match >= 40:
+                scored.append((match, item))
+        scored.sort(key=lambda pair: (pair[0], pair[1].get("score") or 0), reverse=True)
+        top = [item for _match, item in scored[:top_n]]
+        if not top:
+            continue
+        budget = str(client.get("price") or "").strip()
+        label = " - ".join(x for x in (client.get("area"), client.get("type")) if x) or "عميل محتمل"
+        lines = [
+            f"السلام عليكم، معك [اسمك]. هذه أفضل {len(top)} فرص هذا الأسبوع تناسب طلبكم: {label}"
+            + (f" (ميزانية {budget} د.ك)" if budget else "")
+            + ":"
+        ]
+        for i, item in enumerate(top, 1):
+            price = item.get("priceText") or f"{item.get('price'):,.0f} د.ك"
+            valuation = item.get("valuationLabel") or ""
+            sources = list(dict.fromkeys(
+                e.get("source") for e in (item.get("evidence") or []) if e.get("source")
+            ))
+            source_text = f" — المصادر: {', '.join(sources)}" if sources else ""
+            url = item.get("url")
+            lines.append(
+                f"{i}. {item.get('code')} — {item.get('area') or 'غير محددة'} — {price} — {valuation}{source_text}"
+                + (f"\n   🔗 {url}" if url else "")
+            )
+        lines.append("\nهل ترغب بمتابعة التفاصيل أو حجز موعد معاينة؟ شكرًا.")
+        message = "\n".join(lines)
+        digests.append({
+            "client": {"area": client.get("area"), "type": client.get("type"), "price": budget},
+            "phones": [f"+{p}" for p in phones],
+            "opportunities": top,
+            "message": message,
+            "matchCount": len(top),
+        })
+    digests.sort(key=lambda d: d["matchCount"], reverse=True)
+    return {
+        "generatedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "count": len(digests),
+        "note": (
+            "موجز أسبوعي تلقائي: أفضل 10 فرص بيع لكل عميل محتمل حسب منطقه ونوع عقاره وميزانيته، "
+            "بدرجة مطابقة حتمية ومصادر أدلة لكل فرصة — استبدل [اسمك] قبل الإرسال."
+        ),
+        "digests": digests,
     }

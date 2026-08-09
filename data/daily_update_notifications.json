@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-08-09T14:40:35",
+  "hasPrevious": true,
+  "counts": {
+    "added": 0,
+    "removed": 0,
+    "priceDrops": 0
+  },
+  "officialTransactions": {
+    "importStatus": "skipped",
+    "importCount": 0,
+    "storedCount": 0,
+    "note": "لا يوجد مصدر صفقات رسمي مضبوط لهذا التشغيل."
+  },
+  "officialIndicators": {
+    "storedCount": 51,
+    "status": "ok"
+  },
+  "top": {
+    "priceDrops": [],
+    "added": [],
+    "removed": []
+  },
+  "actions": [
+    "أضف ملف/رابط صفقات وزارة العدل اليومي حتى يصبح التقييم أقوى من الإعلانات فقط."
+  ],
+  "note": "ملخص مجاني من آخر تحديث يومي: يقارن آخر لقطة فرص باللقطة الحالية ويعرض ما يحتاج متابعة."
+}

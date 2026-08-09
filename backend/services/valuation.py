@@ -5,6 +5,7 @@ from statistics import median
 from typing import Any
 
 from backend.connectors.official_data import get_official_transaction_rate
+from backend.connectors.official_indicators import get_official_rate as get_live_official_rate
 from backend.models import Listing, PropertyRequest, RankedListing
 from backend.services.official_valuation import calculate_valuation, assess_deal_quality, derive_market_benchmark
 
@@ -27,6 +28,22 @@ class ValuationResult:
     derived_evidence_count: int = 0  # عدد الأدلة الفعلية التي اشتُق منها سعر المتر
     comparables_count: int = 0
     comparable_scope: str = ""
+    # ── حقول خاصة بعروض الإيجار (عند تفعيل is_rental) ──
+    rental: bool = False
+    monthly_rent: float | None = None
+    annual_rent: float | None = None
+    rent_per_sqm: float | None = None  # إيجار المتر شهريًا (د.ك/م²/شهر)
+    median_rent: float | None = None  # وسيط الإيجارات الشهرية للمقارنات
+    median_rent_per_sqm: float | None = None
+    capital_value: float | None = None  # قيمة العقار التقديرية (أساس العائد)
+    capital_value_kind: str = ""  # official_transactions | official | benchmark | missing
+    rental_yield_percent: float | None = None  # الإيجار السنوي ÷ قيمة العقار
+
+
+def is_rental(listing: Listing) -> bool:
+    """هل هذا الإعلان عرض إيجار (شهري) وليس عرض بيع؟"""
+    text = f"{listing.transaction or ''} {listing.listing_mode or ''}"
+    return "للإيجار" in text or "ايجار" in text
 
 
 def comparable_pool(
@@ -34,38 +51,218 @@ def comparable_pool(
     listings: list[Listing],
     request: PropertyRequest | None = None,
 ) -> list[Listing]:
-    """مقارنات صارمة: نفس المنطقة أولاً، ولا نقبل أي إعلان خارج مناطق الطلب أبدًا."""
+    """مقارنات صارمة: نفس المنطقة أولاً، وعند نقصها توسعة لنفس المحافظة (الجيران الأقرب)،
+    ثم لمناطق الطلب الأخرى — ولا نقبل أبدًا مناطق خارج المحافظة غير مطلوبة.
+    """
     allowed_areas: set[str] | None = None
     if request and request.areas:
         allowed_areas = set(request.areas)
 
-    candidates = [
+    same_transaction = [
         row
         for row in listings
         if row.code != target.code
         and row.price
         and row.transaction == target.transaction
         and (row.property_type == target.property_type or row.detail_class == target.detail_class)
-        and (
-            (allowed_areas is not None and row.area in allowed_areas)
-            or (allowed_areas is None and (row.area == target.area or row.governorate == target.governorate))
-        )
     ]
 
-    same_area = [row for row in candidates if row.area == target.area]
-    # توسعة محسوبة فقط عند نقص مقارنات نفس المنطقة (داخل مناطق الطلب)
+    same_area = [row for row in same_transaction if row.area == target.area]
+    # توسعة محسوبة فقط عند نقص مقارنات نفس المنطقة: نفس المحافظة أولاً (الأقرب جغرافيًا وسعريًا)
     if len(same_area) >= 3:
         pool = same_area
     else:
-        others = [row for row in candidates if row.area != target.area]
-        pool = same_area + others
-    return sorted(pool, key=lambda row: (row.area == target.area, row.published_date), reverse=True)[:8]
+        same_gov = [row for row in same_transaction if row.area != target.area and row.governorate == target.governorate]
+        others: list[Listing] = []
+        if allowed_areas:
+            others = [
+                row
+                for row in same_transaction
+                if row.area != target.area and row.governorate != target.governorate and row.area in allowed_areas
+            ]
+        pool = same_area + same_gov + others
+    return sorted(pool, key=lambda row: (row.area == target.area, row.governorate == target.governorate, row.published_date), reverse=True)[:8]
 
 
 def _sqm_rate(listing: Listing) -> float | None:
     if listing.price and listing.space:
         return listing.price / listing.space
     return None
+
+
+def _capital_value_estimate(target: Listing) -> tuple[float | None, str]:
+    """قيمة العقار التقديرية من المصادر الرسمية فقط (أساس حساب العائد الإيجاري).
+
+    الترتيب: صفقات رسمية مسجلة ← مؤشر رسمي حي ← معيار المنطقة الرسمي.
+    لا تُشتق من إعلانات الإيجار أبدًا (سعر متر الإيجار ليس سعر شراء).
+    """
+    if not target.space:
+        return None, ""
+    rate, count, window = get_official_transaction_rate(target.area)
+    if rate:
+        return rate * target.space, f"official_transactions|وسيط {count} صفقة رسمية مسجلة ({window})"
+    live, src, _ = get_live_official_rate(target.area)
+    if live:
+        return live * target.space, f"official|المؤشر الرسمي لسعر المتر ({src})"
+    official_val, _breakdown = calculate_valuation(target.area, target.space, [])
+    if official_val:
+        return official_val, "benchmark|المعيار الرسمي للمنطقة (سعر المتر × المساحة)"
+    return None, ""
+
+
+def _rental_price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
+    """خط حساب مميز لعروض الإيجار: الإيجار الشهري/السنوي، إيجار المتر،
+    وسيط إيجارات المنطقة، قيمة العقار التقديرية، والعائد الإيجاري السنوي.
+
+    الإيجار يختلف جوهريًا عن البيع: السعر قيمة شهرية وليست إجمالية،
+    والتقييم يقارنها بوسيط الإيجارات في المنطقة، والعائد = الإيجار السنوي ÷ قيمة العقار.
+    """
+    monthly = target.price
+    annual = (monthly * 12) if monthly else None
+    rent_per_sqm = (monthly / target.space) if (monthly and target.space) else None
+    clean = [row.price for row in comps if row.price]
+    median_rent = median(clean) if clean else None
+    sqm_rates = [row.price / row.space for row in comps if row.price and row.space]
+    median_rent_sqm = median(sqm_rates) if sqm_rates else None
+    ratio = (monthly / median_rent) if (monthly and median_rent) else None
+
+    capital_value, capital_kind_raw = _capital_value_estimate(target)
+    capital_kind = capital_kind_raw.split("|")[0] if capital_kind_raw else "missing"
+    capital_note = capital_kind_raw.split("|")[1] if "|" in (capital_kind_raw or "") else ""
+    yield_pct = (annual / capital_value * 100) if (annual and capital_value) else None
+
+    evidence = [
+        {
+            "code": row.code,
+            "source": row.source,
+            "area": row.area,
+            "price": row.price,
+            "priceText": row.price_text,
+            "space": row.space,
+            "date": row.published_date,
+            "url": row.original_url,
+        }
+        for row in comps[:5]
+    ]
+    same_area_count = sum(1 for row in comps if row.area == target.area)
+    scope = "نفس المنطقة" if same_area_count >= 3 else ("نفس المنطقة + توسعة محدودة" if comps else "بدون مقارنات")
+
+    if not monthly:
+        return ValuationResult(
+            label="لا يمكن الحكم على الإيجار",
+            reason="الإيجار غير معلن، لذلك لا يمكن مقارنته بوسيط إيجارات المنطقة.",
+            confidence=0.35,
+            deal_score=35,
+            market_median=median_rent,
+            price_ratio=None,
+            evidence=evidence,
+            price_per_sqm=rent_per_sqm,
+            median_per_sqm=median_rent_sqm,
+            official_value=capital_value,
+            official_source_kind="rental",
+            comparables_count=len(clean),
+            comparable_scope=scope,
+            rental=True,
+            monthly_rent=None,
+            annual_rent=None,
+            rent_per_sqm=rent_per_sqm,
+            median_rent=median_rent,
+            median_rent_per_sqm=median_rent_sqm,
+            capital_value=capital_value,
+            capital_value_kind=capital_kind,
+            rental_yield_percent=None,
+        )
+
+    if not median_rent:
+        return ValuationResult(
+            label="تقييم استرشادي ببيانات محدودة",
+            reason=(
+                f"لا توجد عروض إيجار كافية للمقارنة في {target.area or 'المنطقة'}، "
+                f"فلم يُحكم على عدالة الإيجار بشكل قاطع."
+            ),
+            confidence=0.45,
+            deal_score=50,
+            market_median=None,
+            price_ratio=None,
+            evidence=evidence,
+            price_per_sqm=rent_per_sqm,
+            median_per_sqm=median_rent_sqm,
+            official_value=capital_value,
+            official_source_kind="rental",
+            comparables_count=len(clean),
+            comparable_scope=scope,
+            rental=True,
+            monthly_rent=monthly,
+            annual_rent=annual,
+            rent_per_sqm=rent_per_sqm,
+            median_rent=None,
+            median_rent_per_sqm=median_rent_sqm,
+            capital_value=capital_value,
+            capital_value_kind=capital_kind,
+            rental_yield_percent=yield_pct,
+        )
+
+    # عدالة الإيجار: نسبة الإيجار المطلوب إلى وسيط إيجارات المنطقة
+    if ratio <= 0.82:
+        label = "إيجار ممتاز"
+        reason = f"الإيجار أقل من وسيط إيجارات المنطقة بوضوح: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
+        deal_score = 100
+    elif ratio <= 0.92:
+        label = "أقل من السوق"
+        reason = f"الإيجار أقل من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
+        deal_score = 88
+    elif ratio <= 1.08:
+        label = "إيجار عادل"
+        reason = f"الإيجار قريب من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
+        deal_score = 74
+    elif ratio <= 1.18:
+        label = "أعلى قليلاً"
+        reason = f"الإيجار أعلى قليلًا من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
+        deal_score = 58
+    elif ratio <= 1.35:
+        label = "غالي"
+        reason = f"الإيجار أعلى بوضوح من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
+        deal_score = 38
+    else:
+        label = "مبالغ فيه"
+        reason = f"الإيجار أعلى كثيرًا من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
+        deal_score = 20
+
+    basis = f"المقارنة تمت داخل {scope} على الإيجار الشهري للعروض المشابهة"
+    if target.space and median_rent_sqm:
+        basis += f"، وإيجار المتر للمطلوب {rent_per_sqm:,.0f} د.ك/م²/شهر مقابل وسيط {median_rent_sqm:,.0f} د.ك/م²/شهر"
+    if yield_pct is not None and capital_note:
+        basis += f"، والعائد الإيجاري السنوي المتوقع {yield_pct:.1f}% (الإيجار السنوي {annual:,.0f} د.ك ÷ قيمة العقار التقديرية {capital_value:,.0f} د.ك — {capital_note})"
+    reason = f"{reason} {basis}."
+    confidence = min(0.9, 0.5 + len(clean) * 0.06)
+    if capital_kind == "official_transactions":
+        confidence = max(confidence, 0.9)
+    elif capital_kind == "official":
+        confidence = max(confidence, 0.85)
+    return ValuationResult(
+        label=label,
+        reason=reason,
+        confidence=confidence,
+        deal_score=deal_score,
+        market_median=median_rent,
+        price_ratio=round(ratio, 3),
+        evidence=evidence,
+        price_per_sqm=rent_per_sqm,
+        median_per_sqm=median_rent_sqm,
+        official_value=capital_value,
+        official_source_kind="rental",
+        comparables_count=len(clean),
+        comparable_scope=scope,
+        rental=True,
+        monthly_rent=monthly,
+        annual_rent=annual,
+        rent_per_sqm=rent_per_sqm,
+        median_rent=median_rent,
+        median_rent_per_sqm=median_rent_sqm,
+        capital_value=capital_value,
+        capital_value_kind=capital_kind,
+        rental_yield_percent=round(yield_pct, 2) if yield_pct is not None else None,
+    )
 
 
 def _official_valuation(
@@ -95,11 +292,24 @@ def _official_valuation(
                 }
             ]
             return official_val, breakdown, "official_transactions", official_count, official_window
-    # 2) المعيار الرسمي للمنطقة (سعر المتر الرسمي × المساحة)
+    # 2) المؤشر الرسمي الحي (جدول official_market_indicators): سعر المتر المرجعي الرسمي
+    #    للمنطقة من بيانات Supabase الحية — يُجيب مباشرة على «لا توجد بيانات رسمية لسعر المتر»
+    if target.space:
+        live_rate, live_source, _live_note = get_live_official_rate(target.area)
+        if live_rate:
+            official_val = live_rate * target.space
+            breakdown = [
+                {
+                    "factor": f"سعر المتر المرجعي من المؤشرات الرسمية ({live_source})",
+                    "value": official_val,
+                }
+            ]
+            return official_val, breakdown, "official", 1, ""
+    # 3) المعيار الرسمي للمنطقة (سعر المتر الرسمي × المساحة)
     official_val, official_breakdown = calculate_valuation(target.area, target.space, features)
     if official_val:
         return official_val, official_breakdown, "official", 0, ""
-    # 3) سعر المتر المشتق من الإعلانات الفعلية في المنطقة
+    # 4) سعر المتر المشتق من الإعلانات الفعلية في المنطقة
     rate, count = derive_market_benchmark(target.area, comps or [])
     if rate and target.space:
         derived_val = rate * target.space
@@ -114,11 +324,15 @@ def _official_valuation(
 
 
 def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
+    # عروض الإيجار لها خط حساب مميز (إيجار شهري/سنوي + عائد) — لا يُطبَّق عليها منطق البيع أبدًا
+    if is_rental(target):
+        return _rental_price_label(target, comps)
     price = target.price
     clean = [row.price for row in comps if row.price]
     evidence = [
         {
             "code": row.code,
+            "source": row.source,
             "area": row.area,
             "price": row.price,
             "priceText": row.price_text,
@@ -160,8 +374,10 @@ def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
             **common,
         )
 
-    # التقييم: معيار رسمي إن وُجد، وإلا سعر متر مشتق من السوق الفعلي — دائمًا بإفصاح شفاف
-    if official_val:
+    # التقييم: عند توفر 3 مقارنات سوقية فعلية في نفس السياق نستخدم وسيط السوق
+    # كرقم العرض الرئيسي، ونبقي المؤشر الرسمي كدليل إضافي. هذا يمنع أن يطغى
+    # معيار رسمي محافظ على مجموعة عروض بيع واضحة مثل شقق السالمية.
+    if official_val and (official_kind == "official_transactions" or len(clean) < 2):
         label = assess_deal_quality(price, official_val)
         ratio = price / official_val
         sqm_text = f" وسعر المتر المتوقع {official_val / target.space:,.0f} د.ك/م²." if target.space else ""
@@ -171,10 +387,13 @@ def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
             if item.get("value")
         )
         if official_kind == "official_transactions":
-            basis = f"التقييم استند لسجل الصفقات الرسمية المسجلة في {target.area} ({official_window}) — أعلى مصداقية من الإعلانات."
+            basis = (
+                f"استند التقييم إلى سجل الصفقات الرسمية المسجلة في {target.area} "
+                f"({official_window}) — المرجع الأعلى مصداقية من الإعلانات."
+            )
             confidence = 0.9
         elif official_kind == "official":
-            basis = f"التقييم استند للتقييم الرسمي لسعر المتر في {target.area}."
+            basis = f"استند التقييم إلى التقييم الرسمي لسعر المتر في {target.area}."
             confidence = 0.85
         else:
             basis = (
@@ -182,10 +401,12 @@ def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
                 f"فاستُخدم سعر المتر المشتق من الإعلانات الفعلية في المنطقة."
             )
             confidence = min(0.8, 0.45 + len(clean) * 0.05)
+        fair_pct = (price / official_val * 100) if official_val else 0.0
         reason = (
-            f"{basis} "
-            f"القيمة العادلة المتوقعة {official_val:,.0f} د.ك، والمطلوب {price:,.0f} د.ك.{sqm_text}"
-            + (f" تفصيله: {breakdown_text}." if breakdown_text else "")
+            f"القيمة العادلة المتوقعة للعقار {official_val:,.0f} د.ك مقابل السعر المطلوب "
+            f"{price:,.0f} د.ك، أي ما يعادل {fair_pct:,.0f}% من القيمة العادلة.{sqm_text} "
+            f"{basis}"
+            + (f" تفصيل الحساب: {breakdown_text}." if breakdown_text else "")
         )
         if ratio <= 0.85:
             deal_score = 100
@@ -314,6 +535,82 @@ def recommendation_breakdown(match_score: float, valuation: ValuationResult, war
 
 
 def number_sources(listing: Listing, valuation: ValuationResult) -> dict[str, Any]:
+    # ── خط شفافية مميز لعروض الإيجار: إيجار شهري/سنوي، إيجار المتر، وسيط الإيجارات، العائد ──
+    if valuation.rental:
+        comp_codes = [item["code"] for item in valuation.evidence]
+        rent_source = (
+            f"وسيط الإيجارات الشهرية للمقارنات ({valuation.comparable_scope}): {', '.join(comp_codes) if comp_codes else 'لا توجد مقارنات كافية'}"
+        )
+        capital_source = "قيمة العقار التقديرية غير متوفرة (تحتاج مساحة + مصدر رسمي)"
+        if valuation.capital_value and valuation.capital_value_kind == "official_transactions":
+            capital_source = "سعر المتر من الصفقات الرسمية المسجلة في المنطقة × المساحة (أساس العائد الإيجاري)"
+        elif valuation.capital_value and valuation.capital_value_kind == "official":
+            capital_source = "المؤشر الرسمي الحي لسعر المتر × المساحة (أساس العائد الإيجاري)"
+        elif valuation.capital_value and valuation.capital_value_kind == "benchmark":
+            capital_source = "المعيار الرسمي للمنطقة (سعر المتر × المساحة) كأساس تقديري للعائد"
+        return {
+            "rental": {"value": True, "display": "إيجار شهري", "source": "عرض للإيجار — خط حساب مميز عن البيع"},
+            "price": {
+                "value": listing.price,
+                "display": f"{listing.price:,.0f} د.ك/شهر" if listing.price else "غير معلن",
+                "source": "الإيجار الشهري المطلوب في الإعلان",
+            },
+            "annualRent": {
+                "value": valuation.annual_rent,
+                "display": f"{valuation.annual_rent:,.0f} د.ك/سنة" if valuation.annual_rent else "غير محسوب",
+                "source": "الإيجار الشهري × 12 شهرًا",
+            },
+            "space": {
+                "value": listing.space,
+                "source": listing.raw.get("spaceSource") if listing.space else "غير مذكورة في الإعلان، ولم تدخل في حساب إيجار المتر",
+            },
+            "pricePerSqm": {
+                "value": valuation.rent_per_sqm,
+                "display": f"{valuation.rent_per_sqm:,.0f} د.ك/م²/شهر" if valuation.rent_per_sqm else "غير محسوب",
+                "source": "الإيجار الشهري ÷ مساحة الإعلان",
+            },
+            "marketMedian": {
+                "value": valuation.median_rent,
+                "display": f"{valuation.median_rent:,.0f} د.ك/شهر" if valuation.median_rent else "غير متوفر",
+                "source": rent_source,
+            },
+            "medianPerSqm": {
+                "value": valuation.median_rent_per_sqm,
+                "display": f"{valuation.median_rent_per_sqm:,.0f} د.ك/م²/شهر" if valuation.median_rent_per_sqm else "غير محسوب",
+                "source": "وسيط إيجار المتر الشهري بين عروض الإيجار المتاحة",
+            },
+            "officialValue": {
+                "value": valuation.capital_value,
+                "display": f"{valuation.capital_value:,.0f} د.ك" if valuation.capital_value else "غير متوفر",
+                "source": capital_source,
+            },
+            "rentalYield": {
+                "value": valuation.rental_yield_percent,
+                "display": f"{valuation.rental_yield_percent:.1f}% سنويًا" if valuation.rental_yield_percent is not None else "غير محسوب",
+                "source": "الإيجار السنوي ÷ قيمة العقار التقديرية — يقارن العائد بشراء العقار بدل تأجيره",
+            },
+            "priceRatio": {
+                "value": valuation.price_ratio,
+                "source": "الإيجار الشهري المطلوب ÷ وسيط الإيجارات الشهرية في المنطقة",
+            },
+            "comparablesCount": {
+                "value": valuation.comparables_count,
+                "source": f"عدد عروض الإيجار الداخلة في التقييم ({valuation.comparable_scope})",
+            },
+            "confidence": {
+                "value": valuation.confidence,
+                "source": (
+                    "ثقة عالية جدًا لأن قيمة العقار الأساس اشتُقت من صفقات رسمية مسجلة في المنطقة"
+                    if valuation.capital_value_kind == "official_transactions"
+                    else (
+                        "ثقة عالية لأن قيمة العقار الأساس اشتُقت من مؤشر رسمي حي لسعر المتر"
+                        if valuation.capital_value_kind == "official"
+                        else f"ثقة من {valuation.comparables_count} عروض إيجار في المنطقة + المعيار الرسمي للمنطقة"
+                    )
+                ),
+            },
+        }
+
     comp_codes = [item["code"] for item in valuation.evidence]
     # عند وجود قيمة رسمية قد لا يُملأ وسيط السوق (مثل إعلان بلا سعر) — نستخدم القيمة الرسمية كعرض آمن
     market_value = valuation.market_median if valuation.market_median is not None else valuation.official_value

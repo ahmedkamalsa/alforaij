@@ -3,44 +3,193 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>مساعد الفريج للبحث والتقييم العقاري</title>
-  <link rel="stylesheet" href="/styles.css">
+  <meta name="description" content="منصة الفريج للبحث والتقييم العقاري وفرص المكسب المبنية على الأدلة والمصادر.">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/alforaij-official-symbol.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/alforaij-official-symbol.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+  <meta name="theme-color" content="#0F172A">
+  <title>منصة الفريج للفرص والتقييم العقاري</title>
+  <link rel="stylesheet" href="styles.css?v=20260809-evidence-suite">
+  <script src="config.js?v=20260809-evidence-suite"></script>
 </head>
 <body>
   <header class="topbar">
-    <div>
-      <p class="eyebrow">تحليل محلي مبني على الأدلة</p>
-      <h1>مساعد الفريج للبحث والتقييم العقاري</h1>
+    <div class="hero-content">
+      <div class="hero-title">
+        <p class="eyebrow">بحث وتقييم وفرص عقارية مبنية على الأدلة</p>
+        <h1>منصة الفريج للفرص والتقييم العقاري</h1>
+        <p class="hero-copy">بحث موحد في بيانات الفريج والمصادر الخارجية، تقييم موثق بمصدر كل رقم، وفرص مكسب تربط العرض بالطلب والعملاء المحتملين.</p>
+        <div class="hero-actions">
+          <a class="hero-link" href="https://ahmedkamalsa.github.io/alforaijboard/" target="_blank" rel="noreferrer">فتح لوحة الفريج الأساسية</a>
+        </div>
+      </div>
+      <div class="logo-showcase" aria-label="شركة عبدالعزيز سعود الفريج العقارية">
+        <img class="brand-logo" src="assets/alforaij_logo.png" alt="شركة عبدالعزيز سعود الفريج العقارية">
+        <div class="status" id="healthStatus">جاري فحص البيانات...</div>
+      </div>
     </div>
-    <div class="status" id="healthStatus">جاري فحص البيانات...</div>
   </header>
 
   <main class="workspace">
-    <aside class="request-panel chat-panel">
+    <section class="action-toolbar">
+      <div>
+        <strong>مركز البحث والتقييم</strong>
+        <span>اكتب الطلب، اختر نطاق المصدر، ثم راجع النتائج والمصادر والأدلة من نفس الصفحة.</span>
+      </div>
+      <div class="action-buttons">
+        <button id="toggleCustomSearchBtn" type="button">بحث مخصص</button>
+        <button id="clearChatBtn" type="button">مسح البحث</button>
+        <button id="downloadReportBtn" type="button">حفظ التقرير JSON</button>
+        <button id="downloadPdfBtn" class="primary" type="button">تنزيل تقرير PDF</button>
+      </div>
+    </section>
+
+    <section class="board-panel">
       <div class="section-title">
-        <h2>مربع البحث الذكي (شات)</h2>
-        <span>اسأل، اطلع على الإجابات، وحسّن البحث من نفس المكان</span>
+        <div>
+          <h2>لوحة الأرقام والعروض</h2>
+          <span>فلاتر الصفحة الرئيسية مرتبطة مباشرة بالبحث والتقييم والفرص.</span>
+        </div>
+        <span id="boardFilterSummary" class="filter-summary">كل السجلات</span>
       </div>
 
-      <div id="chatWindow" class="chat-window" aria-live="polite">
-        <!-- messages will be injected here -->
+      <div class="board-filter-grid">
+        <label>قائمة جاهزة حسب الرقم
+          <select id="boardMetricFilter">
+            <option value="movement">حركة الدلال</option>
+            <option value="saleOffers">عروض للبيع</option>
+            <option value="buyRequests">طلبات شراء</option>
+            <option value="rentOffers">عروض الإيجار</option>
+            <option value="rentRequests">طلبات الإيجار</option>
+          </select>
+        </label>
+        <label>المحافظة - اكتب أو اختر
+          <input id="boardGovernorateFilter" list="boardGovernorates" placeholder="كل المحافظات" autocomplete="off">
+          <datalist id="boardGovernorates"></datalist>
+        </label>
+        <label>نوع المعاملة - اكتب أو اختر
+          <input id="boardTransactionFilter" list="boardTransactions" placeholder="كل المعاملات" autocomplete="off">
+          <datalist id="boardTransactions"></datalist>
+        </label>
+        <label>نوع العقار - اكتب أو اختر
+          <input id="boardPropertyTypeFilter" list="boardPropertyTypes" placeholder="كل أنواع العقار" autocomplete="off">
+          <datalist id="boardPropertyTypes"></datalist>
+        </label>
+        <label>نمط الإدراج
+          <select id="boardListingModeFilter">
+            <option value="">كل الأنماط</option>
+          </select>
+        </label>
+        <label>المنطقة - اكتب أو اختر
+          <input id="boardAreaFilter" list="boardAreas" placeholder="كل المناطق" autocomplete="off">
+          <datalist id="boardAreas"></datalist>
+        </label>
+        <div class="board-platform-field">
+          <span class="field-caption">منصات التقييم - الافتراضي كل المنصات</span>
+          <div class="platform-chips" id="boardPlatformFilter">
+            <label><input name="boardPlatform" type="checkbox" value="__all" checked> كل المنصات</label>
+            <label><input name="boardPlatform" type="checkbox" value="الفريج"> الفريج</label>
+            <label><input name="boardPlatform" type="checkbox" value="بوشملان"> بوشملان</label>
+            <label><input name="boardPlatform" type="checkbox" value="OpenSooq"> OpenSooq</label>
+            <label><input name="boardPlatform" type="checkbox" value="Mourjan"> Mourjan</label>
+            <label><input name="boardPlatform" type="checkbox" value="Q8Aqar"> Q8Aqar</label>
+            <label><input name="boardPlatform" type="checkbox" value="Sakan"> Sakan</label>
+            <label><input name="boardPlatform" type="checkbox" value="Waseet"> Waseet</label>
+            <label><input name="boardPlatform" type="checkbox" value="4Sale"> 4Sale</label>
+          </div>
+        </div>
       </div>
+
+      <div class="board-filter-actions">
+        <button id="boardRunSearchBtn" class="primary" type="button">بحث وتقييم حسب الاختيارات</button>
+        <button id="boardClearFiltersBtn" type="button">مسح اختيارات اللوحة</button>
+      </div>
+
+      <div id="boardMetricCards" class="board-metrics"></div>
+
+      <div class="board-layout">
+        <section class="board-overview">
+          <div class="section-title compact-title">
+            <h3>حركة الاختيارات</h3>
+            <span>اضغط أي كارت أو رقم لتشغيل نفس الفلاتر في التقييم.</span>
+          </div>
+          <div id="boardStats" class="board-stats"></div>
+          <div class="section-title compact-title companion-title">
+            <h3>إعلانات مرافقة</h3>
+            <span>حسب نفس الفلاتر والمنصات.</span>
+          </div>
+          <div id="boardCompanionAds" class="companion-ads"></div>
+        </section>
+        <section class="governorate-board">
+          <div class="section-title compact-title">
+            <h3>الأرقام حسب المحافظات</h3>
+            <span>اضغط المحافظة لفتح مناطقها، أو اضغط الرقم لتصفية وتحليل نفس الاختيار.</span>
+          </div>
+          <div class="table-scroll">
+            <table class="governorate-table">
+              <thead>
+                <tr>
+                  <th>المحافظة / المنطقة</th>
+                  <th>الحركة</th>
+                  <th>الفرص</th>
+                  <th>للبيع</th>
+                  <th>شراء</th>
+                  <th>إيجار</th>
+                  <th>طلب إيجار</th>
+                </tr>
+              </thead>
+              <tbody id="governorateTableBody">
+                <tr><td colspan="6">جاري تحميل بيانات اللوحة...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="customSearchPanel" class="request-panel chat-panel custom-search-panel" hidden>
+      <div class="section-title">
+        <h2>بحث وتقييم الفرص</h2>
+        <span>اكتب وصف الطلب، اختر نطاق المصدر، ثم راجع النتائج والأدلة من نفس المكان</span>
+      </div>
+
+      <div id="chatWindow" class="chat-window" aria-live="polite"></div>
 
       <div class="chat-controls">
         <input id="chatInput" type="text" placeholder="اكتب سؤالك أو الوصف هنا... مثال: بيت 400م في ابو فطيرة، تشطيب سوبر ديلوكس" autocomplete="off">
-        <button id="sendChatBtn" class="primary">إرسال</button>
+        <button id="sendChatBtn" class="primary" type="button" onclick="sendChat()">إرسال</button>
       </div>
 
       <div class="chat-options">
-        <label><input type="radio" name="scope" value="company" checked> البحث في الفريج فقط</label>
-        <label><input type="radio" name="scope" value="all"> البحث في كل الشركات</label>
+        <label>نطاق المصدر
+          <select id="sourceModeField">
+            <option value="local">الفريج فقط</option>
+            <option value="all" selected>كل المصادر المتاحة</option>
+            <option value="source">منصة/مصدر محدد فقط</option>
+          </select>
+        </label>
+        <label>المنصة المحددة
+          <select id="selectedSourceField">
+            <option value="OpenSooq">OpenSooq</option>
+            <option value="Mourjan">Mourjan</option>
+            <option value="Q8Aqar">Q8Aqar</option>
+            <option value="Sakan">Sakan</option>
+            <option value="Waseet">Waseet</option>
+            <option value="NabdAqar">NabdAqar</option>
+            <option value="Bu3qar">Bu3qar / بوشملان</option>
+            <option value="Aqarat">Aqarat</option>
+            <option value="4Sale">4Sale</option>
+            <option value="السوق المباشر">السوق المباشر</option>
+            <option value="مؤشرات رسمية">مؤشرات رسمية</option>
+            <option value="الصفقات الرسمية">الصفقات الرسمية</option>
+          </select>
+        </label>
         <label class="compact"><input id="includeExternal" type="checkbox" checked> تفعيل مصادر خارجية</label>
       </div>
 
       <div class="actions compact-actions">
-        <button id="clearChatBtn">مسح الشات</button>
-        <button id="downloadReportBtnTop">تنزيل آخر تقرير (JSON)</button>
-        <button id="downloadPdfBtnTop" class="primary">تنزيل تقرير PDF</button>
+        <button id="openEvidenceQuick" type="button">المصادر والأدلة</button>
       </div>
 
       <details class="advanced-fields">
@@ -56,7 +205,7 @@
           <label>عدد الغرف<input id="bedroomsField" type="number" min="0"></label>
         </div>
       </details>
-    </aside>
+    </section>
 
     <section class="main-panel">
       <section class="summary-strip">
@@ -73,18 +222,20 @@
           <strong id="connectedSources">-</strong>
         </div>
         <div>
-          <span class="metric-label">Supabase</span>
+          <span class="metric-label">قاعدة البيانات</span>
           <strong id="persistenceStatus">-</strong>
         </div>
-        <button id="downloadReportBtn">حفظ التقرير JSON</button>
-        <button id="downloadPdfBtn" class="primary">تنزيل تقرير PDF</button>
       </section>
 
       <section class="insight-panel">
         <div>
           <h2>الخلاصة <span id="analysisBadge" class="analysis-badge"></span></h2>
-          <p id="searchScopeNote" class="scope-note" hidden></p>
+          <div id="searchScopeNote" class="scope-note" hidden></div>
           <p id="summaryText">لم يتم تشغيل تحليل بعد.</p>
+          <details id="fullSummaryBox" class="collapsible" hidden>
+            <summary>التقرير الكامل</summary>
+            <div id="fullSummaryText"></div>
+          </details>
         </div>
         <details class="collapsible">
           <summary>طريقة الترتيب والحساب</summary>
@@ -93,6 +244,30 @@
             <p id="rankingMethod">بعد تشغيل البحث ستظهر طريقة حساب درجة التوصية.</p>
           </div>
         </details>
+        <details class="collapsible">
+          <summary>الفرق بين الإيجار والبيع والشراء (تأكيد الحسابات)</summary>
+          <div id="transactionSummary" class="method-box">
+            <p>بعد تشغيل البحث سيظهر تأكيد الفرق في حسابات كل نوع معاملة.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="profit-panel">
+        <div class="section-title">
+          <h2>فرص المكسب</h2>
+          <span id="profitMeta">تظهر بعد البحث</span>
+        </div>
+        <p id="profitNote" class="scope-note"></p>
+        <div id="profitList" class="profit-list"></div>
+      </section>
+
+      <section class="similar-external-panel">
+        <div class="section-title">
+          <h2>إعلانات مشابهة من المواقع الأخرى</h2>
+          <span id="similarExternalMeta">تظهر بعد تشغيل البحث</span>
+        </div>
+        <p id="similarExternalNote" class="scope-note"></p>
+        <div id="similarExternalList" class="similar-external-list"></div>
       </section>
 
       <section class="opportunities-panel">
@@ -102,24 +277,39 @@
             <span>يومية / أسبوعية / شهرية / سنوية + توقعات الأسعار، بربط مباشر بالعملاء المحتملين</span>
           </div>
           <div class="opp-head-actions">
+            <span class="opp-schedule-note">الصفحة الرئيسية = أفضل الفرص اليومية · تتحدث يوميًا في 6:00 صباحًا</span>
             <span id="oppUpdated" class="opp-updated"></span>
-            <button id="oppRefreshBtn" class="primary">تحديث الآن</button>
+            <button id="oppRefreshBtn" class="primary">تحديث الفرص</button>
           </div>
         </div>
 
         <div class="opp-tabs" id="oppTabs" role="tablist">
-          <button class="opp-tab active" data-tier="daily" role="tab">يومية</button>
+          <button class="opp-tab active" data-tier="best" role="tab">الأفضل</button>
+          <button class="opp-tab" data-tier="daily" role="tab">يومية</button>
           <button class="opp-tab" data-tier="weekly" role="tab">أسبوعية</button>
           <button class="opp-tab" data-tier="monthly" role="tab">شهرية</button>
           <button class="opp-tab" data-tier="yearly" role="tab">سنوية</button>
           <button class="opp-tab" data-tier="forecast" role="tab">التوقعات</button>
           <button class="opp-tab" data-tier="clients" role="tab">العملاء</button>
           <button class="opp-tab" data-tier="alerts" role="tab">تنبيهات واتساب</button>
+          <button class="opp-tab" data-tier="digest" role="tab">الموجز الأسبوعي</button>
           <button class="opp-tab" data-tier="history" role="tab">الأداء الزمني</button>
+          <button class="opp-tab" data-tier="matching" role="tab">العرض والطلب</button>
+          <button class="opp-tab" data-tier="delta" role="tab">الجديد والمحذوف</button>
         </div>
 
         <details class="collapsible opp-filters">
-          <summary>الفلاتر (المحافظة / المنطقة / نوع العقار / السعر)</summary>
+          <summary>الفلاتر (المصدر / نوع الإعلان / المحافظة / المنطقة / نوع العقار / السعر)</summary>
+          <div id="oppSourceFilterRow" class="opp-source-filter" role="group" aria-label="فلتر مصدر الفرص">
+            <button class="opp-source-chip active" data-source="" type="button">الكل <b id="oppCountAll">0</b></button>
+            <button class="opp-source-chip" data-source="external" type="button">مواقع خارجية <b id="oppCountExternal">0</b></button>
+            <button class="opp-source-chip" data-source="local" type="button">الفريج فقط <b id="oppCountLocal">0</b></button>
+          </div>
+          <div id="oppKindFilterRow" class="opp-source-filter opp-kind-filter" role="group" aria-label="فلتر نوع الإعلان (مباشر/مكتب)">
+            <button class="opp-source-chip active" data-kind="" type="button">كل الأنواع</button>
+            <button class="opp-source-chip" data-kind="مباشر" type="button">مباشر <b id="oppCountDirect">0</b></button>
+            <button class="opp-source-chip" data-kind="مكتب" type="button">مكتب <b id="oppCountOffice">0</b></button>
+          </div>
           <div class="fields opp-filter-fields">
             <label>المحافظة
               <select id="oppGovFilter"><option value="">الكل</option></select>
@@ -129,6 +319,13 @@
             </label>
             <label>نوع العقار
               <select id="oppTypeFilter"><option value="">الكل</option></select>
+            </label>
+            <label>نوع العملية
+              <select id="oppTransactionFilter">
+                <option value="">الكل</option>
+                <option value="بيع">بيع / شراء</option>
+                <option value="إيجار">إيجار</option>
+              </select>
             </label>
             <label>أقل سعر (د.ك)
               <input id="oppMinPrice" type="number" min="0" placeholder="0">
@@ -149,10 +346,39 @@
 
       <section class="sources-panel">
         <div class="section-title">
-          <h2>مصادر البحث والتقييم</h2>
-          <span>المتصل والناقص</span>
+          <h2>تشغيل المنصة والبيانات</h2>
+          <span>تحديث آلي يومي للمصادر والفرص مع إشعارات تشغيل واضحة</span>
         </div>
-        <div id="sourceStatus" class="source-grid"></div>
+        <div class="ops-panel">
+          <div class="ops-card ops-card-primary">
+            <h3>وكيل التحديث اليومي</h3>
+            <p>يجلب أحدث المصادر، يحدّث فرص المكسب، يحفظ اللقطات، ويعرض إشعارات التغيير. التشغيل المجدول المقترح: يوميًا 6:00 صباحًا مع كاش يومي للفرص وكاش أسبوعي للموجز.</p>
+            <div class="ops-actions">
+              <button id="runDailyAgentBtnInline" class="primary" type="button">تشغيل التحديث الآن</button>
+            </div>
+            <p id="dailyAgentStateInline" class="ops-status">سيظهر هنا وقت آخر تشغيل وحالته.</p>
+          </div>
+        </div>
+        <div id="dailyUpdateNotice" class="daily-update-notice" hidden></div>
+        <details class="collapsible ops-advanced">
+          <summary>استيراد يدوي احتياطي لصفقات وزارة العدل</summary>
+          <p class="scope-note">المسار الأساسي أوتوماتيكي عبر الوكيل اليومي و <code>OFFICIAL_TRANSACTIONS_SOURCE</code>. استخدم هذا فقط عند توفر CSV/JSON موثق وتريد إدخاله فورًا.</p>
+          <input id="officialImportFile" type="file" accept=".csv,.json,text/csv,application/json">
+          <div class="ops-actions">
+            <button id="officialImportBtn" class="primary" type="button">استيراد الصفقات</button>
+          </div>
+          <p id="officialImportStatus" class="ops-status"></p>
+        </details>
+
+        <div class="section-title">
+          <h2>حالة المصادر</h2>
+          <span>مختصر ما دخل التقييم وما لم يدخل</span>
+        </div>
+        <div id="sourceSummaryBar" class="source-summary-bar"></div>
+        <details class="collapsible">
+          <summary>تفاصيل المصادر</summary>
+          <div id="sourceStatus" class="source-grid"></div>
+        </details>
         <details class="collapsible">
           <summary>الخطة المستقبلية للمصادر</summary>
           <div id="externalSourcePlan" class="source-grid muted-grid"></div>
@@ -185,6 +411,7 @@
           <div>
             <h3></h3>
             <p class="meta"></p>
+            <span class="outside-area pill warn" hidden></span>
           </div>
           <div class="verdict">
             <span class="verdict-label"></span>
@@ -193,35 +420,44 @@
         </div>
 
         <div class="score-grid"></div>
-        <p class="valuation-reason"></p>
-        <p class="description"></p>
-        <div class="financing-info"></div>
-
-        <div class="reason-block">
-          <h4>لماذا ظهرت بهذا الترتيب؟</h4>
-          <div class="reasons"></div>
-          <div class="warnings"></div>
+        <div class="result-insights">
+          <span class="data-quality"></span>
+          <span class="source-trust"></span>
         </div>
-
-        <details class="evidence">
-          <summary>الأدلة والمقارنات</summary>
-          <div class="comparables"></div>
-        </details>
-
-        <details class="calc-details">
-          <summary>مصدر كل رقم وطريقة الحساب</summary>
-          <div class="number-sources"></div>
-          <h4>تفصيل مطابقة الطلب</h4>
-          <div class="match-breakdown"></div>
-          <h4>تفصيل درجة التوصية</h4>
-          <div class="recommendation-breakdown"></div>
-        </details>
-
+        <p class="decision-line"></p>
         <a class="open-link" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>
+
+        <details class="result-details">
+          <summary>التفاصيل والأدلة</summary>
+          <p class="valuation-reason"></p>
+          <p class="description"></p>
+          <div class="result-clients"></div>
+          <div class="financing-info"></div>
+
+          <div class="reason-block">
+            <h4>لماذا ظهرت بهذا الترتيب؟</h4>
+            <div class="reasons"></div>
+            <div class="warnings"></div>
+          </div>
+
+          <details class="evidence">
+            <summary>الأدلة والمقارنات</summary>
+            <div class="comparables"></div>
+          </details>
+
+          <details class="calc-details">
+            <summary>مصدر كل رقم وطريقة الحساب</summary>
+            <div class="number-sources"></div>
+            <h4>تفصيل مطابقة الطلب</h4>
+            <div class="match-breakdown"></div>
+            <h4>تفصيل درجة التوصية</h4>
+            <div class="recommendation-breakdown"></div>
+          </details>
+        </details>
       </div>
     </article>
   </template>
 
-  <script src="/app.js"></script>
+  <script src="app.js?v=20260809-final-platform"></script>
 </body>
 </html>

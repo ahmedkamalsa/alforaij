@@ -11,16 +11,20 @@ create table if not exists client_leads (
 
 alter table client_leads enable row level security;
 
-create policy "public read client_leads"
-  on client_leads for select
+create policy "service read client_leads"
+  on client_leads for select to service_role
   using (true);
 
 create policy "service write client_leads"
-  on client_leads for insert
+  on client_leads for insert to service_role
   with check (true);
 
 create policy "service update client_leads"
-  on client_leads for update
+  on client_leads for update to service_role
+  using (true);
+
+create policy "service delete client_leads"
+  on client_leads for delete to service_role
   using (true);
 
 -- عميل أولي: الرقم الذي طلبه المستخدم (يُربط بالفرص تلقائيًا عند اكتمال تفاصيله)

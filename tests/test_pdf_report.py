@@ -34,9 +34,10 @@ class TestPdfReport(unittest.TestCase):
                     "confidence": 0.45,
                     "valuationLabel": "تقييم استرشادي ببيانات محدودة",
                     "valuationReason": "يوجد 2 مقارنة سعرية فقط في النهضة.",
+                    "originalUrl": "https://front.alforaij.com/Listing/Detail/278",
                     "comparables": [
-                        {"code": "AF-310", "area": "النهضة", "price": 360000, "space": 400, "date": "2026-07-01"},
-                        {"code": "AF-311", "area": "النهضة", "price": 350000, "space": 400, "date": "2026-06-20"},
+                        {"code": "AF-310", "area": "النهضة", "price": 360000, "space": 400, "date": "2026-07-01", "url": "https://front.alforaij.com/Listing/Detail/310"},
+                        {"code": "AF-311", "area": "النهضة", "price": 350000, "space": 400, "date": "2026-06-20", "url": "https://front.alforaij.com/Listing/Detail/311"},
                     ],
                     "financing": {"down_payment": 105000, "monthly_payment": 1874.23, "interest_rate_percent": 4.5, "years": 15},
                     "numberSources": {
@@ -71,6 +72,39 @@ class TestPdfReport(unittest.TestCase):
 
         pdf = build_pdf(None)
         self.assertTrue(pdf.startswith(b"%PDF"))
+
+    def test_build_pdf_includes_clickable_ad_links(self) -> None:
+        """كل إعلان يحمل رابطًا مباشرًا قابلاً للنقر (URI annotation) في جدول النتائج والمقارنات."""
+        import io
+
+        from pypdf import PdfReader
+
+        from backend.services.pdf_report import build_pdf
+
+        pdf = build_pdf(self._sample_report())
+        self.assertIn(b"https://front.alforaij.com/Listing/Detail/278", pdf)
+        self.assertIn(b"https://front.alforaij.com/Listing/Detail/310", pdf)
+        reader = PdfReader(io.BytesIO(pdf))
+        uris: list[str] = []
+        for page in reader.pages:
+            for annot_ref in page.get("/Annots") or []:
+                annot = annot_ref.get_object()
+                uri = (annot.get("/A") or {}).get("/URI")
+                if uri:
+                    uris.append(str(uri))
+        self.assertIn("https://front.alforaij.com/Listing/Detail/278", uris)
+        self.assertIn("https://front.alforaij.com/Listing/Detail/310", uris)
+
+    def test_build_pdf_skips_missing_links_gracefully(self) -> None:
+        """إعلان بلا رابط لا يكسر التقرير ويُعرض بشرطة."""
+        from backend.services.pdf_report import build_pdf
+
+        report = self._sample_report()
+        report["results"][0]["originalUrl"] = ""
+        report["results"][0]["comparables"][0]["url"] = None
+        pdf = build_pdf(report)
+        self.assertTrue(pdf.startswith(b"%PDF"))
+        self.assertGreater(len(pdf), 5000)
 
 
 if __name__ == "__main__":

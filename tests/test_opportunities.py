@@ -62,8 +62,8 @@ class TestOpportunities(unittest.TestCase):
         # مع فشل المصادر، تبقى البيانات المحلية أساس الفرص
         self.assertGreaterEqual(snapshot["totalScored"], 1)
 
-    def test_rentals_are_excluded_from_tiers(self) -> None:
-        """عروض الإيجار مستبعدة من الفرص حتى لا تُقارن إيجارات شهرية بوسيط شراء."""
+    def test_rent_offers_enter_tiers_with_rental_line(self) -> None:
+        """عروض الإيجار تدخل الفرص الآن بخط حسابها المميز (إيجار شهري/سنوي/عائد) دون خلط بوسيط البيع."""
         from unittest import mock
         from backend.models import Listing
         from backend.services import opportunities
@@ -79,21 +79,115 @@ class TestOpportunities(unittest.TestCase):
             price_text="450 د.ك/شهر",
             space=80,
             listing_mode="",
-            summary="شقة للإيجار",
+            summary="شقة للإيجار في السالمية",
             features="",
             published_date="2026-08-01",
             original_url="https://example.com/rent1",
             source="OpenSooq",
         )
-        with mock.patch("backend.services.opportunities.search_external_sources", return_value=([rental], [{"name": "OpenSooq", "status": "success", "records": 1}])):
+        with mock.patch("backend.services.opportunities.search_external_sources", return_value=([rental], [{"name": "OpenSooq", "status": "success", "records": 1}])), \
+             mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
+            snapshot = opportunities.build_opportunities(include_external=True)
+        items = [
+            item
+            for tier in snapshot["tiers"].values()
+            for item in tier["items"]
+        ]
+        found = next((item for item in items if item["code"] == "RENT-1"), None)
+        self.assertIsNotNone(found, "عرض الإيجار يجب أن يدخل الفئات")
+        self.assertTrue(found["rental"])
+        # الخط الإيجاري: إيجار سنوي = شهري × 12، ولا يظهر كوسيط بيع بمئات الآلاف
+        self.assertEqual(found["annualRent"], 5400)
+        self.assertTrue(found["marketMedian"] is None or found["marketMedian"] < 1000)
+        # لا يُربط العملاء (ميزانيات الشراء) بعروض الإيجار
+        self.assertEqual(found.get("clients") or [], [])
+        # العدادات الجديدة موجودة
+        self.assertGreaterEqual(snapshot["rentalCount"], 1)
+
+    def test_client_match_includes_potential_profit_kwd(self) -> None:
+        from backend.services.opportunities import match_clients_for_listing
+
+        clients = [{
+            "area": "صباح الناصر",
+            "type": "بيت",
+            "price": "450000",
+            "phones": "55559950",
+            "source": "supabase",
+        }]
+
+        matched = match_clients_for_listing(clients, "صباح الناصر", "بيت", 280000)
+
+        self.assertEqual(len(matched), 1)
+        self.assertEqual(matched[0]["clientBudget"], 450000)
+        self.assertEqual(matched[0]["potentialProfitKwd"], 170000)
+        self.assertIn("ميزانية العميل", matched[0]["profitReason"])
+        self.assertEqual(matched[0]["source"], "supabase")
+
+        other_area = dict(clients[0], area="النهضة")
+        self.assertEqual(match_clients_for_listing([other_area], "صباح الناصر", "بيت", 280000), [])
+
+    def test_demand_listing_becomes_client_with_source(self) -> None:
+        from backend.models import Listing
+        from backend.services.opportunities import clients_from_demand_listings
+
+        demand = Listing(
+            code="OS-D1",
+            transaction="مطلوب للشراء",
+            governorate="",
+            area="صباح الناصر",
+            property_type="بيت",
+            detail_class="",
+            price=350000,
+            price_text="350,000 د.ك",
+            space=400,
+            listing_mode="",
+            summary="مطلوب بيت في صباح الناصر للتواصل 55559950",
+            features="",
+            published_date="",
+            original_url="https://example.test",
+            source="OpenSooq",
+        )
+
+        clients = clients_from_demand_listings([demand])
+
+        self.assertEqual(len(clients), 1)
+        self.assertEqual(clients[0]["area"], "صباح الناصر")
+        self.assertEqual(clients[0]["source"], "OpenSooq")
+        self.assertIn("55559950", clients[0]["phones"])
+
+    def test_demand_listings_are_excluded_from_tiers(self) -> None:
+        """طلبات «مطلوب للشراء / مطلوب للإيجار» إشارات طلب وليست فرصًا للمستخدم — تُستبعد."""
+        from unittest import mock
+        from backend.models import Listing
+        from backend.services import opportunities
+
+        demand = Listing(
+            code="WANT-1",
+            transaction="مطلوب للإيجار",
+            governorate="حولي",
+            area="السالمية",
+            property_type="شقة",
+            detail_class="",
+            price=450,
+            price_text="450 د.ك/شهر",
+            space=80,
+            listing_mode="",
+            summary="ابي شقة للإيجار",
+            features="",
+            published_date="2026-08-01",
+            original_url="https://example.com/want1",
+            source="OpenSooq",
+        )
+        with mock.patch("backend.services.opportunities.search_external_sources", return_value=([demand], [{"name": "OpenSooq", "status": "success", "records": 1}])), \
+             mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
             snapshot = opportunities.build_opportunities(include_external=True)
         codes = [
             item["code"]
             for tier in snapshot["tiers"].values()
             for item in tier["items"]
         ]
-        self.assertNotIn("RENT-1", codes)
-        self.assertGreaterEqual(snapshot.get("skippedRentals", 0), 1)
+        self.assertNotIn("WANT-1", codes)
+        self.assertGreaterEqual(snapshot["skippedDemandCount"], 1)
 
     def test_external_listings_enter_tiers(self) -> None:
         """إعلان خارجي بسعر معلوم يجب أن يدخل في الفئات عند توفر المصادر."""
@@ -120,7 +214,8 @@ class TestOpportunities(unittest.TestCase):
                 source="OpenSooq",
             )
         ]
-        with mock.patch("backend.services.opportunities.search_external_sources", return_value=(external, [{"name": "OpenSooq", "status": "success", "records": 1}])):
+        with mock.patch("backend.services.opportunities.search_external_sources", return_value=(external, [{"name": "OpenSooq", "status": "success", "records": 1}])), \
+             mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
             snapshot = opportunities.build_opportunities(include_external=True)
         # الفحص عبر كل الفئات (إعلان حديث قد يتفوق عليه محليون أعلى درجة في فئة معينة)
         codes = [
@@ -129,6 +224,114 @@ class TestOpportunities(unittest.TestCase):
             for item in tier["items"]
         ]
         self.assertIn("EXT-1", codes)
+
+    def test_external_listing_without_date_enters_daily_tier(self) -> None:
+        """الإعلان الخارجي الحي بلا تاريخ نشر يُعتبر حديثًا (يوم 0) فيدخل الفئة اليومية
+        — بذلك تظهر كل منصات المواقع/التطبيقات في الصفحة الرئيسية وليس الفريج فقط."""
+        from unittest import mock
+        from backend.models import Listing
+        from backend.services import opportunities
+
+        external = Listing(
+            code="EXT-LIVE",
+            transaction="للبيع",
+            governorate="حولي",
+            area="السالمية",
+            property_type="بيت",
+            detail_class="",
+            price=450000,
+            price_text="450,000 د.ك",
+            space=400,
+            listing_mode="",
+            summary="بيت للبيع في السالمية",
+            features="",
+            published_date="",  # المسح الحي لا يحمل تاريخ نشر
+            original_url="https://example.com/ext-live",
+            source="Mourjan",
+        )
+        with mock.patch(
+            "backend.services.opportunities.search_external_sources",
+            return_value=([external], [{"name": "Mourjan", "status": "success", "records": 1}]),
+        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
+            snapshot = opportunities.build_opportunities(include_external=True)
+        daily_items = snapshot["tiers"]["daily"]["items"]
+        daily_codes = [item["code"] for item in daily_items]
+        self.assertIn("EXT-LIVE", daily_codes)
+        found = next(item for item in daily_items if item["code"] == "EXT-LIVE")
+        self.assertEqual(found["daysAgo"], 0)
+        self.assertEqual(found["source"], "Mourjan")
+
+    def test_unreal_prices_are_excluded_from_opportunities(self) -> None:
+        """الأسعار غير المنطقية (فشل استخراج من صفحة المصدر) لا تلوث أفضل الفرص — تُستبعد مع العدّ."""
+        from unittest import mock
+        from backend.models import Listing
+        from backend.services import opportunities
+
+        def make(code, price, transaction):
+            return Listing(
+                code=code, transaction=transaction, governorate="حولي", area="السالمية",
+                property_type="شقة", detail_class="", price=price,
+                price_text=f"{price} د.ك", space=80, listing_mode="",
+                summary="شقة", features="", published_date="2026-08-01",
+                original_url=f"https://example.com/{code}", source="OpenSooq",
+            )
+
+        external = [
+            make("OS-BAD-RENT", 2.0, "للإيجار"),
+            make("OS-BAD-SALE", 500.0, "للبيع"),
+            make("OS-GOOD", 250000.0, "للبيع"),
+        ]
+        with mock.patch(
+            "backend.services.opportunities.search_external_sources",
+            return_value=(external, [{"name": "OpenSooq", "status": "success", "records": 3}]),
+        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
+            snapshot = opportunities.build_opportunities(include_external=True)
+        codes = [item["code"] for tier in snapshot["tiers"].values() for item in tier["items"]]
+        self.assertIn("OS-GOOD", codes)
+        self.assertNotIn("OS-BAD-RENT", codes)
+        self.assertNotIn("OS-BAD-SALE", codes)
+        self.assertGreaterEqual(snapshot["skippedUnrealCount"], 2)
+
+    def test_broad_combo_expansion_merges_dedupes_and_contributes(self) -> None:
+        """المسح المركّب (Q8Aqar/OpenSooq) يُدمج إعلانات فريدة بلا تكرار، ويسهم في قائمة المصادر."""
+        from unittest import mock
+        from backend.models import Listing
+        from backend.services import opportunities
+
+        combo_rental = Listing(
+            code="OS-777",
+            transaction="للإيجار",
+            governorate="حولي",
+            area="السالمية",
+            property_type="شقة",
+            detail_class="",
+            price=450,
+            price_text="450 د.ك/شهر",
+            space=80,
+            listing_mode="",
+            summary="شقة للإيجار في السالمية",
+            features="",
+            published_date="",  # حي بلا تاريخ → يوم 0 فيدخل اليومية
+            original_url="https://example.com/os777",
+            source="OpenSooq",
+        )
+        with mock.patch(
+            "backend.services.opportunities.search_external_sources",
+            return_value=([], [{"name": "Mourjan", "status": "success", "records": 0}]),
+        ), mock.patch(
+            "backend.services.opportunities.search_combo_sources",
+            return_value=([combo_rental], [
+                {"name": "Q8Aqar", "status": "success", "records": 0},
+                {"name": "OpenSooq", "status": "success", "records": 1},
+            ]),
+        ):
+            snapshot = opportunities.build_opportunities(include_external=True)
+        daily_codes = [item["code"] for item in snapshot["tiers"]["daily"]["items"]]
+        self.assertIn("OS-777", daily_codes, "إعلان المسح المركّب يجب أن يدخل الفئة اليومية")
+        # المصادر المسهمة لا تتكرر رغم ورود حالة كل مصدر مرة لكل تركيب
+        self.assertEqual(snapshot["contributingSources"].count("OpenSooq"), 1)
+        self.assertIn("Q8Aqar", snapshot["contributingSources"])
+        self.assertGreaterEqual(snapshot["rentalCount"], 1)
 
     # ------------------------------------------------------------------
     # تنبيهات واتساب + أرشفة الأداء + تطبيع الأرقام

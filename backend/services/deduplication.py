@@ -9,6 +9,7 @@ def deduplicate_ranked(items: list[RankedListing]) -> list[RankedListing]:
     for item in items:
         listing = item.listing
         key = (
+            listing.transaction,
             listing.area,
             listing.property_type,
             listing.space or "",

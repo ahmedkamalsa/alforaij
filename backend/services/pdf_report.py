@@ -107,6 +107,23 @@ def money(value: Any) -> str:
         return "غير معلن"
 
 
+def ar_link(label: Any, url: str | None) -> str:
+    """رابط مباشر قابل للنقر داخل Paragraph: النص مشكّل عربيًا والرابط يبقى كاملًا في href."""
+    text = str(label if label is not None else "فتح الإعلان")
+    if not url:
+        return ar(text)
+    return f'<a href="{_esc(url)}" color="#1457a8">{_shape(_esc(text))}</a>'
+
+
+def _display_url(url: str, max_len: int = 58) -> str:
+    """اختصار عنوان طويل من المنتصف للعرض، مع إبقائه كاملًا في الرابط القابل للنقر."""
+    if not url or len(url) <= max_len:
+        return url
+    head = max_len // 2 - 2
+    tail = max_len - head - 1
+    return f"{url[:head]}…{url[-tail:]}"
+
+
 # ---------------------------------------------------------------------------
 # أنماط
 # ---------------------------------------------------------------------------
@@ -190,7 +207,14 @@ def _heading(story: list, text: str) -> None:
 
 def _info_table(rows: list[tuple[str, str]], widths: list[float]) -> Table:
     styles = _styles()
-    data = [[Paragraph(ar(label), styles["box_title"]), Paragraph(ar(value), styles["cell"])] for label, value in rows]
+    # القيمة التي تبدأ بوسم reportlab (<a …>) تُعتبر ترميزًا جاهزًا (مشكّلًا ومهرّبًا) فلا تُمرَّر عبر ar()
+    data = [
+        [
+            Paragraph(ar(label), styles["box_title"]),
+            Paragraph(value if (isinstance(value, str) and value.startswith("<")) else ar(value), styles["cell"]),
+        ]
+        for label, value in rows
+    ]
     table = Table(data, colWidths=widths, hAlign="RIGHT")
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
@@ -202,6 +226,20 @@ def _info_table(rows: list[tuple[str, str]], widths: list[float]) -> Table:
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
     ]))
     return table
+
+
+def _data_table_style() -> TableStyle:
+    """تنسيق موحد لجداول البيانات (رأس داكن + صفوف متناوبة)."""
+    return TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("GRID", (0, 0), (-1, -1), 0.5, BORDER),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ])
 
 
 def _bullet_list(story: list, items: list[str]) -> None:
@@ -293,6 +331,7 @@ def build_pdf(report: dict | None) -> bytes:
             Paragraph(ar("وسيط المقارنات"), styles["cell_head"]),
             Paragraph(ar("التوصية"), styles["cell_head"]),
             Paragraph(ar("الثقة"), styles["cell_head"]),
+            Paragraph(ar("الرابط"), styles["cell_head"]),
         ]
         rows = [header]
         for index, item in enumerate(results[:10], start=1):
@@ -302,6 +341,8 @@ def build_pdf(report: dict | None) -> bytes:
             median = money(item.get("marketMedian")) if item.get("marketMedian") else "—"
             rec = f"{round(item.get('recommendationScore') or 0)}/100"
             conf = f"{round((item.get('confidence') or 0) * 100)}%"
+            url = item.get("originalUrl") or ""
+            link_cell = Paragraph(ar_link("فتح الإعلان", url), styles["cell"]) if url else Paragraph(ar("—"), styles["cell"])
             rows.append([
                 Paragraph(ar(str(index)), styles["cell"]),
                 Paragraph(ar(item.get("code") or "—"), styles["cell"]),
@@ -311,18 +352,10 @@ def build_pdf(report: dict | None) -> bytes:
                 Paragraph(ar(median), styles["cell"]),
                 Paragraph(ar(rec), styles["cell"]),
                 Paragraph(ar(conf), styles["cell"]),
+                link_cell,
             ])
-        table = Table(rows, colWidths=[9 * mm, 26 * mm, 26 * mm, 30 * mm, 24 * mm, 30 * mm, 20 * mm, 17 * mm], repeatRows=1, hAlign="RIGHT")
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-            ("GRID", (0, 0), (-1, -1), 0.5, BORDER),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ]))
+        table = Table(rows, colWidths=[8 * mm, 22 * mm, 24 * mm, 26 * mm, 19 * mm, 28 * mm, 16 * mm, 12 * mm, 27 * mm], repeatRows=1, hAlign="RIGHT")
+        table.setStyle(_data_table_style())
         story.append(KeepTogether(table))
     story.append(Spacer(1, 6))
 
@@ -342,6 +375,23 @@ def build_pdf(report: dict | None) -> bytes:
     if missing:
         _heading(story, "بيانات مقترحة لتأكيد التقييم")
         _bullet_list(story, re.split(r"[؛\n]", missing))
+        story.append(Spacer(1, 4))
+
+    # ---- التأكيد النهائي: الفرق بين الإيجار والبيع والشراء (في نهاية التقرير) ----
+    tsum = report.get("transactionSummary") or {}
+    if tsum:
+        _heading(story, "تأكيد الفرق في الحسابات (الإيجار / البيع / الشراء)")
+        bd = tsum.get("breakdown") or {}
+        sale = bd.get("sale") or {}
+        rent = bd.get("rent") or {}
+        _bullet_list(story, [
+            f"نوع العملية المكتشف: {tsum.get('detected') or 'غير محدد'}.",
+            f"متى يُكتشف: {tsum.get('detectedWhen') or '—'}.",
+            f"طريقة الحساب المطبقة: {tsum.get('calculation') or '—'}.",
+            f"بيع/شراء ({sale.get('count') or 0} نتيجة): {sale.get('method') or '—'}.",
+            f"إيجار ({rent.get('count') or 0} نتيجة): {rent.get('method') or '—'}.",
+            f"التأكيد: {tsum.get('confirmation') or '—'}.",
+        ])
         story.append(Spacer(1, 4))
 
     # ---- القيود ----
@@ -372,6 +422,12 @@ def _detail_top_result(story: list, item: dict, styles: dict[str, ParagraphStyle
         ("الثقة", f"{conf}%"),
         ("السبب", reason),
     ]
+    url = item.get("originalUrl") or ""
+    if url:
+        summary_rows.append((
+            "رابط الإعلان المباشر",
+            f"{ar_link('اضغط هنا لفتح الإعلان الأصلي', url)}<br/>{ar(_display_url(url))}",
+        ))
     story.append(_info_table(summary_rows, [40 * mm, 140 * mm]))
     story.append(Spacer(1, 6))
 
@@ -384,53 +440,69 @@ def _detail_top_result(story: list, item: dict, styles: dict[str, ParagraphStyle
             Paragraph(ar("السعر"), styles["cell_head"]),
             Paragraph(ar("المساحة"), styles["cell_head"]),
             Paragraph(ar("التاريخ"), styles["cell_head"]),
+            Paragraph(ar("الرابط"), styles["cell_head"]),
         ]
         rows = [header]
         for comp in comparables[:8]:
             price = comp.get("priceText") or money(comp.get("price"))
             space = f"{comp.get('space'):,.0f} م²" if comp.get("space") else "—"
+            comp_url = comp.get("url") or ""
+            link_cell = Paragraph(ar_link("فتح الإعلان", comp_url), styles["cell"]) if comp_url else Paragraph(ar("—"), styles["cell"])
             rows.append([
                 Paragraph(ar(comp.get("code") or "—"), styles["cell"]),
                 Paragraph(ar(comp.get("area") or "—"), styles["cell"]),
                 Paragraph(ar(price), styles["cell"]),
                 Paragraph(ar(space), styles["cell"]),
                 Paragraph(ar(comp.get("date") or "—"), styles["cell"]),
+                link_cell,
             ])
-        comp_table = Table(rows, colWidths=[30 * mm, 30 * mm, 40 * mm, 26 * mm, 26 * mm], repeatRows=1, hAlign="RIGHT")
-        comp_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-            ("GRID", (0, 0), (-1, -1), 0.5, BORDER),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ]))
+        comp_table = Table(rows, colWidths=[24 * mm, 28 * mm, 34 * mm, 24 * mm, 24 * mm, 28 * mm], repeatRows=1, hAlign="RIGHT")
+        comp_table.setStyle(_data_table_style())
         story.append(Paragraph(ar("المقارنات السعرية الداخلة في التقييم"), styles["box_title"]))
         story.append(Spacer(1, 2))
         story.append(KeepTogether(comp_table))
         story.append(Spacer(1, 6))
 
-    # التقييم الرسمي + سعر المتر
+    # التقييم الرسمي + سعر المتر (تسميات تختلف بين الإيجار والبيع: قيمة العقار مقابل إيجار المتر)
     official = sources.get("officialValue") or {}
     price_per_sqm = sources.get("pricePerSqm") or {}
     median_per_sqm = sources.get("medianPerSqm") or {}
     if official.get("display") or official.get("value"):
-        official_rows = [
-            ("التقييم الرسمي للمنطقة", official.get("display") or money(official.get("value"))),
-            ("سعر المتر المطلوب", price_per_sqm.get("display") or "غير محسوب"),
-            ("وسيط سعر المتر", median_per_sqm.get("display") or "غير محسوب"),
-            ("أساس التقييم", official.get("source") or "لا توجد بيانات رسمية موثوقة"),
-        ]
-        story.append(Paragraph(ar("التقييم الرسمي وسعر المتر"), styles["box_title"]))
+        if item.get("rental"):
+            official_rows = [
+                ("قيمة العقار التقديرية (أساس العائد)", official.get("display") or money(official.get("value"))),
+                ("إيجار المتر (شهريًا)", price_per_sqm.get("display") or "غير محسوب"),
+                ("وسيط إيجار المتر (شهريًا)", median_per_sqm.get("display") or "غير محسوب"),
+                ("أساس القيمة", official.get("source") or "لا توجد بيانات رسمية موثوقة"),
+            ]
+            story.append(Paragraph(ar("قيمة العقار التقديرية وإيجار المتر (الإيجار)"), styles["box_title"]))
+        else:
+            official_rows = [
+                ("التقييم الرسمي للمنطقة", official.get("display") or money(official.get("value"))),
+                ("سعر المتر المطلوب", price_per_sqm.get("display") or "غير محسوب"),
+                ("وسيط سعر المتر", median_per_sqm.get("display") or "غير محسوب"),
+                ("أساس التقييم", official.get("source") or "لا توجد بيانات رسمية موثوقة"),
+            ]
+            story.append(Paragraph(ar("التقييم الرسمي وسعر المتر"), styles["box_title"]))
         story.append(Spacer(1, 2))
         story.append(_info_table(official_rows, [40 * mm, 140 * mm]))
         story.append(Spacer(1, 6))
 
-    # التمويل المتوقع
+    # التمويل المتوقع (للبيع/الشراء فقط) — الإيجار له خط حساب مميز (شهري/سنوي/عائد)
     financing = item.get("financing") or {}
-    if financing.get("monthly_payment"):
+    if item.get("rental"):
+        rent_rows = [
+            ("الإيجار الشهري", money(item.get("monthlyRent")) if item.get("monthlyRent") is not None else "غير معلن"),
+            ("الإيجار السنوي", money(item.get("annualRent")) if item.get("annualRent") is not None else "غير محسوب"),
+            ("وسيط إيجارات المنطقة (شهري)", money(item.get("marketMedian")) if item.get("marketMedian") else "غير متوفر"),
+            ("العائد الإيجاري السنوي", f"{item.get('rentalYieldPercent')}%" if item.get("rentalYieldPercent") is not None else "غير محسوب"),
+            ("ملاحظة", "الإيجار شهري ولا يُموَّل بتمويل عقاري؛ العائد = الإيجار السنوي ÷ قيمة العقار التقديرية"),
+        ]
+        story.append(Paragraph(ar("تحليل عروض الإيجار (خط حساب مميز عن البيع)"), styles["box_title"]))
+        story.append(Spacer(1, 2))
+        story.append(_info_table(rent_rows, [45 * mm, 135 * mm]))
+        story.append(Spacer(1, 6))
+    elif financing.get("monthly_payment"):
         finance_rows = [
             ("الدفعة المقدمة", money(financing.get("down_payment"))),
             ("القسط الشهري المتوقع", money(financing.get("monthly_payment"))),
@@ -444,17 +516,32 @@ def _detail_top_result(story: list, item: dict, styles: dict[str, ParagraphStyle
 
     # مصدر كل رقم (الشفافية)
     source_rows: list[tuple[str, str]] = []
-    mapping = [
-        ("السعر المطلوب", sources.get("price")),
-        ("المساحة", sources.get("space")),
-        ("سعر المتر المطلوب", sources.get("pricePerSqm")),
-        ("وسيط المقارنات", sources.get("marketMedian")),
-        ("وسيط سعر المتر", sources.get("medianPerSqm")),
-        ("التقييم الرسمي", sources.get("officialValue")),
-        ("نسبة السعر للوسيط", sources.get("priceRatio")),
-        ("عدد المقارنات الداخلة", sources.get("comparablesCount")),
-        ("الثقة", sources.get("confidence")),
-    ]
+    if item.get("rental"):
+        mapping = [
+            ("الإيجار الشهري", sources.get("price")),
+            ("الإيجار السنوي", sources.get("annualRent")),
+            ("المساحة", sources.get("space")),
+            ("إيجار المتر (شهريًا)", sources.get("pricePerSqm")),
+            ("وسيط إيجارات المنطقة", sources.get("marketMedian")),
+            ("وسيط إيجار المتر", sources.get("medianPerSqm")),
+            ("قيمة العقار التقديرية", sources.get("officialValue")),
+            ("العائد الإيجاري السنوي", sources.get("rentalYield")),
+            ("نسبة الإيجار للوسيط", sources.get("priceRatio")),
+            ("عدد المقارنات الداخلة", sources.get("comparablesCount")),
+            ("الثقة", sources.get("confidence")),
+        ]
+    else:
+        mapping = [
+            ("السعر المطلوب", sources.get("price")),
+            ("المساحة", sources.get("space")),
+            ("سعر المتر المطلوب", sources.get("pricePerSqm")),
+            ("وسيط المقارنات", sources.get("marketMedian")),
+            ("وسيط سعر المتر", sources.get("medianPerSqm")),
+            ("التقييم الرسمي", sources.get("officialValue")),
+            ("نسبة السعر للوسيط", sources.get("priceRatio")),
+            ("عدد المقارنات الداخلة", sources.get("comparablesCount")),
+            ("الثقة", sources.get("confidence")),
+        ]
     for label, entry in mapping:
         if not isinstance(entry, dict):
             continue

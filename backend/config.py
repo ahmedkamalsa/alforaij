@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -7,6 +8,30 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 FRONTEND_DIR = ROOT / "frontend"
+
+def resolve_log_level(name: str | None = None) -> int:
+    """تحويل اسم مستوى (DEBUG/INFO/...) إلى ثابت logging، مع سقوط آمن لـ INFO."""
+    return getattr(logging, (name or "").upper() or "INFO", logging.INFO)
+
+
+def setup_logging(level: int | None = None) -> None:
+    """تهيئة logging مركزي: مستوى قابل للضبط عبر ALFORAIJ_LOG_LEVEL.
+
+    القيم المقبولة: DEBUG / INFO / WARNING / ERROR / CRITICAL (أي قيمة خاطئة
+    تُهمل ويُستخدم INFO). تُستدعى عند استيراد config فيكون كل مسجل (logger)
+    في التطبيق متصلًا بنفس الإعداد.
+    """
+    effective = level if level is not None else resolve_log_level(os.getenv("ALFORAIJ_LOG_LEVEL"))
+    logging.basicConfig(
+        level=effective,
+        format="%(asctime)s %(levelname)-7s [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    # ضمان تطبيق المستوى حتى عند وجود معالجات سابقة (basicConfig قد يتجاهل المستوى)
+    logging.getLogger().setLevel(effective)
+
+
+setup_logging()
 
 
 def load_local_env(path: Path = ROOT / ".env") -> None:

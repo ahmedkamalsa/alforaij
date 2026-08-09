@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from backend.config import load_local_env
+from backend.config import load_local_env, resolve_log_level
 
 
 class ConfigTests(unittest.TestCase):
@@ -28,6 +30,23 @@ class ConfigTests(unittest.TestCase):
             load_local_env(env_path)
 
             self.assertEqual(os.environ["ALFORAIJ_TEMP_VALUE"], "ok")
+
+    def test_resolve_log_level_defaults_to_info(self) -> None:
+        # بدون متغير بيئة: المستوى الافتراضي INFO مهما كان سياق التشغيل
+        self.assertEqual(resolve_log_level(None), logging.INFO)
+        self.assertEqual(resolve_log_level(""), logging.INFO)
+
+    def test_resolve_log_level_reads_environment(self) -> None:
+        # المستوى يُقرأ من ALFORAIJ_LOG_LEVEL ويُحوَّل لثابت logging صالح
+        with mock.patch.dict(os.environ, {"ALFORAIJ_LOG_LEVEL": "debug"}):
+            self.assertEqual(resolve_log_level(os.getenv("ALFORAIJ_LOG_LEVEL")), logging.DEBUG)
+        with mock.patch.dict(os.environ, {"ALFORAIJ_LOG_LEVEL": "WARNING"}):
+            self.assertEqual(resolve_log_level(os.getenv("ALFORAIJ_LOG_LEVEL")), logging.WARNING)
+
+    def test_resolve_log_level_falls_back_on_invalid_value(self) -> None:
+        # أي قيمة غير مدعومة تسقط آمنًا إلى INFO بدل كسر التطبيق
+        with mock.patch.dict(os.environ, {"ALFORAIJ_LOG_LEVEL": "VERBOSE"}):
+            self.assertEqual(resolve_log_level(os.getenv("ALFORAIJ_LOG_LEVEL")), logging.INFO)
 
 
 if __name__ == "__main__":

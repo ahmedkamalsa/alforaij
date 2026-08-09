@@ -17,9 +17,9 @@ create policy "public read opportunities"
   using (true);
 
 create policy "service write opportunities"
-  on opportunities for insert
+  on opportunities for insert to service_role
   with check (true);
 
 create policy "service update opportunities"
-  on opportunities for update
+  on opportunities for update to service_role
   using (true);
