@@ -42,12 +42,23 @@ jobs:
     needs: prepare
     runs-on: ubuntu-latest
     continue-on-error: true
+    if: ${{ github.event.repository.private == false }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  github-pages-private-note:
+    needs: prepare
+    runs-on: ubuntu-latest
+    if: ${{ github.event.repository.private == true }}
+    steps:
+      - name: Explain GitHub Pages skip
+        run: |
+          echo "GitHub Pages is skipped because this repository is private and the current GitHub plan does not support Pages for private repositories."
+          echo "Use Netlify for private-source deployment, or make the repository public/upgrade GitHub plan to enable Pages."
 
   netlify:
     needs: prepare
