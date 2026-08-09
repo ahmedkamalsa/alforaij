@@ -241,7 +241,7 @@ def search(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
     else:
         note = (
             "لا توجد صفقات رسمية مستوردة بعد. المسار الأساسي هو الوكيل اليومي عبر "
-            "OFFICIAL_TRANSACTIONS_SOURCE عند ضبط ملف أو رابط CSV/JSON موثق، والرفع من الواجهة بديل سريع "
+            "خطوة import_official_transactions باستخدام OFFICIAL_TRANSACTIONS_SOURCE عند ضبط ملف أو رابط CSV/JSON موثق، والرفع من الواجهة بديل سريع "
             "لإدخال نفس البيانات المنظمة فورًا. لا تدخل الصفقات في التقييم إلا بعد حفظها في official_transactions."
         )
     return transactions, {

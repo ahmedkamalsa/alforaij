@@ -286,7 +286,8 @@ function updateBoardSummary(rows) {
     filters.listingMode,
   ].filter(Boolean);
   const opportunityCount = rows.filter((row) => Number(row.opportunityScore) > 0).length;
-  el.textContent = `${parts.join(" - ") || "كل السجلات"} | ${rows.length} إعلان | ${opportunityCount} فرصة`;
+  const totalScored = Number(boardState.opportunities?.totalScored || opportunityCount);
+  el.textContent = `${parts.join(" - ") || "كل السجلات"} | ${rows.length} إعلان | ${opportunityCount} فرصة ظاهرة | ${totalScored} دخلت التقييم`;
 }
 
 function renderBoardMetricCards(rows) {
@@ -312,12 +313,14 @@ function renderBoardStats(rows) {
   const priced = rows.filter((row) => Number(row.price) > 0).length;
   const withSpace = rows.filter((row) => Number(row.space) > 0).length;
   const opportunities = rows.filter((row) => Number(row.opportunityScore) > 0).length;
+  const totalScored = Number(boardState.opportunities?.totalScored || opportunities);
   const evidence = rows.reduce((sum, row) => sum + Number(row.opportunityEvidenceCount || 0), 0);
   const direct = rows.filter((row) => normalizeArabic(row.listingMode).includes("مباشر")).length;
   const office = rows.filter((row) => normalizeArabic(row.listingMode).includes("مكتب")).length;
   root.innerHTML = [
     ["إجمالي الاختيار", rows.length],
-    ["فرص محسوبة", opportunities],
+    ["فرص ظاهرة", opportunities],
+    ["دخلت التقييم", totalScored],
     ["أدلة ومقارنات", evidence],
     ["أسعار معلنة", priced],
     ["مساحات موثقة", withSpace],

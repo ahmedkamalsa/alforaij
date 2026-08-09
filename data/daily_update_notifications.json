@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-09T14:40:35",
+  "generatedAt": "2026-08-09T16:21:14",
   "hasPrevious": true,
   "counts": {
-    "added": 0,
-    "removed": 0,
+    "added": 1,
+    "removed": 1,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -18,10 +18,39 @@
   },
   "top": {
     "priceDrops": [],
-    "added": [],
-    "removed": []
+    "added": [
+      {
+        "code": "OS-285341192",
+        "area": "الأحمدي",
+        "propertyType": "شقة",
+        "price": 120.0,
+        "priceText": "120 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "إيجار عادل",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/285341192",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      }
+    ],
+    "removed": [
+      {
+        "code": "MJ-29921201",
+        "area": "الزهراء",
+        "propertyType": "أرض",
+        "price": 395000.0,
+        "priceText": "395,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "غالي",
+        "source": "Mourjan",
+        "url": "https://www.mourjan.com/kw/kuwait/lands/for-sale/29921201/",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      }
+    ]
   },
   "actions": [
+    "راجع الفرص الجديدة الأعلى درجة قبل إرسالها.",
     "أضف ملف/رابط صفقات وزارة العدل اليومي حتى يصبح التقييم أقوى من الإعلانات فقط."
   ],
   "note": "ملخص مجاني من آخر تحديث يومي: يقارن آخر لقطة فرص باللقطة الحالية ويعرض ما يحتاج متابعة."

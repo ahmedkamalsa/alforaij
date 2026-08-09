@@ -179,7 +179,7 @@ def _record_from_opportunity(item: dict, area_map: dict[str, str]) -> dict:
     return record
 
 
-def _flat_dashboard_opportunities(selected: set[str], include_local: bool, area_map: dict[str, str]) -> tuple[list[dict], dict[str, dict]]:
+def _flat_dashboard_opportunities(selected: set[str], include_local: bool, area_map: dict[str, str]) -> tuple[list[dict], dict[str, dict], dict]:
     try:
         from backend.services.supabase_store import fetch_latest_opportunities
 
@@ -188,7 +188,7 @@ def _flat_dashboard_opportunities(selected: set[str], include_local: bool, area_
         logger.warning("Dashboard opportunities skipped: %s", exc)
         snapshot = None
     if not snapshot:
-        return [], {}
+        return [], {}, {}
 
     by_code: dict[str, dict] = {}
     for tier in (snapshot.get("tiers") or {}).values():
@@ -213,7 +213,7 @@ def _flat_dashboard_opportunities(selected: set[str], include_local: bool, area_
             clean["evidenceCount"] = len(clean.get("evidence") or [])
             clean["clientsCount"] = len(clean.get("clients") or [])
             by_code[code] = clean
-    return list(by_code.values()), by_code
+    return list(by_code.values()), by_code, snapshot
 
 
 def _dashboard_summary(listings, selected_platforms: set[str] | None = None, include_local: bool = True) -> dict:
@@ -233,7 +233,7 @@ def _dashboard_summary(listings, selected_platforms: set[str] | None = None, inc
         market_records = []
     records = local_records + market_records
     raw_count = len(records)
-    opportunity_items, opportunities_by_code = _flat_dashboard_opportunities(selected_platforms, include_local, area_map)
+    opportunity_items, opportunities_by_code, opportunity_snapshot = _flat_dashboard_opportunities(selected_platforms, include_local, area_map)
     existing_codes = {str(record.get("code") or "") for record in records}
     for record in records:
         opp = opportunities_by_code.get(str(record.get("code") or ""))
@@ -256,8 +256,11 @@ def _dashboard_summary(listings, selected_platforms: set[str] | None = None, inc
         "records": records,
         "opportunities": {
             "count": len(opportunity_items),
+            "displayedCount": min(len(opportunity_items), 60),
+            "totalScored": opportunity_snapshot.get("totalScored") or len(opportunity_items),
+            "generatedAt": opportunity_snapshot.get("generatedAt") or opportunity_snapshot.get("generatedDate"),
             "items": opportunity_items[:60],
-            "calculation": "الفرصة = إعلان عرض بسعر صالح تم تقييمه في لقطة الفرص، ويُحسب بعد نفس فلاتر المنصة والمحافظة والمنطقة. الدرجة = 65% جاذبية السعر + 35% الثقة، والثقة مبنية على مصداقية المصدر وعدد المقارنات/الأدلة.",
+            "calculation": "الفرصة = إعلان عرض بسعر صالح تم تقييمه في لقطة الفرص. تعرض اللوحة أعلى الفرص فقط، بينما totalScored يوضح إجمالي الإعلانات التي دخلت التقييم. الدرجة = 65% جاذبية السعر + 35% الثقة، والثقة مبنية على مصداقية المصدر وعدد المقارنات/الأدلة.",
         },
         "platforms": sorted({row["source"] for row in records if row["source"]}),
         "selectedPlatforms": sorted(selected_platforms),
@@ -303,14 +306,14 @@ def _apply_filter_overrides(request, filters: dict) -> None:
         return
     transaction = str(filters.get("transaction") or "").strip()
     property_type = str(filters.get("propertyType") or "").strip()
-    areas = str(filters.get("areas") or "").strip()
+    areas = str(filters.get("areas") or filters.get("area") or "").strip()
     governorate = str(filters.get("governorate") or "").strip()
     if transaction:
         request.transaction = transaction
     if property_type:
         request.property_type = property_type
     if governorate:
-        request.governorates = [part.strip() for part in re.split(r"[ØŒ,|]+", governorate) if part.strip()]
+        request.governorates = [part.strip() for part in re.split(r"[،,|]+", governorate) if part.strip()]
     if areas:
         request.areas = [part.strip() for part in re.split(r"[،,|]+", areas) if part.strip()]
 
@@ -338,6 +341,20 @@ def _apply_filter_overrides(request, filters: dict) -> None:
         request.rent_budget = rent_budget
     if bedrooms is not None:
         request.bedrooms = int(bedrooms)
+
+
+def _filter_listings_by_explicit_location(listings: list, request, filters: dict) -> list:
+    if not isinstance(filters, dict):
+        return listings
+    area_filter = str(filters.get("areas") or filters.get("area") or "").strip()
+    governorate_filter = str(filters.get("governorate") or "").strip()
+    if area_filter and request.areas:
+        allowed = set(request.areas)
+        return [item for item in listings if item.area in allowed]
+    if governorate_filter and request.governorates:
+        allowed_govs = set(request.governorates)
+        return [item for item in listings if item.governorate in allowed_govs]
+    return listings
 
 
 def _profit_opportunities(report: dict) -> dict:
@@ -434,7 +451,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/opportunities":
             import time
             from backend.services.opportunities import build_opportunities
-            from backend.services.supabase_store import save_opportunities
+            from backend.services.supabase_store import fetch_latest_opportunities, save_opportunities
 
             params = parse_qs(urlparse(self.path).query)
             force_refresh = params.get("refresh", ["0"])[0] == "1"
@@ -444,6 +461,13 @@ class Handler(BaseHTTPRequestHandler):
             if not stale and not force_refresh:
                 json_response(self, _OPPORTUNITIES_CACHE)
                 return
+            if not force_refresh:
+                fallback = fetch_latest_opportunities()
+                if fallback:
+                    _OPPORTUNITIES_CACHE = fallback
+                    _OPPORTUNITIES_CACHE_AT = time.time()
+                    json_response(self, fallback)
+                    return
             with _OPPORTUNITIES_LOCK:
                 try:
                     # الصفحة تعتمد على الفرص الفعلية من كل المواقع: يُفحص المصادر الخارجية
@@ -461,7 +485,6 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as exc:
                     logger.exception("Opportunities build failed")
                     # احتياط: عرض آخر لقطة محفوظة في Supabase بدل فشل الطلب
-                    from backend.services.supabase_store import fetch_latest_opportunities
                     fallback = fetch_latest_opportunities()
                     if fallback:
                         _OPPORTUNITIES_CACHE = fallback
@@ -602,7 +625,8 @@ class Handler(BaseHTTPRequestHandler):
                 request = parse_request(text)
                 if payload.get("mode") in {"search", "valuation", "search_and_value"}:
                     request.intent = str(payload["mode"])
-                _apply_filter_overrides(request, payload.get("filters") or {})
+                filter_overrides = payload.get("filters") or {}
+                _apply_filter_overrides(request, filter_overrides)
                 _default_sale_when_unspecified(request)
                 source_mode = str(payload.get("sourceMode") or "local").strip()
                 selected_source = str(payload.get("selectedSource") or "").strip()
@@ -628,6 +652,7 @@ class Handler(BaseHTTPRequestHandler):
                         item for item in listings
                         if item.governorate in allowed_governorates
                     ]
+                listings = _filter_listings_by_explicit_location(listings, request, filter_overrides)
                 ranked = top_matches(request, listings, limit=100)
                 enriched = enrich_rankings(request, ranked, listings)
                 deduped = deduplicate_ranked(enriched)[:50]

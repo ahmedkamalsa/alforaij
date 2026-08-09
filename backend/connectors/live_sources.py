@@ -340,6 +340,7 @@ def listing_from_text(
     # Use parsed price from text first; fall back to provided price
     price_value = extract_price_from_title(full_text) or parse_price(full_text, price)
     inferred_thousands = False
+    weak_price = False
     if (
         transaction == "للبيع"
         and property_type in {"بيت", "أرض", "عمارة"}
@@ -348,6 +349,16 @@ def listing_from_text(
     ):
         price_value *= 1000
         inferred_thousands = True
+    if (
+        transaction == "للبيع"
+        and property_type in {"بيت", "أرض", "عمارة"}
+        and price_value
+        and price_value < 80_000
+    ):
+        # بيع بيت/أرض بهذا السعر في الكويت غالبًا رقم مختصر أو ناقص من المصدر.
+        # لا نخترع رقمًا بديلًا؛ نستبعد السعر من التقييم حتى لا تظهر فرصة وهمية.
+        price_value = None
+        weak_price = True
     return Listing(
         code=code,
         transaction=transaction,
@@ -368,8 +379,11 @@ def listing_from_text(
             "priceSource": (
                 f"استخراج مباشر من صفحة {source}، والرقم عومل كألف د.ك لأنه بيع {property_type}"
                 if inferred_thousands
+                else f"رقم السعر منخفض وغير موثوق لبيع {property_type}، لذلك لم يدخل في التقييم"
+                if weak_price
                 else f"استخراج مباشر من نص إعلان {source}"
             ),
+            "dataWarnings": "سعر خارجي منخفض/ناقص لم يدخل في التقييم" if weak_price else "",
             "spaceSource": "مستخرجة من نص الإعلان" if space else "غير مذكورة",
             "external": True,
         },

@@ -1,8 +1,8 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-09T14:39:24",
-  "finishedAt": "2026-08-09T14:40:35",
+  "startedAt": "2026-08-09T16:19:59",
+  "finishedAt": "2026-08-09T16:21:14",
   "steps": [
     {
       "name": "sync_source_registry",
@@ -39,7 +39,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 178,
+        "totalScored": 179,
         "includeExternal": true
       }
     },
@@ -47,8 +47,8 @@
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 0,
-        "removed": 0,
+        "added": 1,
+        "removed": 1,
         "priceDrops": 0
       }
     }
@@ -56,10 +56,10 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "opportunitiesScored": 178,
+    "opportunitiesScored": 179,
     "notificationCounts": {
-      "added": 0,
-      "removed": 0,
+      "added": 1,
+      "removed": 1,
       "priceDrops": 0
     },
     "officialReferenceSources": {
@@ -154,19 +154,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 301,
+          "count": 316,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 1762,
+          "count": 1902,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 22685,
+          "count": 25734,
           "status": "ok"
         },
         "client_leads": {
@@ -184,13 +184,13 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 328,
+          "count": 346,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 44,
+          "count": 56,
           "status": "ok"
         }
       },
