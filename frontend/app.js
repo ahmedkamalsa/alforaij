@@ -28,7 +28,7 @@ const recentAreasKey = "alforaij_recent_areas_v2";
 
 const $ = (id) => document.getElementById(id);
 const API_BASE = String(window.ALFORAIJ_API_BASE || localStorage.getItem("ALFORAIJ_API_BASE") || "").replace(/\/$/, "");
-const STATIC_SNAPSHOT_MODE = !API_BASE && /\.github\.io$/i.test(window.location.hostname);
+const STATIC_SNAPSHOT_MODE = !API_BASE;
 const STATIC_DATA_MAP = {
   "/api/health": "health.json",
   "/api/sources": "sources.json",
