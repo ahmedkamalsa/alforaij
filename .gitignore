@@ -10,6 +10,7 @@ node_modules/
 dist/
 build/
 *.log
+frontend/static-data/
 data/refined_*
 data/top10_similar_leads.*
 test-results/

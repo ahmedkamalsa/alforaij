@@ -6,6 +6,7 @@ const state = {
 };
 
 const boardState = {
+  allRecords: [],
   records: [],
   metrics: [],
   opportunities: { count: 0, items: [], calculation: "" },
@@ -27,9 +28,53 @@ const recentAreasKey = "alforaij_recent_areas_v2";
 
 const $ = (id) => document.getElementById(id);
 const API_BASE = String(window.ALFORAIJ_API_BASE || localStorage.getItem("ALFORAIJ_API_BASE") || "").replace(/\/$/, "");
+const STATIC_SNAPSHOT_MODE = !API_BASE && /\.github\.io$/i.test(window.location.hostname);
+const STATIC_DATA_MAP = {
+  "/api/health": "health.json",
+  "/api/sources": "sources.json",
+  "/api/dashboard/summary": "dashboard-summary.json",
+  "/api/opportunities": "opportunities.json",
+  "/api/opportunities/history": "opportunities-history.json",
+  "/api/market-matching": "market-matching.json",
+  "/api/opportunity-delta": "opportunity-delta.json",
+  "/api/weekly-digest": "weekly-digest.json",
+  "/api/whatsapp-alerts": "whatsapp-alerts.json",
+  "/api/outreach/stats": "outreach-stats.json",
+  "/api/clients": "clients.json",
+  "/api/update-notifications": "update-notifications.json",
+  "/api/daily-agent/status": "daily-agent-status.json",
+  "/api/official-reference-sources": "official-reference-sources.json",
+};
 
 function apiUrl(path) {
   return `${API_BASE}${path}`;
+}
+
+function staticDataUrl(path) {
+  const clean = String(path || "").split("?")[0];
+  const file = STATIC_DATA_MAP[clean];
+  return file ? `static-data/${file}` : "";
+}
+
+async function fetchStaticJson(path) {
+  const url = staticDataUrl(path);
+  if (!url) throw new Error("No static snapshot for " + path);
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+async function getJson(path) {
+  if (STATIC_SNAPSHOT_MODE) return fetchStaticJson(path);
+  try {
+    const response = await fetch(apiUrl(path));
+    if (!response.ok) throw new Error(await response.text());
+    return await response.json();
+  } catch (err) {
+    const fallback = staticDataUrl(path);
+    if (!fallback) throw err;
+    return fetchStaticJson(path);
+  }
 }
 
 function escapeHtml(value) {
@@ -243,7 +288,135 @@ function persistenceLabel(value) {
   return value.status || "-";
 }
 
+function sourceMatchesPlatformScope(row, scope) {
+  if (!scope || scope.sourceMode === "all") return true;
+  const source = normalizeArabic(row.source || "");
+  const isLocal = source.includes(normalizeArabic("الفريج")) || source.includes("alforaij");
+  if (scope.includeLocal && !scope.includeExternal) return isLocal;
+  if (!scope.includeLocal && isLocal) return false;
+  const selected = (scope.selectedSources || []).map(normalizeArabic);
+  return !selected.length || selected.some((name) => source.includes(name) || name.includes(source));
+}
+
+function staticAnalyzeReport(payload) {
+  const filters = payload.filters || {};
+  const text = String(payload.text || "");
+  const area = String(filters.areas || filters.area || "").trim();
+  const propertyType = String(filters.propertyType || "").trim();
+  const transaction = String(filters.transaction || "").trim();
+  const minArea = Number(filters.minArea || 0);
+  const maxArea = Number(filters.maxArea || 0);
+  const budget = Number(filters.budget || filters.rentBudget || 0);
+  const sourceScope = selectedBoardPlatforms();
+  let rows = (boardState.allRecords || boardState.records || []).slice();
+
+  if (area) rows = rows.filter((row) => normalizeArabic(row.area).includes(normalizeArabic(area)) || normalizeArabic(area).includes(normalizeArabic(row.area)));
+  if (propertyType) rows = rows.filter((row) => normalizeArabic(row.propertyType).includes(normalizeArabic(propertyType)));
+  if (transaction) rows = rows.filter((row) => normalizeArabic(row.transaction).includes(normalizeArabic(transaction)));
+  if (minArea) rows = rows.filter((row) => Number(row.space || 0) >= minArea);
+  if (maxArea) rows = rows.filter((row) => Number(row.space || 0) <= maxArea);
+  rows = rows.filter((row) => sourceMatchesPlatformScope(row, sourceScope));
+
+  const priced = rows.filter((row) => Number(row.price || 0) > 0);
+  const medianPool = priced.map((row) => Number(row.price || 0)).sort((a, b) => a - b);
+  const median = medianPool.length ? medianPool[Math.floor(medianPool.length / 2)] : 0;
+
+  const results = rows.map((row) => {
+    const price = Number(row.price || 0);
+    const priceScore = budget && price ? Math.max(0, Math.min(100, 100 - Math.abs(price - budget) / budget * 100)) : Number(row.opportunityScore || 50);
+    const score = Number(row.opportunityScore || priceScore || 50);
+    const comps = priced
+      .filter((other) => other.code !== row.code && (!row.area || normalizeArabic(other.area) === normalizeArabic(row.area)))
+      .slice(0, 4)
+      .map((other) => ({
+        code: other.code,
+        area: other.area,
+        price: other.price,
+        priceText: other.priceText,
+        source: other.source,
+        url: other.originalUrl,
+        summary: other.summary,
+      }));
+    return {
+      code: row.code || "STATIC",
+      area: row.area,
+      governorate: row.governorate,
+      transaction: row.transaction,
+      propertyType: row.propertyType,
+      detailClass: row.detailClass,
+      listingType: row.listingMode,
+      source: row.source,
+      price,
+      priceText: row.priceText || (price ? formatMoney(price) : ""),
+      space: row.space,
+      publishedDate: row.publishedDate,
+      originalUrl: row.originalUrl,
+      summary: row.summary || row.features || "",
+      features: row.features || "",
+      recommendationScore: Math.round(score),
+      matchScore: Math.round(priceScore || score),
+      marketMedian: median,
+      priceRatio: median && price ? price / median : null,
+      valuationLabel: row.opportunityLabel || (score >= 75 ? "فرصة قوية" : score >= 60 ? "مناسبة" : "تحتاج مراجعة"),
+      valuationReason: row.opportunityReason || "تقييم من لقطة البيانات المنشورة: مطابقة الفلاتر، السعر، وجود المقارنات، ومصدر الإعلان.",
+      decisionLine: "نسخة GitHub Pages تستخدم لقطة بيانات منشورة. التحديث الحي يحتاج API backend.",
+      reasons: [
+        area ? `مطابق للمنطقة: ${area}` : "مطابق لنطاق البحث",
+        propertyType ? `نوع العقار: ${propertyType}` : "نوع العقار من بيانات الإعلان",
+        comps.length ? `يوجد ${comps.length} مقارنات من نفس النطاق` : "المقارنات محدودة في اللقطة الحالية",
+      ],
+      warnings: STATIC_SNAPSHOT_MODE ? ["التحليل من لقطة منشورة وليس اتصالًا حيًا"] : [],
+      comparables: comps,
+      numberSources: {
+        price: { value: row.priceText || price, source: row.source, note: "من بيانات الإعلان" },
+        space: { value: row.space || null, source: row.source, note: row.space ? "من بيانات الإعلان" : "غير مذكورة" },
+        marketMedian: { value: median || null, source: "لقطة المقارنات", note: `${priced.length} إعلان بسعر معلن` },
+        comparablesCount: { value: comps.length, source: "لقطة المقارنات", note: "نفس النطاق المتاح" },
+        confidence: { value: Math.round(score), source: "تقييم static", note: "السعر + الفلاتر + الأدلة المتاحة" },
+      },
+      matchBreakdown: [
+        { name: "مطابقة الفلاتر", points: area || propertyType ? 40 : 20, value: "حسب المدخلات", weight: "40%" },
+        { name: "السعر", points: Math.round(priceScore || 0), value: row.priceText || price || "غير معلن", weight: "35%" },
+        { name: "الأدلة", points: comps.length * 10, value: `${comps.length} مقارنات`, weight: "25%" },
+      ],
+      recommendationBreakdown: [
+        { name: "درجة الفرصة", points: Math.round(score), value: row.opportunityReason || "لقطة منشورة", weight: "100%" },
+      ],
+    };
+  }).sort((a, b) => b.recommendationScore - a.recommendationScore).slice(0, 20);
+
+  return {
+    generatedAt: new Date().toLocaleString("ar-KW"),
+    analysisMethod: "local",
+    summary: results.length
+      ? `تم تحليل ${results.length} نتيجة من لقطة GitHub Pages. أفضل نتيجة ${results[0].code} بدرجة ${results[0].recommendationScore}/100.`
+      : "لا توجد نتائج مطابقة في لقطة البيانات المنشورة. جرّب توسيع المنطقة أو المنصة.",
+    request: { rawText: text, areas: area ? [area] : [], propertyType, transaction },
+    extractedFilters: [
+      { label: "المنطقة", value: area, source: "الفلاتر" },
+      { label: "نوع العقار", value: propertyType, source: "الفلاتر" },
+      { label: "العملية", value: transaction, source: "الفلاتر" },
+    ],
+    searchScope: { note: "تحليل من لقطة static منشورة. النتائج الحية تحتاج API backend." },
+    rankingMethod: {
+      title: "ترتيب static",
+      description: "الترتيب حسب درجة الفرصة، مطابقة الفلاتر، السعر، وعدد المقارنات المتاحة في اللقطة.",
+      weights: [
+        { label: "مطابقة الطلب", value: "40%" },
+        { label: "جاذبية السعر", value: "35%" },
+        { label: "الأدلة", value: "25%" },
+      ],
+    },
+    sourceStatus: [{ name: "GitHub Pages static snapshot", status: "success", records: rows.length }],
+    similarExternal: { items: results.slice(0, 6), sources: Array.from(new Set(results.map((r) => r.source).filter(Boolean))) },
+    profitOpportunities: { items: [] },
+    results,
+    persistence: { status: "static" },
+  };
+}
+
 async function postJson(path, payload) {
+  if (STATIC_SNAPSHOT_MODE && path === "/api/analyze") return staticAnalyzeReport(payload);
   const response = await fetch(apiUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -510,12 +683,14 @@ async function loadDashboardBoard() {
     if (platforms.includeLocal && platforms.sourceMode !== "all") params.append("platform", "الفريج");
     params.set("includeLocal", platforms.includeLocal ? "1" : "0");
     const suffix = params.toString() ? `?${params.toString()}` : "";
-    const data = await fetch(apiUrl(`/api/dashboard/summary${suffix}`)).then((r) => r.json());
-    boardState.records = data.records || [];
+    const data = await getJson(`/api/dashboard/summary${suffix}`);
+    boardState.allRecords = data.records || [];
+    boardState.records = STATIC_SNAPSHOT_MODE
+      ? boardState.allRecords.filter((row) => sourceMatchesPlatformScope(row, platforms))
+      : boardState.allRecords;
     boardState.metrics = data.metrics || [];
     boardState.opportunities = data.opportunities || { count: 0, items: [], calculation: "" };
-    fetch(apiUrl("/api/market-matching"))
-      .then((r) => r.json())
+    getJson("/api/market-matching")
       .then((matching) => {
         boardState.matching = matching;
         renderBoard();
@@ -2227,9 +2402,7 @@ function renderDailyAgentOfficialSources(status) {
 
 async function loadDailyUpdateNotice() {
   try {
-    const response = await fetch(apiUrl("/api/update-notifications"));
-    if (!response.ok) throw new Error(await response.text());
-    renderDailyUpdateNotice(await response.json());
+    renderDailyUpdateNotice(await getJson("/api/update-notifications"));
   } catch (err) {
     console.warn("Update notifications unavailable", err);
   }
@@ -2239,9 +2412,7 @@ async function loadDailyAgentStatus() {
   const stateEl = $("dailyAgentState");
   const inlineStateEl = $("dailyAgentStateInline");
   try {
-    const response = await fetch(apiUrl("/api/daily-agent/status"));
-    if (!response.ok) throw new Error(await response.text());
-    const status = await response.json();
+    const status = await getJson("/api/daily-agent/status");
     if (stateEl) {
       const finished = status.finishedAt ? String(status.finishedAt).replace("T", " ").slice(0, 16) : "";
       stateEl.textContent = `حالة الوكيل: ${status.status || "غير معروف"}${finished ? ` · ${finished}` : ""}`;
@@ -2333,9 +2504,7 @@ async function loadOpportunities(forceRefresh = false) {
   if (!root) return;
   root.innerHTML = '<div class="empty">جاري تحميل أفضل الفرص...</div>';
   try {
-    const response = await fetch(apiUrl(`/api/opportunities${forceRefresh ? "?refresh=1" : ""}`));
-    if (!response.ok) throw new Error(await response.text());
-    oppState.data = await response.json();
+    oppState.data = await getJson(`/api/opportunities${forceRefresh ? "?refresh=1" : ""}`);
 
     const allItems = Object.values(oppState.data.tiers || {}).flatMap((tier) => tier.items || []);
     fillOppSelect("oppGovFilter", allItems.map((item) => item.governorate));
@@ -2359,41 +2528,30 @@ async function loadOpportunityTab(tier) {
   root.innerHTML = '<div class="empty">جاري التحميل...</div>';
   try {
     if (tier === "clients") {
-      const res = await fetch(apiUrl("/api/clients"));
-      if (!res.ok) throw new Error(await res.text());
-      const payload = await res.json();
+      const payload = await getJson("/api/clients");
       oppState.clients = payload.clients || [];
       renderClientsTab(root);
     } else if (tier === "alerts") {
-      const res = await fetch(apiUrl("/api/whatsapp-alerts"));
-      if (!res.ok) throw new Error(await res.text());
-      const payload = await res.json();
+      const payload = await getJson("/api/whatsapp-alerts");
       oppState.alerts = payload.alerts || [];
       oppState.alertsNote = payload.note || "";
       renderAlertsTab(root);
     } else if (tier === "digest") {
-      const res = await fetch(apiUrl("/api/weekly-digest"));
-      if (!res.ok) throw new Error(await res.text());
-      oppState.digest = await res.json();
+      oppState.digest = await getJson("/api/weekly-digest");
       renderDigestTab(root);
     } else if (tier === "history") {
       const [historyRes, outreachRes] = await Promise.all([
-        fetch(apiUrl("/api/opportunities/history")),
-        fetch(apiUrl("/api/outreach/stats")),
+        getJson("/api/opportunities/history"),
+        getJson("/api/outreach/stats").catch(() => null),
       ]);
-      if (!historyRes.ok) throw new Error(await historyRes.text());
-      oppState.history = await historyRes.json();
-      oppState.outreach = outreachRes.ok ? await outreachRes.json() : null;
+      oppState.history = historyRes;
+      oppState.outreach = outreachRes;
       renderHistoryTab(root);
     } else if (tier === "matching") {
-      const res = await fetch(apiUrl("/api/market-matching"));
-      if (!res.ok) throw new Error(await res.text());
-      oppState.matching = await res.json();
+      oppState.matching = await getJson("/api/market-matching");
       renderMatchingTab(root);
     } else if (tier === "delta") {
-      const res = await fetch(apiUrl("/api/opportunity-delta"));
-      if (!res.ok) throw new Error(await res.text());
-      oppState.delta = await res.json();
+      oppState.delta = await getJson("/api/opportunity-delta");
       renderDeltaTab(root);
     }
   } catch (err) {
@@ -2596,7 +2754,7 @@ async function boot() {
     if (!document.hidden) loadOpportunities(false);
   }, 5 * 60 * 1000);
   try {
-    const health = await fetch(apiUrl("/api/health")).then((r) => r.json());
+    const health = await getJson("/api/health");
     const aiStatus = health.aiAnalysis ? "التحليل الذكي متاح" : "تحليل محلي";
     setStatus(`البيانات: ${health.records} إعلان | قاعدة البيانات: ${health.supabase ? "متصلة" : "غير مضبوطة"} | ${aiStatus}`);
   } catch {

@@ -5,7 +5,10 @@ on:
   push:
     branches: [main]
     paths:
+      - "backend/**"
+      - "data/**"
       - "frontend/**"
+      - "scripts/export_static_frontend_data.py"
       - ".github/workflows/deploy-cloudflare-pages.yml"
 
 concurrency:
@@ -23,6 +26,8 @@ jobs:
           cat > frontend/config.js <<'EOF'
           window.ALFORAIJ_API_BASE = "${{ vars.ALFORAIJ_API_BASE }}";
           EOF
+      - name: Generate static data snapshot
+        run: python scripts/export_static_frontend_data.py
       - name: Deploy to Cloudflare Pages
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then

@@ -5,7 +5,10 @@ on:
   push:
     branches: [main]
     paths:
+      - "backend/**"
+      - "data/**"
       - "frontend/**"
+      - "scripts/export_static_frontend_data.py"
       - "netlify.toml"
       - ".github/workflows/deploy-static.yml"
 
@@ -28,6 +31,8 @@ jobs:
           cat > frontend/config.js <<'EOF'
           window.ALFORAIJ_API_BASE = "${{ vars.ALFORAIJ_API_BASE }}";
           EOF
+      - name: Generate static data snapshot
+        run: python scripts/export_static_frontend_data.py
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
