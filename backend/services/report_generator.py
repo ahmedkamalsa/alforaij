@@ -605,6 +605,7 @@ def build_report(
                     "records": status.get("records", 0),
                     "candidates": status.get("candidates", status.get("records", 0)),
                     "responseMs": status.get("responseMs"),
+                    "attempts": status.get("attempts"),
                     "url": status.get("url"),
                     "note": status.get("note", ""),
                     "availableCount": status.get("availableCount"),

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -48,17 +49,28 @@ def _post(table: str, rows: list[dict[str, Any]], *, upsert: bool = False, confl
         method="POST",
         headers=_headers(prefer),
     )
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            if response.status not in {200, 201, 204}:
-                raise RuntimeError(f"Supabase returned HTTP {response.status}")
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        logger.exception("Supabase %s write failed: HTTP %s %s", table, exc.code, detail)
-        raise RuntimeError(f"Supabase {table} write failed: HTTP {exc.code} {detail}") from exc
-    except Exception:
-        logger.exception("Supabase %s write failed", table)
-        raise
+    # إعادة محاولة واحدة عند تعطل الكتابة الشبكي العابر (write operation timed out)
+    # — الوكيل اليومي يكتب دفعات كبيرة وتُحل الشبكة المتقطعة بالتكرار بدل فشل الدورة كاملة.
+    for attempt in range(2):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                if response.status not in {200, 201, 204}:
+                    raise RuntimeError(f"Supabase returned HTTP {response.status}")
+            return
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            logger.exception("Supabase %s write failed: HTTP %s %s", table, exc.code, detail)
+            raise RuntimeError(f"Supabase {table} write failed: HTTP {exc.code} {detail}") from exc
+        except (TimeoutError, urllib.error.URLError, ConnectionError, OSError) as exc:
+            if attempt == 0:
+                logger.warning("Supabase %s write timeout (attempt 1/2), retrying: %s", table, exc)
+                time.sleep(2)
+                continue
+            logger.exception("Supabase %s write failed after retry", table)
+            raise
+        except Exception:
+            logger.exception("Supabase %s write failed", table)
+            raise
 
 
 def listing_row(listing: Listing) -> dict[str, Any]:
@@ -445,9 +457,12 @@ def fetch_market_ads(
     if property_type:
         pt_map = {"بيت": "private_residential", "شقة": "apartment", "أرض": "land", "عمارة": "building"}
         mapped = pt_map.get(property_type, property_type)
-        params.append(f"or=(property_type.eq.{mapped},property_type.ilike.*{mapped}*)")
+        encoded_pt = urllib.parse.quote(mapped)
+        params.append(f"or=(property_type.eq.{encoded_pt},property_type.ilike.*{encoded_pt}*)")
     if region:
-        params.append(f"or=(region.ilike.*{region}*,title.ilike.*{urllib.parse.quote(region)}*)")
+        # ترميز المنطقة (عربية/إنجليزية) في كل موضع — إدراجها خامًا يكسر urllib بخطأ ascii
+        encoded_region = urllib.parse.quote(region)
+        params.append(f"or=(region.ilike.*{encoded_region}*,title.ilike.*{encoded_region}*)")
     params.append("order=fetched_at.desc")
     endpoint = f"{SUPABASE_URL}/rest/v1/market_ads?{'&'.join(params)}"
     return _fetch_rows(endpoint)
@@ -521,6 +536,131 @@ def fetch_market_listings(
     params.append("order=fetched_at.desc")
     endpoint = f"{SUPABASE_URL}/rest/v1/market_listings?{'&'.join(params)}"
     return _fetch_rows(endpoint)
+
+
+def fetch_market_analytics(limit: int = 5000) -> dict[str, Any]:
+    """تحليلات الحصاد المتراكم من market_listings لكل موقع على حدة.
+
+    تُجمَّع الصفوف (كل المواقع) في Python لأن REST لا يدعم group-by:
+    - إجمالي: عدد الصفوف/المواقع/المناطق/المحافظات + آخر جلب.
+    - لكل مصدر: عدد الإعلانات، خلط المعاملات، أنواع العقار، المناطق،
+      وسيط السعر والمساحة (حيثما وُجدت أرقام صالحة) — أساس قياس تغطية كل موقع.
+    - المناطق الأكثر تغطية (ترتيب تنازلي) لمعرفة أين تتوفر بيانات فعلية للتحليل.
+
+    متسامح تمامًا: غياب الجدول أو تعذر القراءة يعيد حالة واضحة بدل كسر الطلب.
+    """
+    if not market_listings_table_available():
+        return {
+            "tableOk": False,
+            "note": "جدول market_listings غير موجود بعد — شغّل migration 010 ثم الوكيل اليومي.",
+            "totals": {"rows": 0, "sources": 0, "areas": 0, "governorates": 0, "transactions": 0, "propertyTypes": 0},
+            "sources": [],
+            "areas": [],
+        }
+    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_listings?select=*&order=fetched_at.desc&limit={int(limit)}")
+    if not rows:
+        return {
+            "tableOk": True,
+            "note": "الجدول جاهز ولا توجد صفوف بعد — شغّل الوكيل اليومي (حصاد المواقع) لبدء التراكم.",
+            "totals": {"rows": 0, "sources": 0, "areas": 0, "governorates": 0, "transactions": 0, "propertyTypes": 0},
+            "sources": [],
+            "areas": [],
+        }
+
+    def _median(values: list[float]) -> float | None:
+        if not values:
+            return None
+        ordered = sorted(values)
+        middle = len(ordered) // 2
+        if len(ordered) % 2:
+            return round(ordered[middle], 1)
+        return round((ordered[middle - 1] + ordered[middle]) / 2, 1)
+
+    by_source: dict[str, dict[str, Any]] = {}
+    area_counts: dict[str, int] = {}
+    gov_counts: dict[str, int] = {}
+    trans_counts: dict[str, int] = {}
+    type_counts: dict[str, int] = {}
+    last_fetched = ""
+    for row in rows:
+        source = str(row.get("source") or "غير معروف").strip() or "غير معروف"
+        bucket = by_source.setdefault(source, {
+            "source": source,
+            "count": 0,
+            "transactions": {},
+            "propertyTypes": set(),
+            "areas": set(),
+            "governorates": set(),
+            "prices": [],
+            "spaces": [],
+            "lastFetched": "",
+        })
+        bucket["count"] += 1
+        transaction = str(row.get("transaction") or "").strip()
+        property_type = str(row.get("property_type") or "").strip()
+        area = str(row.get("area") or "").strip()
+        governorate = str(row.get("governorate") or "").strip()
+        if transaction:
+            bucket["transactions"][transaction] = bucket["transactions"].get(transaction, 0) + 1
+            trans_counts[transaction] = trans_counts.get(transaction, 0) + 1
+        if property_type:
+            bucket["propertyTypes"].add(property_type)
+            type_counts[property_type] = type_counts.get(property_type, 0) + 1
+        if area:
+            bucket["areas"].add(area)
+            area_counts[area] = area_counts.get(area, 0) + 1
+        if governorate:
+            bucket["governorates"].add(governorate)
+            gov_counts[governorate] = gov_counts.get(governorate, 0) + 1
+        try:
+            price = float(row.get("price"))
+            if price and price > 0:
+                bucket["prices"].append(price)
+        except (TypeError, ValueError):
+            pass
+        try:
+            space = float(row.get("space"))
+            if space and space > 0:
+                bucket["spaces"].append(space)
+        except (TypeError, ValueError):
+            pass
+        fetched = str(row.get("fetched_at") or "")
+        if fetched > bucket["lastFetched"]:
+            bucket["lastFetched"] = fetched
+        if fetched > last_fetched:
+            last_fetched = fetched
+
+    sources = []
+    for bucket in by_source.values():
+        sources.append({
+            "source": bucket["source"],
+            "count": bucket["count"],
+            "transactions": bucket["transactions"],
+            "propertyTypes": sorted(bucket["propertyTypes"]),
+            "areas": sorted(bucket["areas"]),
+            "governorates": sorted(bucket["governorates"]),
+            "price": {"median": _median(bucket["prices"]), "min": min(bucket["prices"]) if bucket["prices"] else None, "max": max(bucket["prices"]) if bucket["prices"] else None},
+            "space": {"median": _median(bucket["spaces"])},
+            "lastFetched": bucket["lastFetched"],
+        })
+    sources.sort(key=lambda item: item["count"], reverse=True)
+    areas = sorted(area_counts.items(), key=lambda pair: pair[1], reverse=True)[:30]
+    return {
+        "tableOk": True,
+        "fetchedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "note": "تحليلات الحصاد المتراكم من market_listings — كل إعلان يحمل original_url وfetched_at كدليل قابل للفتح.",
+        "totals": {
+            "rows": len(rows),
+            "sources": len(sources),
+            "areas": len(area_counts),
+            "governorates": len(gov_counts),
+            "transactions": trans_counts,
+            "propertyTypes": type_counts,
+            "lastFetched": last_fetched,
+        },
+        "sources": sources,
+        "areas": [{"area": area, "count": count} for area, count in areas],
+    }
 
 
 def fetch_official_indicators(region: str | None = None, limit: int = 50) -> list[dict[str, Any]]:

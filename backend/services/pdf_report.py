@@ -24,6 +24,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     HRFlowable,
     KeepTogether,
+    PageBreak,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -124,6 +125,72 @@ def _display_url(url: str, max_len: int = 58) -> str:
     return f"{url[:head]}…{url[-tail:]}"
 
 
+_STATUS_LABELS = {
+    "success": ("نجح", "#1a7f37"),
+    "fallback": ("مصدر بديل", "#b45309"),
+    "failed": ("فشل", "#b91c1c"),
+    "no_results": ("لا نتائج", "#5a6472"),
+    "no_data": ("لا بيانات", "#5a6472"),
+    "page_reachable": ("الصفحة متاحة", "#5a6472"),
+}
+
+
+def _source_status_label(status: str) -> str:
+    """تسمية عربية ملونة لحالة المصدر داخل Paragraph (تشكيل + لون)."""
+    label, color = _STATUS_LABELS.get(status or "", (status or "غير معروف", "#5a6472"))
+    return f'<font color="{color}">{_shape(_esc(label))}</font>'
+
+
+def _source_evidence_table(sources: list[dict], styles: dict[str, ParagraphStyle]) -> Table:
+    """جدول المصادر والأدلة: حالة كل مصدر + آلية الجلب + المدة + المحاولات + النتائج + الدليل."""
+    header = [
+        Paragraph(ar("#"), styles["cell_head"]),
+        Paragraph(ar("المصدر"), styles["cell_head"]),
+        Paragraph(ar("الحالة"), styles["cell_head"]),
+        Paragraph(ar("آلية الجلب"), styles["cell_head"]),
+        Paragraph(ar("المدة"), styles["cell_head"]),
+        Paragraph(ar("المحاولات"), styles["cell_head"]),
+        Paragraph(ar("النتائج"), styles["cell_head"]),
+        Paragraph(ar("الدليل / نقطة النهاية"), styles["cell_head"]),
+    ]
+    rows = [header]
+    for index, src in enumerate(sources, start=1):
+        name = str(src.get("name") or "مصدر")
+        mech = str(src.get("fetchMethod") or "")
+        if not mech:
+            mech = "بيانات محلية (لوحة الفريج)" if name == "الفريج" else "—"
+        ms = src.get("responseMs")
+        duration = f"{ms / 1000:.1f} ث" if isinstance(ms, (int, float)) else "—"
+        attempts = src.get("attempts")
+        attempts_text = f"{attempts}" if attempts is not None else "—"
+        records = src.get("records", 0)
+        endpoint = str(src.get("endpoint") or src.get("url") or "")
+        if endpoint.startswith("http"):
+            evidence = Paragraph(ar_link(_display_url(endpoint, max_len=34), endpoint), styles["cell"])
+        elif endpoint:
+            evidence = Paragraph(ar(endpoint), styles["cell"])
+        else:
+            evidence = Paragraph(ar("—"), styles["cell"])
+        rows.append([
+            Paragraph(ar(str(index)), styles["cell"]),
+            Paragraph(ar(name), styles["cell"]),
+            Paragraph(_source_status_label(str(src.get("status") or "")), styles["cell"]),
+            Paragraph(ar(mech), styles["cell"]),
+            Paragraph(ar(duration), styles["cell"]),
+            Paragraph(ar(attempts_text), styles["cell"]),
+            Paragraph(ar(f"{records}"), styles["cell"]),
+            evidence,
+        ])
+    table = Table(
+        rows,
+        colWidths=[6 * mm, 24 * mm, 24 * mm, 36 * mm, 17 * mm, 20 * mm, 14 * mm, 41 * mm],
+        repeatRows=1,
+        hAlign="RIGHT",
+    )
+    table.setStyle(_data_table_style())
+    return table
+
+
 # ---------------------------------------------------------------------------
 # أنماط
 # ---------------------------------------------------------------------------
@@ -170,7 +237,8 @@ def _draw_header(canvas_obj: Any, doc: Any) -> None:
     # العناوين يمين الشعار
     canvas_obj.setFillColor(colors.white)
     canvas_obj.setFont(_FONT_BOLD, 16)
-    canvas_obj.drawRightString(w - 16 * mm, h - 13 * mm, _shape("تقرير التقييم العقاري"))
+    title = getattr(doc, "_report_title", None) or "تقرير التقييم العقاري"
+    canvas_obj.drawRightString(w - 16 * mm, h - 13 * mm, _shape(title))
     canvas_obj.setFont(_FONT_NAME, 9)
     canvas_obj.setFillColor(GOLD)
     canvas_obj.drawRightString(w - 16 * mm, h - 21.5 * mm, _shape("مساعد الفريج للبحث والتقييم العقاري — دولة الكويت"))
@@ -255,8 +323,12 @@ def _bullet_list(story: list, items: list[str]) -> None:
 # ---------------------------------------------------------------------------
 # بناء التقرير
 # ---------------------------------------------------------------------------
-def build_pdf(report: dict | None) -> bytes:
-    """يولّد ملف PDF من تقرير البحث (بنية build_report). يعيد البايتات."""
+def build_pdf(report: dict | None, *, title: str | None = None, client_recommendations: list[str] | None = None) -> bytes:
+    """يولّد ملف PDF من تقرير البحث (بنية build_report). يعيد البايتات.
+
+    - title: عنوان عربي مخصص يظهر في رأس كل صفحة بدل العنوان الافتراضي.
+    - client_recommendations: قائمة توصيات للعميل تُعرض في صفحة مخصصة في نهاية التقرير.
+    """
     _register_fonts()
     styles = _styles()
     report = report or {}
@@ -275,9 +347,10 @@ def build_pdf(report: dict | None) -> bytes:
         leftMargin=14 * mm,
         topMargin=40 * mm,
         bottomMargin=18 * mm,
-        title="تقرير التقييم العقاري — مساعد الفريج",
+        title=title or "تقرير التقييم العقاري — مساعد الفريج",
         author="مساعد الفريج",
     )
+    doc._report_title = title
 
     story: list = []
 
@@ -398,6 +471,40 @@ def build_pdf(report: dict | None) -> bytes:
     if limitations:
         _heading(story, "حدود هذا التقرير")
         _bullet_list(story, limitations)
+
+    # ---- المصادر والأدلة (في نهاية التقرير لتوثيق التسليم) ----
+    sources = report.get("sourceStatus") or []
+    if sources:
+        _heading(story, "المصادر والأدلة")
+        ok_count = sum(1 for s in sources if s.get("status") == "success")
+        story.append(
+            Paragraph(
+                ar(f"تشغيل هذا التقرير: {ok_count} مصدرًا ناجحًا من أصل {len(sources)} — كل رقم قابل للتتبع إلى نقطة الجلب والوقت أدناه."),
+                styles["body"],
+            )
+        )
+        story.append(Spacer(1, 3))
+        story.append(_source_evidence_table(sources, styles))
+        story.append(Spacer(1, 3))
+        story.append(
+            Paragraph(
+                ar("الحالة: نجح = جلب فعلي · مصدر بديل = البديل استُخدم بدل منصة تعذر الوصول إليها · لا نتائج/لا بيانات = اكتمل الفحص دون مطابقة · فشل = تعذر الوصول نهائيًا."),
+                styles["small"],
+            )
+        )
+
+    # ---- توصيات العميل (صفحة مخصصة في نهاية التقرير) ----
+    if client_recommendations:
+        story.append(PageBreak())
+        _heading(story, "توصيات العميل — خطة التنفيذ")
+        raw_text = request.get("raw_text") or request.get("text") or ""
+        if raw_text:
+            story.append(Paragraph(ar_rich(f"**طلب العميل:** {raw_text}"), styles["body"]))
+            story.append(Spacer(1, 4))
+        for index, rec in enumerate(client_recommendations, start=1):
+            story.append(Paragraph(f"{index}. {ar(rec)}", styles["body"]))
+            story.append(Spacer(1, 2))
+        story.append(Spacer(1, 6))
 
     doc.build(story, onFirstPage=_draw_header, onLaterPages=_draw_header_footer)
     return buf.getvalue()

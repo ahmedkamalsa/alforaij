@@ -1,14 +1,14 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-09T17:12:16",
-  "finishedAt": "2026-08-09T17:13:34",
+  "startedAt": "2026-08-11T00:51:11",
+  "finishedAt": "2026-08-11T00:52:34",
   "steps": [
     {
       "name": "sync_source_registry",
       "status": "ok",
       "result": {
-        "count": 19
+        "count": 20
       }
     },
     {
@@ -39,16 +39,25 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 177,
+        "totalScored": 228,
         "includeExternal": true
+      }
+    },
+    {
+      "name": "persist_market_listings",
+      "status": "ok",
+      "result": {
+        "status": "saved",
+        "count": 210,
+        "error": ""
       }
     },
     {
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 3,
-        "removed": 4,
+        "added": 11,
+        "removed": 10,
         "priceDrops": 0
       }
     }
@@ -56,10 +65,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "opportunitiesScored": 177,
+    "marketListingsHarvested": 210,
+    "opportunitiesScored": 228,
     "notificationCounts": {
-      "added": 3,
-      "removed": 4,
+      "added": 11,
+      "removed": 10,
       "priceDrops": 0
     },
     "officialReferenceSources": {
@@ -133,6 +143,12 @@
           "count": 182,
           "status": "ok"
         },
+        "market_listings": {
+          "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
+          "available": true,
+          "count": 288,
+          "status": "ok"
+        },
         "market_ads": {
           "label": "إعلانات السوق الحية من المواقع/لوحات العرض",
           "available": true,
@@ -154,19 +170,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 324,
+          "count": 370,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 1993,
+          "count": 2633,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 26314,
+          "count": 30946,
           "status": "ok"
         },
         "client_leads": {
@@ -184,13 +200,13 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 349,
+          "count": 353,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 61,
+          "count": 107,
           "status": "ok"
         }
       },

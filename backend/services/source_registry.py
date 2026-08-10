@@ -137,6 +137,17 @@ SOURCE_REGISTRY: list[dict[str, Any]] = [
         "status": "live_conditional",
     },
     {
+        "id": "yebtah",
+        "name": "Yebtah",
+        "category": "مصادر توسعة",
+        "connection": "بيانات ItemList منظمة (JSON-LD) من صفحتي البيع والإيجار",
+        "role": "يدخل في البحث والتقييم عند ظهور إعلان يثبت نفس الطلب",
+        "trustLevel": "متوسط",
+        "scoringPolicy": "تدخل بنفس قواعد الفلترة والدليل (المنطقة والنوع والعملية).",
+        "evidencePolicy": "كل نتيجة تحفظ الرابط والنص الأصلي كدليل.",
+        "status": "live_scored",
+    },
+    {
         "id": "market_ads",
         "name": "السوق المباشر (Supabase market_ads)",
         "category": "مصدر أساسي حي",

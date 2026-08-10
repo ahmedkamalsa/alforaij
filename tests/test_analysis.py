@@ -357,6 +357,26 @@ class AnalysisTests(unittest.TestCase):
         self.assertIn("AF-97", codes)
         self.assertNotIn("AF-98", codes)
 
+    def test_governorate_mention_without_prefix_expands_to_its_areas(self) -> None:
+        """ذكر محافظة بلا «محافظة» قبلها (مثل «بالعاصمة») يوسّع لمناطقها ولا يضيّعها."""
+        request = parse_request("يبي ايجار مكتب بالعاصمة او حولي شي رخيص بحدود ٢٠٠")
+
+        self.assertEqual(request.transaction, "مطلوب للإيجار")
+        self.assertEqual(request.property_type, "تجاري")
+        self.assertEqual(request.rent_budget, 200.0)
+        self.assertIn("العاصمة", request.governorates)
+        self.assertIn("حولي", request.areas)
+        # مناطق العاصمة تُوسَّع (مثل الشرق) حتى لا يُفقد البحث عن العاصمة
+        self.assertIn("الشرق", request.areas)
+        self.assertIn("القبلة", request.areas)
+
+    def test_area_only_request_does_not_expand_governorate(self) -> None:
+        """طلب منطقة محددة (السالمية) يبقى محصورًا فيها ولا يتوسع لمحافظة حولي كلها."""
+        request = parse_request("ايجار شقة في السالمية")
+
+        self.assertEqual(request.areas, ["السالمية"])
+        self.assertEqual(request.governorates, [])
+
 
 if __name__ == "__main__":
     unittest.main()

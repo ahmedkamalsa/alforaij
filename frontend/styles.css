@@ -1389,6 +1389,37 @@ button:hover {
   color: var(--blue) !important;
 }
 
+.ops-analytics {
+  margin-top: 10px;
+  font-weight: 700;
+}
+
+.minitable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 420px;
+}
+
+.minitable th,
+.minitable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.minitable th {
+  background: var(--navy);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.minitable td:first-child,
+.minitable th:first-child {
+  text-align: right;
+}
+
 .ops-advanced {
   margin-top: 12px;
 }

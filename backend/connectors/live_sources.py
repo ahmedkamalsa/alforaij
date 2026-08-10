@@ -125,6 +125,10 @@ SOURCE_MECHANISMS: dict[str, dict[str, str]] = {
         "method": "فحص روابط HTML",
         "endpoint": "https://www.bu3qar.com/?s=…",
     },
+    "Yebtah": {
+        "method": "بيانات ItemList منظمة (JSON-LD) من صفحتي البيع والإيجار",
+        "endpoint": "https://yebtah.com/en/for_sale · /en/for_rent",
+    },
     "الحسبة العامة": {
         "method": "تغذية رسمية من موقع الحسبة (صفقات موثقة بمواعيد وأرقام قسائم)",
         "endpoint": "https://alhisba.com/…",
@@ -255,7 +259,7 @@ def parse_price(text: str, fallback: Any = None) -> float | None:
     # Try "X الف" / "X مليون" patterns
     patterns = [
         r"([0-9]+(?:\.[0-9]+)?)\s*مليون",
-        r"(?:السعر|سعر البيع|المطلوب|بياع|الثمن)[:\s]*([0-9]+(?:\.[0-9]+)?)\s*(مليون|الف|ألف|دينار|د\.ك|دك)?",
+        r"(?:السعر|سعر البيع|المطلوب|بياع|الثمن|الايجار|ايجار|الاجار)[:\s]*([0-9]+(?:\.[0-9]+)?)\s*(مليون|الف|ألف|دينار|د\.ك|دك)?",
         r"([0-9]+(?:\.[0-9]+)?)\s*(مليون|الف|ألف)\s*(?:دينار|د\.ك|دك)?",
     ]
     for pattern in patterns:
@@ -421,6 +425,12 @@ def listing_from_text(
         # لا نخترع رقمًا بديلًا؛ نستبعد السعر من التقييم حتى لا تظهر فرصة وهمية.
         price_value = None
         weak_price = True
+    if transaction == "للإيجار" and price_value and price_value < 30:
+        # إيجار شهري أقل من 30 د.ك رقم وهمي/عنصر نائب من المصدر (مثل "1" أو "20" في OpenSooq)
+        # أو إعلان «للاتصال» بسعر مضلل. لا نخترع رقمًا بديلًا؛ نستبعد السعر من التقييم
+        # حتى لا تظهر فرصة وهمية بأفضل صفقة.
+        price_value = None
+        weak_price = True
     return Listing(
         code=code,
         transaction=transaction,
@@ -441,7 +451,7 @@ def listing_from_text(
             "priceSource": (
                 f"استخراج مباشر من صفحة {source}، والرقم عومل كألف د.ك لأنه بيع {property_type}"
                 if inferred_thousands
-                else f"رقم السعر منخفض وغير موثوق لبيع {property_type}، لذلك لم يدخل في التقييم"
+                else f"رقم السعر منخفض وغير موثوق ({property_type} — {transaction})، لذلك لم يدخل في التقييم"
                 if weak_price
                 else f"استخراج مباشر من نص إعلان {source}"
             ),
@@ -1244,6 +1254,190 @@ def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
     )
 
 
+# ─── Yebtah (منصة كويتية حديثة — بيانات ItemList منظمة بلا REST عام) ─────────
+
+# أسماء Yebtah إنجليزية («in Salmiya, Hawalli - 45,000 KWD») — نحولها لعربية
+# حتى تطابق فلاتر المنطقة/المحافظة وتدخل في التقييم والمقارنات مثل باقي المصادر.
+YEBTAH_GOVERNORATES: dict[str, str] = {
+    "Hawalli": "محافظة حولي",
+    "Al Asimah": "محافظة العاصمة",
+    "Asimah": "محافظة العاصمة",
+    "Jahra": "محافظة الجهراء",
+    "Ahmadi": "محافظة الأحمدي",
+    "Farwaniya": "محافظة الفروانية",
+    "Mubarak Al-Kabeer": "محافظة مبارك الكبير",
+    "Mubarak Al Kabeer": "محافظة مبارك الكبير",
+}
+
+YEBTAH_AREAS: dict[str, str] = {
+    "Salmiya": "السالمية",
+    "Hawalli": "حولي",
+    "Jabriya": "الجابرية",
+    "Salwa": "سلوى",
+    "Bayan": "بيان",
+    "Al-Mutlaa": "المطلاع",
+    "Mutlaa": "المطلاع",
+    "Sabah Al-Ahmad City": "صباح الأحمد",
+    "Sabah Al-Ahmad": "صباح الأحمد",
+    "Jahra": "الجهراء",
+    "Ahmadi": "الأحمدي",
+    "Fahaheel": "الفحيحيل",
+    "Farwaniya": "الفروانية",
+    "Khaitan": "خيطان",
+    "Qurtuba": "قرطبة",
+    "Mishrif": "مشرف",
+    "Salam": "سلام",
+    "Rumaithiya": "الرميثية",
+    "Dasma": "الدسمة",
+    "Sharq": "الشرق",
+    "Bnaid Al-Qar": "بنيد القار",
+    "Sabah Al-Salem": "صباح السالم",
+    "Ferdous": "الفردوس",
+    "North West Sulaibikhat": "شمال غرب الصليبيخات",
+    "Adan": "العدان",
+    "Abu Fatira": "أبو فطيرة",
+    "Funaitis": "فنطاس",
+    "Naeem": "نعيم",
+    "Ardiya": "العارضية",
+    "Sulaibiya": "الصليبية",
+    "Sabhan": "صبحان",
+    "Rai": "الراي",
+}
+
+
+def _yebtah_place(name: str) -> tuple[str, str]:
+    """استخراج (منطقة عربية، محافظة عربية) من «… in Salmiya, Hawalli - 45,000 KWD»."""
+    match = re.search(r"\bin\s+([^,]+?)\s*,\s*([^,-]+)", name, re.I)
+    if not match:
+        return "", ""
+    area_en = match.group(1).strip()
+    gov_en = match.group(2).strip()
+    return YEBTAH_AREAS.get(area_en, area_en), YEBTAH_GOVERNORATES.get(gov_en, "")
+
+
+def _yebtah_type(name: str, fallback: str) -> str:
+    lowered = name.lower()
+    if any(word in lowered for word in ("apartment", "duplex", "flat", "studio")):
+        return "شقة"
+    if any(word in lowered for word in ("land", "plot", "ground")):
+        return "أرض"
+    if any(word in lowered for word in ("building", "tower", "shop", "office", "floor", "commercial")):
+        return "عمارة"
+    if any(word in lowered for word in ("villa", "house", "chalet", "home", "farm")):
+        return "بيت"
+    return fallback or "عقارات"
+
+
+def _yebtah_transaction(name: str, fallback: str) -> str:
+    lowered = name.lower()
+    if "for rent" in lowered:
+        return "للإيجار"
+    if "for sale" in lowered:
+        return "للبيع"
+    return fallback
+
+
+def _yebtah_price(name: str) -> float | None:
+    match = re.search(r"-\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*KWD", name, re.I)
+    return float(match.group(1).replace(",", "")) if match else None
+
+
+def _fetch_yebtah_page(mode: str, fallback_transaction: str) -> tuple[list[Listing], dict[str, Any]]:
+    """جلب صفحة Yebtah (for_sale/for_rent) وتحويل كروت ItemList إلى إعلانات."""
+    url = f"https://yebtah.com/en/{mode}"
+    body, status, ms, error, attempts = fetch_url(url)
+    listings: list[Listing] = []
+    candidates = 0
+    if body:
+        for raw_json in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S):
+            try:
+                data = json.loads(raw_json)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(data, dict) or data.get("@type") != "ItemList":
+                continue
+            for element in data.get("itemListElement", []):
+                item = element.get("item", element) if isinstance(element, dict) else {}
+                name = str(item.get("name") or "").strip()
+                href = str(item.get("url") or "").strip()
+                if not name or not href:
+                    continue
+                candidates += 1
+                code = "YEB-" + href.rstrip("/").split("/")[-1]
+                transaction = _yebtah_transaction(name, fallback_transaction)
+                area_ar, gov_ar = _yebtah_place(name)
+                listing = listing_from_text(
+                    source="Yebtah",
+                    code=code,
+                    url=href,
+                    title=name,
+                    description=name,
+                    price=_yebtah_price(name),
+                    transaction=transaction,
+                    fallback_type=_yebtah_type(name, ""),
+                )
+                # المنطقة/المحافظة إنجليزية في الاسم → نملأ العربية المعادلة للفلاتر والتقييم
+                listing.area = area_ar or listing.area
+                listing.governorate = gov_ar or listing.governorate
+                listings.append(listing)
+    return listings, {
+        "status": "success" if listings else ("no_results" if not error else "failed"),
+        "records": len(listings),
+        "candidates": candidates,
+        "attempts": attempts,
+        "responseMs": ms,
+        "url": url,
+        "note": error or "بيانات ItemList منظمة (الاسم + رابط التفاصيل) — المنطقة/المحافظة معرّبة للمطابقة.",
+    }
+
+
+def search_yebtah(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    """Yebtah — منصة كويتية حديثة (yebtah.com) بلا REST API عام.
+
+    صفحتا /en/for_sale و /en/for_rent تعرضان ItemList منظمًا فيه كل إعلان اسمه
+    (مثل «6-Bed Villa For Sale in Sharq, Al Asimah - 45,000 KWD») ورابط تفاصيله.
+    الطلب المحدد (بيع/إيجار) يجلب الصفحة المناسبة؛ الطلب العريض (حصاد يومي)
+    يجلب الصفحتين لتراكم إعلانات البيع والإيجار معًا في market_listings.
+    """
+    transaction = transaction_from_request(request)
+    modes = ["for_rent"] if transaction == "للإيجار" else (["for_sale", "for_rent"] if not request.raw_text.strip() and not request.transaction else ["for_sale"])
+    # الطلب العريض (حصاد يومي فارغ): لا نفلتر بالمعاملة حتى تراكم البيع والإيجار معًا
+    is_broad = not request.raw_text.strip() and not request.transaction and not request.areas and not request.property_type
+    merged: list[Listing] = []
+    seen: set[str] = set()
+    candidates = 0
+    attempts = 0
+    ms_total = 0.0
+    first_url = ""
+    errors: list[str] = []
+    for mode in modes:
+        listings, status = _fetch_yebtah_page(mode, transaction)
+        candidates += status.get("candidates", 0) or 0
+        attempts = max(attempts, status.get("attempts") or 0)
+        ms_total += status.get("responseMs") or 0
+        first_url = first_url or status.get("url") or ""
+        if status.get("status") == "failed":
+            errors.append(str(status.get("note") or ""))
+        for listing in listings:
+            if listing.code in seen:
+                continue
+            seen.add(listing.code)
+            if is_broad or request_matches_listing(request, listing):
+                merged.append(listing)
+    return merged[:80], {
+        "name": "Yebtah",
+        "status": "success" if merged else ("no_results" if not errors else "failed"),
+        "records": len(merged),
+        "candidates": candidates,
+        "attempts": attempts,
+        "responseMs": ms_total,
+        "url": first_url,
+        "note": " | ".join(errors) if errors else (
+            "بيانات ItemList منظمة من صفحات Yebtah (بيع وإيجار عند الحصاد العريض) مع روابط التفاصيل."
+        ),
+    }
+
+
 def search_alhisba_public_deals(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
     from backend.connectors.official_data import _transaction_listing
 
@@ -1278,6 +1472,7 @@ SEARCHERS: list[tuple[str, Any]] = [
     ("Bu3qar", search_bu3qar),
     ("Aqarat", search_aqarat),
     ("4Sale", search_four_sale),
+    ("Yebtah", search_yebtah),
     ("الحسبة", search_alhisba_public_deals),
     ("السوق المباشر", search_market_ads),
     ("مؤشرات رسمية", search_official_indicators),

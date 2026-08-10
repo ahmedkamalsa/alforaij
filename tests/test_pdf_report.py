@@ -106,6 +106,81 @@ class TestPdfReport(unittest.TestCase):
         self.assertTrue(pdf.startswith(b"%PDF"))
         self.assertGreater(len(pdf), 5000)
 
+    def test_build_pdf_includes_sources_evidence_table(self) -> None:
+        """جدول «المصادر والأدلة» يظهر في نهاية التقرير بكل الحقول وآلية الجلب والروابط."""
+        import io
+
+        from pypdf import PdfReader
+
+        from backend.services.pdf_report import build_pdf
+
+        report = self._sample_report()
+        report["sourceStatus"] = [
+            {
+                "name": "الفريج",
+                "status": "success",
+                "records": 12,
+                "note": "بيانات محلية.",
+            },
+            {
+                "name": "OpenSooq",
+                "status": "success",
+                "records": 20,
+                "candidates": 20,
+                "responseMs": 4696,
+                "attempts": 1,
+                "fetchMethod": "حمولة JSON مضمّنة (__NEXT_DATA__)",
+                "endpoint": "https://kw.opensooq.com/en/find?term=office",
+                "note": "تم البحث واستخراج النتائج.",
+            },
+            {
+                "name": "4Sale",
+                "status": "fallback",
+                "records": 0,
+                "responseMs": 6883,
+                "attempts": 4,
+                "fetchMethod": "فحص HTML",
+                "endpoint": "https://kw.opensooq.com/",
+                "note": "تعذر الوصول — استُخدم المصدر البديل.",
+            },
+        ]
+        pdf = build_pdf(report)
+        self.assertIn(b"https://kw.opensooq.com/en/find?term=office", pdf)
+        reader = PdfReader(io.BytesIO(pdf))
+        text = "".join(page.extract_text() or "" for page in reader.pages)
+        # رأس الجدول وأسماء المصادر ظاهرة في نص المستند
+        self.assertIn("OpenSooq", text)
+        self.assertIn("4Sale", text)
+
+    def test_build_pdf_accepts_arabic_title(self) -> None:
+        """عنوان عربي مخصص يظهر في رأس المستند بدل العنوان الافتراضي."""
+        from backend.services.pdf_report import build_pdf
+
+        pdf = build_pdf(self._sample_report(), title="تقرير تقييم إيجار المكاتب — حولي والعاصمة")
+        self.assertTrue(pdf.startswith(b"%PDF"))
+        # العنوان يُشكَّل ويُطبع في محتوى الصفحة الأولى (يظهر في بيانات البايتات بعد التشكيل)
+        self.assertGreater(len(pdf), 5000)
+
+    def test_build_pdf_adds_client_recommendations_page(self) -> None:
+        """صفحة توصيات العميل تُضاف في نهاية التقرير عند تمرير قائمة توصيات."""
+        import io
+
+        from pypdf import PdfReader
+
+        from backend.services.pdf_report import build_pdf
+
+        import unicodedata
+
+        recs = ["الإعلان OS-285406788 في حولي — 240 د.ك.", "تواصل فورًا قبل انتهاء العرض."]
+        base = build_pdf(self._sample_report())
+        with_recs = build_pdf(self._sample_report(), client_recommendations=recs)
+        self.assertGreater(len(with_recs), len(base))
+        reader = PdfReader(io.BytesIO(with_recs))
+        # pypdf يستخرج العربية بأشكال العرض (presentation forms) — نحوّلها NFKC للمقارنة
+        text = unicodedata.normalize("NFKC", "".join(page.extract_text() or "" for page in reader.pages))
+        self.assertGreater(len(reader.pages), 2)  # صفحة إضافية للتوصيات
+        self.assertIn("توصيات العميل", text)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,6 +22,35 @@ class LiveSourceParsingTests(unittest.TestCase):
         self.assertEqual(listing.price, 320000)
         self.assertIn("\u0639\u0648\u0645\u0644 \u0643\u0623\u0644\u0641", listing.raw["priceSource"])
 
+    def test_rental_implausible_price_is_excluded_from_valuation(self) -> None:
+        """\u0625\u064a\u062c\u0627\u0631 \u0634\u0647\u0631\u064a \u0648\u0647\u0645\u064a (\u0645\u062b\u0644 \u00ab1\u00bb \u0623\u0648 \u00ab20\u00bb \u0643\u0639\u0646\u0627\u0635\u0631 \u0646\u0627\u0626\u0628\u0629) \u064a\u0633\u062a\u0628\u0639\u062f \u0645\u0646 \u0627\u0644\u062a\u0642\u064a\u064a\u0645 \u062d\u062a\u0649 \u0644\u0627 \u062a\u0638\u0647\u0631 \u0641\u0631\u0635\u0629 \u0648\u0647\u0645\u064a\u0629."""
+        fake = listing_from_text(
+            source="OpenSooq",
+            code="OS-fake-price",
+            url="https://example.test/1",
+            title="\u0644\u0644\u0625\u064a\u062c\u0627\u0631 \u0645\u0643\u062a\u0628 \u0641\u064a \u062d\u0648\u0644\u064a",
+            description="\u0645\u0643\u062a\u0628 \u062a\u062c\u0627\u0631\u064a",
+            price=1.0,
+            transaction="\u0644\u0644\u0625\u064a\u062c\u0627\u0631",
+            fallback_type="\u062a\u062c\u0627\u0631\u064a",
+        )
+        self.assertIsNone(fake.price)
+        self.assertIn("\u0644\u0645 \u064a\u062f\u062e\u0644 \u0641\u064a \u0627\u0644\u062a\u0642\u064a\u064a\u0645", fake.raw["priceSource"])
+        self.assertTrue(fake.raw["dataWarnings"])
+
+        # \u0625\u064a\u062c\u0627\u0631 \u0648\u0627\u0642\u0639\u064a (200 \u062f.\u0643) \u064a\u0628\u0642\u064a \u0643\u0645\u0627 \u0647\u0648
+        real = listing_from_text(
+            source="OpenSooq",
+            code="OS-real-price",
+            url="https://example.test/2",
+            title="\u0645\u0643\u062a\u0628 \u0644\u0644\u0627\u064a\u062c\u0627\u0631 \u0628\u062d\u0648\u0644\u064a",
+            description="\u0627\u0644\u0625\u064a\u062c\u0627\u0631 200 \u062f\u064a\u0646\u0627\u0631",
+            price=None,
+            transaction="\u0644\u0644\u0625\u064a\u062c\u0627\u0631",
+            fallback_type="\u062a\u062c\u0627\u0631\u064a",
+        )
+        self.assertEqual(real.price, 200.0)
+
     def test_bnaid_al_qar_routes_to_real_source_slugs(self) -> None:
         request = parse_request(
             "\u0634\u0642\u0629 \u0644\u0644\u0628\u064a\u0639 \u0641\u064a "
@@ -368,6 +397,97 @@ class LiveSourceParsingTests(unittest.TestCase):
             listings, status = live_sources.search_official_transactions(request)
         self.assertEqual(listings, [])
         self.assertEqual(status["status"], "no_data")
+
+    # ------------------------------------------------------------------
+    # Yebtah — بيانات ItemList منظمة مع تعريب المنطقة/المحافظة
+    # ------------------------------------------------------------------
+    def _yebtah_body(self, *items: tuple[str, str]) -> str:
+        elements = ",".join(
+            '{"@type": "ListItem", "position": %d, "url": "https://yebtah.com/en/property/%s", "name": "%s"}'
+            % (index + 1, code, name.replace('"', "'"))
+            for index, (code, name) in enumerate(items)
+        )
+        return (
+            '<script type="application/ld+json">'
+            '{"@type": "ItemList", "itemListElement": [' + elements + "]}</script>"
+        )
+
+    def test_yebtah_parses_itemlist_and_arabizes_place(self) -> None:
+        from unittest import mock
+        from backend.connectors import live_sources
+
+        body = self._yebtah_body(
+            ("abc123", "6-Bed Villa For Sale in Salmiya, Hawalli - 350,000 KWD"),
+            ("def456", "3-Bed Apartment For Rent in Qurtuba, Al Asimah - 420 KWD"),
+        )
+        with mock.patch.object(live_sources, "fetch_url", return_value=(body, 200, 100.0, None, 1)):
+            listings, status = live_sources.search_yebtah(parse_request(""))
+        self.assertEqual(status["status"], "success")
+        self.assertEqual(len(listings), 2)
+        sale = next(item for item in listings if item.code == "YEB-abc123")
+        self.assertEqual(sale.transaction, "للبيع")
+        self.assertEqual(sale.property_type, "بيت")
+        self.assertEqual(sale.area, "السالمية")
+        self.assertEqual(sale.governorate, "محافظة حولي")
+        self.assertEqual(sale.price, 350000)
+        self.assertIn("yebtah.com/en/property/abc123", sale.original_url)
+        rent = next(item for item in listings if item.code == "YEB-def456")
+        self.assertEqual(rent.transaction, "للإيجار")
+        self.assertEqual(rent.property_type, "شقة")
+        self.assertEqual(rent.area, "قرطبة")
+        self.assertEqual(rent.governorate, "محافظة العاصمة")
+        self.assertEqual(rent.price, 420)
+
+    def test_yebtah_broad_scan_keeps_both_sale_and_rent(self) -> None:
+        from unittest import mock
+        from backend.connectors import live_sources
+
+        sale_body = self._yebtah_body(("s1", "6-Bed Villa For Sale in Salmiya, Hawalli - 350,000 KWD"))
+        rent_body = self._yebtah_body(("r1", "3-Bed Apartment For Rent in Qurtuba, Al Asimah - 420 KWD"))
+
+        def fake_fetch(url, extra_headers=None):
+            if "for_rent" in url:
+                return (rent_body, 200, 50.0, None, 1)
+            return (sale_body, 200, 50.0, None, 1)
+
+        with mock.patch.object(live_sources, "fetch_url", side_effect=fake_fetch):
+            listings, status = live_sources.search_yebtah(parse_request(""))
+        transactions = {item.transaction for item in listings}
+        self.assertEqual(transactions, {"للبيع", "للإيجار"})
+        self.assertEqual(status["records"], 2)
+
+    def test_yebtah_filters_rent_when_sale_requested(self) -> None:
+        from unittest import mock
+        from backend.connectors import live_sources
+
+        body = self._yebtah_body(
+            ("r1", "3-Bed Apartment For Rent in Qurtuba, Al Asimah - 420 KWD"),
+        )
+        request = parse_request("شقة للبيع في قرطبة")
+        with mock.patch.object(live_sources, "fetch_url", return_value=(body, 200, 50.0, None, 1)):
+            listings, status = live_sources.search_yebtah(request)
+        self.assertEqual(listings, [])
+        self.assertEqual(status["status"], "no_results")
+
+    def test_yebtah_tolerates_network_failures(self) -> None:
+        from unittest import mock
+        from backend.connectors import live_sources
+
+        request = parse_request("بيت للبيع في خيطان")
+        with mock.patch.object(live_sources, "fetch_url", return_value=("", 0, 1.0, "net down", 4)):
+            listings, status = live_sources.search_yebtah(request)
+        self.assertEqual(listings, [])
+        self.assertEqual(status["status"], "failed")
+        self.assertEqual(status["attempts"], 4)
+
+    def test_yebtah_is_wired_into_searchers_and_mechanisms(self) -> None:
+        from backend.connectors import live_sources
+
+        names = [name for name, _fn in live_sources.SEARCHERS]
+        self.assertIn("Yebtah", names)
+        mechanism = live_sources.source_mechanism("Yebtah")
+        self.assertIn("ItemList", mechanism["method"])
+        self.assertIn("yebtah.com", mechanism["endpoint"])
 
     def test_search_external_sources_can_run_one_selected_source(self) -> None:
         from unittest import mock

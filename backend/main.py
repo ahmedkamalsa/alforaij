@@ -128,7 +128,7 @@ def _is_local_platform_selected(selected: set[str]) -> bool:
 
 
 def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> list[dict]:
-    market_names = {"السوق المباشر", "بوشملان", "OpenSooq", "Mourjan", "Q8Aqar", "Sakan", "Waseet", "4Sale", "Bu3qar", "Aqarat", "NabdAqar"}
+    market_names = {"السوق المباشر", "بوشملان", "OpenSooq", "Mourjan", "Q8Aqar", "Sakan", "Waseet", "4Sale", "Bu3qar", "Aqarat", "NabdAqar", "Yebtah"}
     records = []
     if not selected or selected & market_names:
         try:
@@ -440,6 +440,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/sources":
             json_response(self, {"sources": source_registry()})
+            return
+        if path == "/api/market-analytics":
+            # تحليلات الحصاد المتراكم: كل موقع على حدة (عدد/مناطق/أسعار) من market_listings
+            from backend.services.supabase_store import fetch_market_analytics
+            try:
+                json_response(self, fetch_market_analytics())
+            except Exception as exc:
+                logger.exception("Market analytics failed")
+                json_response(self, {"error": "Market analytics failed", "detail": str(exc)}, status=500)
             return
         if path == "/api/dashboard/summary":
             params = parse_qs(urlparse(self.path).query)

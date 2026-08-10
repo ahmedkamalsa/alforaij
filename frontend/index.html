@@ -372,6 +372,18 @@
               <button id="runDailyAgentBtnInline" class="primary" type="button">تشغيل التحديث الآن</button>
             </div>
             <p id="dailyAgentStateInline" class="ops-status">سيظهر هنا وقت آخر تشغيل وحالته.</p>
+            <div id="marketAnalyticsStrip" class="ops-status ops-analytics"></div>
+            <details class="collapsible">
+              <summary>تحليلات الحصاد لكل موقع</summary>
+              <div class="table-scroll">
+                <table class="minitable">
+                  <thead>
+                    <tr><th>الموقع</th><th>إعلانات</th><th>مناطق</th><th>وسيط السعر (د.ك)</th><th>وسيط المساحة (م²)</th></tr>
+                  </thead>
+                  <tbody id="marketAnalyticsDetail"></tbody>
+                </table>
+              </div>
+            </details>
           </div>
         </div>
         <div id="dailyUpdateNotice" class="daily-update-notice" hidden></div>

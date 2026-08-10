@@ -2592,6 +2592,40 @@ async function loadDailyUpdateNotice() {
   }
 }
 
+async function loadMarketAnalytics() {
+  const strip = $("marketAnalyticsStrip");
+  const detail = $("marketAnalyticsDetail");
+  if (!strip && !detail) return;
+  try {
+    const analytics = await getJson("/api/market-analytics");
+    const totals = analytics.totals || {};
+    if (!analytics.tableOk) {
+      if (strip) strip.textContent = `الحصاد: الجدول غير مفعّل بعد — ${analytics.note || "شغّل migration 010 ثم الوكيل اليومي"}`;
+      if (detail) detail.innerHTML = "";
+      return;
+    }
+    if (strip) {
+      const last = String(totals.lastFetched || "").replace("T", " ").slice(0, 16);
+      strip.textContent = totals.rows
+        ? `حصاد السوق: ${totals.rows} إعلانًا من ${totals.sources} مواقع تغطي ${totals.areas} منطقة${last ? ` · آخر جلب ${last}` : ""} — كل إعلان يحمل الرابط الأصلي ووقت الجلب كدليل.`
+        : `حصاد السوق: الجدول جاهز ولا توجد صفوف بعد — شغّل الوكيل اليومي لبدء التراكم.`;
+    }
+    if (detail) {
+      const rows = (analytics.sources || [])
+        .map((s) => {
+          const medianPrice = s.price && s.price.median != null ? s.price.median.toLocaleString("en") : "—";
+          const medianSpace = s.space && s.space.median != null ? s.space.median.toLocaleString("en") : "—";
+          return `<tr><td>${escapeHtml(s.source)}</td><td>${s.count}</td><td>${(s.areas || []).length}</td><td>${medianPrice}</td><td>${medianSpace}</td></tr>`;
+        })
+        .join("");
+      detail.innerHTML = rows || '<tr><td colspan="5">لا توجد بيانات بعد.</td></tr>';
+    }
+  } catch (err) {
+    if (strip) strip.textContent = "حصاد السوق: غير متاح في هذا الوضع (يتطلب الباك إند الحي).";
+    if (detail) detail.innerHTML = "";
+  }
+}
+
 async function loadDailyAgentStatus() {
   const stateEl = $("dailyAgentState");
   const inlineStateEl = $("dailyAgentStateInline");
@@ -2606,9 +2640,11 @@ async function loadDailyAgentStatus() {
       inlineStateEl.textContent = `آخر تشغيل: ${finished || "لم يعمل بعد"} · الحالة: ${status.status || "غير معروف"} · التحديث المجدول 6:00 صباحًا.`;
     }
     renderDailyAgentOfficialSources(status);
+    loadMarketAnalytics();
   } catch (err) {
     if (stateEl) stateEl.textContent = "تعذر قراءة حالة الوكيل";
     if (inlineStateEl) inlineStateEl.textContent = "تعذر قراءة حالة الوكيل من الباك إند.";
+    loadMarketAnalytics();
   }
 }
 
