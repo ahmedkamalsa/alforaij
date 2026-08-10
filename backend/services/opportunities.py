@@ -242,6 +242,35 @@ def _deal_profit(client: dict[str, Any], listing_price: float | None) -> dict[st
     }
 
 
+def _extract_budget_from_text(text: str) -> float | None:
+    """استخراج ميزانية شراء من نص طلب («بحدود 300 الف»، «حدود 250 ألف»، «ميزانية 180-200»).
+
+    القيمة بالدينار الكويتي؛ «ألف/الف» تُضرب في 1000. تُرجع None عند عدم وجود ميزانية واضحة.
+    """
+    normalized = " ".join((text or "").split())
+    # إزالة أرقام الهواتف الكويتية كاملة من النص حتى لا تُلتقط كجزء من الميزانية
+    normalized = re.sub(r"(?:\+?965)?\s?[24569]\d{7}", " ", normalized)
+    pattern = re.compile(
+        r"(?:بحدود|حدود|بحدود|في حدود|بحدو|الميزانية|ميزانية|بميزانية)?\s*"
+        r"(\d{2,6})\s*(?:الف|ألف|الف دينار|ألف دينار)?"
+        r"(?:\s*(?:الى|إلى|الي|او|أو|-|ـ)\s*(\d{2,6})\s*(?:الف|ألف)?)?",
+        re.IGNORECASE,
+    )
+    for match in pattern.finditer(normalized):
+        first = int(match.group(1))
+        thousand = "الف" in (match.group(0) or "") or "ألف" in (match.group(0) or "")
+        low = first * 1000 if thousand else first
+        if low < 5_000 or low > 50_000_000:
+            continue
+        high_raw = match.group(2)
+        if high_raw:
+            high = int(high_raw) * (1000 if thousand else 1)
+            # نطاق: الوسيط (مثل «180 الى 200 الف» → 190,000)
+            return round((low + high) / 2, 0)
+        return float(low)
+    return None
+
+
 def clients_from_demand_listings(listings: list[Any]) -> list[dict[str, Any]]:
     """حوّل إعلانات الطلب (مطلوب للشراء) من الفريج أو المواقع الخارجية إلى عملاء محتملين."""
     clients: list[dict[str, Any]] = []
@@ -258,11 +287,16 @@ def clients_from_demand_listings(listings: list[Any]) -> list[dict[str, Any]]:
         phones = "|".join(dict.fromkeys(match.replace(" ", "") for match in phone_pattern.findall(text)))
         if not phones:
             continue
+        # ميزانية العميل: حقل السعر إن وُجد، وإلا تُستخرج من نص الطلب («بحدود 300 الف»)
+        # حتى تُحسب فرص المكسب الرقمية للطلبات التي لا تحمل سعرًا صريحًا.
+        price = getattr(listing, "price", None)
+        if not price:
+            price = _extract_budget_from_text(text)
         clients.append({
             "code": f"DEMAND-{getattr(listing, 'code', '')}",
             "area": getattr(listing, "area", "") or "",
             "type": getattr(listing, "property_type", "") or getattr(listing, "detail_class", "") or "",
-            "price": f"{float(getattr(listing, 'price', 0)):,.0f}" if getattr(listing, "price", None) else "",
+            "price": f"{float(price):,.0f}" if price else "",
             "phones": phones,
             "message": text[:300],
             "source": getattr(listing, "source", "") or "market_demand",
@@ -393,7 +427,12 @@ def _score_listings(listings, clients: list[dict[str, Any]]) -> tuple[list[dict[
         if tx.startswith("مطلوب"):
             skipped_demand += 1
             continue
-        if listing.price < (20 if tx.startswith("للإيجار") else 5000):
+        # أسعار وهمية/نائبة من صفحات المصادر (9,999 / 5,000 د.ك بيع، 70 د.ك إيجار) تمرّ
+        # بالحدود المنخفضة السابقة وتتصدر «أفضل الفرص» كأنها صفقات حقيقية. الحد الواقعي
+        # مبني على أدنى أسعار السوق المحلي الفعلي (41,000 د.ك بيع / 250 د.ك إيجار) بهامش أمان.
+        min_sale = 20_000
+        min_rent = 120
+        if listing.price < (min_rent if tx.startswith("للإيجار") else min_sale):
             skipped_unreal += 1
             continue
         comps = comparable_pool(listing, listings)

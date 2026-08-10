@@ -378,5 +378,15 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(request.governorates, [])
 
 
+    def test_parse_request_sulaibikhat_area(self) -> None:
+        """«صليبيخات» تُلتقط كمنطقة، و«شمال غرب الصليبيخات» لا تتسع لمنطقة مضمّنة."""
+        from backend.services.request_parser import parse_request
+
+        r = parse_request("بيع بيت في صليبيخات 300 متر قديم بحدود 160 الف")
+        self.assertEqual(r.areas, ["الصليبيخات"])
+        r2 = parse_request("بيت شمال غرب الصليبيخات 400م")
+        self.assertEqual(r2.areas, ["شمال غرب الصليبيخات"])
+
+
 if __name__ == "__main__":
     unittest.main()

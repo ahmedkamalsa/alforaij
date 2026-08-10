@@ -41,7 +41,7 @@ KNOWN_AREAS = [
     # محافظة الجهراء
     "الجهراء", "المطلاع", "جابر الأحمد", "جابر الاحمد",
     "سعد العبدالله", "الصليبية", "الوهاب", "تيماء",
-    "شمال غرب الصليبيخات", "الواحة", "كاظمة",
+    "شمال غرب الصليبيخات", "الصليبيخات", "الواحة", "كاظمة",
     "القصر", "الجهراء الجديدة", "الأمغرة",
 ]
 
@@ -90,6 +90,7 @@ AREA_ALIASES: dict[str, list[str]] = {
     "جابر الأحمد": ["جابر الاحمد", "جابر احمد", "jaber al ahmed", "jaber al-ahmed"],
     "سعد العبدالله": ["سعد عبدالله", "saad al abdallah", "saad al-abdallah"],
     "شمال غرب الصليبيخات": ["شمال غرب صليبيخات", "north west sulaibikhat", "nwsk"],
+    "الصليبيخات": ["صليبيخات", "الصليبخات", "الصليبيخات", "sulaibikhat", "sulai bikhat"],
     "صباح السالم": ["صباح السالم", "sabah al salem", "sabah al-salem"],
     "السالمية": ["سالمية", "salmiya", "salamiya"],
     "الرميثية": ["رميثية", "rumaithiya", "rumaithia"],
@@ -351,6 +352,12 @@ def parse_request(raw_text: str) -> PropertyRequest:
             continue
         if text_has_area(area, raw_text) and area not in areas:
             areas.append(area)
+    # منطقة مضمّنة داخل منطقة أطول مطابقة (مثل «الصليبيخات» داخل «شمال غرب الصليبيخات»)
+    # لا تُحتسب كمنطقة مستقلة حتى لا يتسع البحث عن غير قصد
+    areas = [
+        a for a in areas
+        if not any(b != a and a in b and text_has_area(b, raw_text) for b in areas)
+    ]
     # المحافظات (بـ «محافظة» صراحة)
     governorates = [area for area in GOVERNORATE_AREA_NAMES if _is_governorate_mention(area, normalized)]
     # ذكر محافظة بلا «محافظة» قبلها (مثل «بالعاصمة» أو «فروانية»): تُوسَّع لمناطقها حتى

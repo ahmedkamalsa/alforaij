@@ -439,6 +439,81 @@ class TestOpportunities(unittest.TestCase):
                 rows = opportunities._load_csv_clients()
                 self.assertEqual(len(rows), 1)
                 self.assertEqual(rows[0]["phones"], "01064955051")
+    def test_unrealistic_prices_are_excluded_from_opportunities(self) -> None:
+        """أسعار نائبة/وهمية (9,999 بيع، 70 إيجار) لا تدخل الفرص، والسعر الواقعي يبقى."""
+        from backend.models import Listing
+        from backend.services.opportunities import _score_listings
+
+        def make(code: str, tx: str, price: float, source: str = "OpenSooq") -> Listing:
+            return Listing(
+                code=code,
+                transaction=tx,
+                governorate="",
+                area="حولي",
+                property_type="بيت",
+                detail_class="",
+                price=price,
+                price_text=str(price),
+                space=300,
+                listing_mode="",
+                summary="x",
+                features="",
+                published_date="",
+                original_url="",
+                source=source,
+            )
+
+        listings = [
+            make("FAKE-SALE", "للبيع", 9999),
+            make("FAKE-RENT", "للإيجار", 70),
+            make("REAL-SALE", "للبيع", 41000, source="الفريج"),
+        ]
+        scored, _skipped_demand, skipped_unreal = _score_listings(listings, [])
+        codes = [item["code"] for item in scored]
+        self.assertNotIn("FAKE-SALE", codes)
+        self.assertNotIn("FAKE-RENT", codes)
+        self.assertIn("REAL-SALE", codes)
+        self.assertGreaterEqual(skipped_unreal, 2)
+
+    def test_budget_extracted_from_demand_text(self) -> None:
+        """ميزانية طلب الشراء تُستخرج من النص (بحدود/حدود/ألف) وتُتجاهل أرقام الهواتف."""
+        from backend.services.opportunities import _extract_budget_from_text
+
+        self.assertEqual(_extract_budget_from_text("بيت حكومية حدود 300 الف"), 300000.0)
+        self.assertEqual(_extract_budget_from_text("بحدود 180 الى 200 الف"), 190000.0)
+        self.assertEqual(_extract_budget_from_text("ميزانية 250 الف دينار"), 250000.0)
+        # رقم الهاتف ليس ميزانية
+        self.assertIsNone(_extract_budget_from_text("مطلوب شراء بيت 📱 55559950 | 41060118"))
+        # نص بلا ميزانية
+        self.assertIsNone(_extract_budget_from_text("مطلوب بيت في المطلاع 3 ادوار"))
+
+    def test_demand_listings_become_clients_with_phones(self) -> None:
+        """إعلان طلب شراء (مطلوب + شراء + هاتف) يتحول لعميل برقم هاتف قابل للتواصل."""
+        from backend.models import Listing
+        from backend.services.opportunities import clients_from_demand_listings
+
+        demand = Listing(
+            code="AF-285",
+            transaction="مطلوب للشراء",
+            governorate="",
+            area="صباح السالم",
+            property_type="بيت",
+            detail_class="",
+            price=None,
+            price_text="",
+            space=None,
+            listing_mode="",
+            summary="مطلوب شراء بيت في صباح السالم بحدود 300 الف 📱 55559950",
+            features="",
+            published_date="",
+            original_url="",
+            source="الفريج",
+        )
+        clients = clients_from_demand_listings([demand])
+        self.assertEqual(len(clients), 1)
+        self.assertEqual(clients[0]["area"], "صباح السالم")
+        self.assertEqual(clients[0]["price"], "300,000")
+        self.assertIn("55559950", clients[0]["phones"])
 
 
 if __name__ == "__main__":

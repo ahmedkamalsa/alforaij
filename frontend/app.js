@@ -2722,9 +2722,22 @@ async function importOfficialTransactions() {
 async function loadOpportunities(forceRefresh = false) {
   const root = $("oppList");
   if (!root) return;
-  root.innerHTML = '<div class="empty">جاري تحميل أفضل الفرص...</div>';
+  const refreshBtn = $("oppRefreshBtn");
+  if (forceRefresh) {
+    root.innerHTML = '<div class="empty">جاري إعادة فحص كل المصادر الخارجية (قد يستغرق حتى دقيقة)...</div>';
+    if (refreshBtn) {
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = "جاري التحديث...";
+    }
+  } else {
+    root.innerHTML = '<div class="empty">جاري تحميل أفضل الفرص...</div>';
+  }
   try {
     oppState.data = await getJson(`/api/opportunities${forceRefresh ? "?refresh=1" : ""}`);
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = "تحديث الفرص";
+    }
 
     const allItems = Object.values(oppState.data.tiers || {}).flatMap((tier) => tier.items || []);
     fillOppSelect("oppGovFilter", allItems.map((item) => item.governorate));
@@ -2738,6 +2751,11 @@ async function loadOpportunities(forceRefresh = false) {
     updateOppTabCount();
   } catch (err) {
     console.error(err);
+    const refreshBtn = $("oppRefreshBtn");
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = "تحديث الفرص";
+    }
     root.innerHTML = `<div class="empty">تعذر تحميل الفرص: ${escapeHtml(err.message)}</div>`;
   }
 }
