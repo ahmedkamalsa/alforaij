@@ -18,11 +18,16 @@ class DailyUpdateAgentTests(unittest.TestCase):
             mock.patch.object(daily_update_agent, "save_opportunities"), \
             mock.patch.object(daily_update_agent, "supabase_data_summary", return_value={"tables": {}}), \
             mock.patch.object(daily_update_agent, "save_update_notifications"), \
+            mock.patch("backend.services.whatsapp_sender.send_whatsapp_alerts", \
+                       return_value={"status": "not_configured", "sent": 0, "failed": 0, "total": 0}), \
             mock.patch.object(daily_update_agent, "_write_status"):
             result = daily_update_agent.run_daily_update_agent(include_external=False)
 
         self.assertEqual(result["status"], "success")
-        self.assertIn("build_and_save_opportunities", [step["name"] for step in result["steps"]])
+        step_names = [step["name"] for step in result["steps"]]
+        self.assertIn("build_and_save_opportunities", step_names)
+        # خطوة إرسال تنبيهات واتساب موجودة دائمًا ولا تكسر الوكيل عند غياب الضبط
+        self.assertIn("send_whatsapp_alerts", step_names)
 
     def test_build_price_trends_groups_medians_by_area_type_month(self) -> None:
         from backend.services.daily_update_agent import _build_price_trends

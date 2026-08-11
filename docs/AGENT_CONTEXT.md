@@ -263,6 +263,14 @@ SSO ملكي — فحصناه)، فالهواتف تأتي من Q8Aqar/Mourjan/4
    كويتية (RSS/HTML بكلمات عقارية + سياق كويتي)، يفحص منصات مرشحة، ويحفظ في
    `market_developments` + `data/market_developments.json` (لا يُفشل الوكيل أبدًا).
 8. `build_update_notifications` + `save_update_notifications` — إشعارات التغيير.
+9. `send_whatsapp_alerts` — **إرسال تنبيهات واتساب المجدولة** (`backend/services/whatsapp_sender.py`):
+   يقارن آخر لقطتين (`build_whatsapp_alerts`) فيرسل رسالة فعلية عبر Meta Cloud API لكل
+   عميل مسجل (CSV/Supabase) يطابق فرصة جديدة أو انخفاض سعر. غياب الضبط
+   (`WHATSAPP_TOKEN`/`WHATSAPP_PHONE_ID` في `.env`) لا يكسر الوكيل: يُسجَّل
+   `not_configured` في الخطوة وتظهر تعليمات الإعداد في تبويب المصادر. سجل محلي
+   `data/whatsapp_send_log.json` يمنع تكرار الإرسال لنفس (إعلان × رقم × نوع) في اليوم،
+   وكل إرسال يُسجَّل في `outreach_clicks` (action=send, channel=whatsapp_agent)
+   ليظهر في عدّادات التفاعل.
 
 الجدولة المقترحة: يوميًا 06:00 (عبر `daily-data-update.yml` — cron 0 3 * * * UTC).
 

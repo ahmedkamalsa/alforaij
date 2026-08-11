@@ -54,6 +54,12 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
 AGENT_ROUTER_API_KEY = os.getenv("AGENT_ROUTER_API_KEY", "")
 AGENT_ROUTER_API_URL = os.getenv("AGENT_ROUTER_API_URL", "https://api.agentrouter.org/v1/chat/completions")
+
+# إرسال تنبيهات واتساب المجدولة (Meta Cloud API) — اختياري: غيابها يعطّل الإرسال
+# التلقائي دون كسر الوكيل اليومي (تبقى أزرار wa.me اليدوية كما هي).
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
+WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "")
+WHATSAPP_SENDER_NAME = os.getenv("WHATSAPP_SENDER_NAME", "فريق الفريج العقاري")
 SEED_LISTINGS_PATH = Path(os.getenv("ALFORAIJ_SEED_LISTINGS", DATA_DIR / "seed_listings.json"))
 BOARD_HTML_PATH = Path(
     os.getenv(

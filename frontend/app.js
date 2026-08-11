@@ -3817,9 +3817,25 @@ async function loadMarketAnalytics() {
   }
 }
 
+function whatsappSendStatusText(status) {
+  const steps = status.steps || [];
+  const step = steps.find((s) => s.name === "send_whatsapp_alerts");
+  if (!step) return "";
+  const r = step.result || {};
+  if (r.status === "not_configured") {
+    return "تنبيهات واتساب: الإرسال التلقائي غير مفعّل — أضف WHATSAPP_TOKEN و WHATSAPP_PHONE_ID في .env (Meta Cloud API) ليتواصل الوكيل اليومي مع العملاء المطابقين تلقائيًا.";
+  }
+  if (r.status === "failed") return `تنبيهات واتساب: فشل الإرسال — ${escapeHtml(r.error || "خطأ غير معروف")}`;
+  const sent = r.sent || 0;
+  const failed = r.failed || 0;
+  const skipped = r.skippedDuplicates || 0;
+  return `تنبيهات واتساب: أُرسلت ${sent} رسالة${failed ? ` · فشل ${failed}` : ""}${skipped ? ` · مكرر اليوم ${skipped}` : ""} (جديد/انخفاض يطابق عملاء مسجلين).`;
+}
+
 async function loadDailyAgentStatus() {
   const stateEl = $("dailyAgentState");
   const inlineStateEl = $("dailyAgentStateInline");
+  const waStateEl = $("dailyAgentWhatsAppInline");
   try {
     const status = await getJson("/api/daily-agent/status");
     if (stateEl) {
@@ -3829,6 +3845,11 @@ async function loadDailyAgentStatus() {
     if (inlineStateEl) {
       const finished = status.finishedAt ? String(status.finishedAt).replace("T", " ").slice(0, 16) : "";
       inlineStateEl.textContent = `آخر تشغيل: ${finished || "لم يعمل بعد"} · الحالة: ${status.status || "غير معروف"} · التحديث المجدول 6:00 صباحًا.`;
+    }
+    if (waStateEl) {
+      const text = whatsappSendStatusText(status);
+      waStateEl.textContent = text || "";
+      waStateEl.hidden = !text;
     }
     renderDailyAgentOfficialSources(status);
     loadMarketAnalytics();

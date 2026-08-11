@@ -281,6 +281,25 @@ def run_daily_update_agent(
         save_update_notifications(notifications)
         step("build_update_notifications", notifications.get("counts") or {})
 
+        # إرسال تنبيهات واتساب المجدولة: مقارنة آخر لقطتين → فرص جديدة أو
+        # انخفاض سعر يطابق عملاء مسجلين → رسالة فعلية لكل رقم عبر Meta Cloud API.
+        # لا يكسر الوكيل أبدًا: غياب الضبط يعيد not_configured ويُسجَّل كخطوة.
+        whatsapp_result: dict[str, Any] = {"status": "not_configured", "sent": 0, "failed": 0, "total": 0}
+        try:
+            from backend.services.opportunities import build_whatsapp_alerts
+            from backend.services.whatsapp_sender import send_whatsapp_alerts
+
+            alerts_payload = build_whatsapp_alerts(previous_snapshot, snapshot)
+            whatsapp_result = send_whatsapp_alerts(alerts_payload.get("alerts", []))
+            step(
+                "send_whatsapp_alerts",
+                {k: whatsapp_result.get(k) for k in ("status", "sent", "failed", "skippedDuplicates", "total")},
+                "ok" if whatsapp_result.get("status") in ("sent", "partial", "empty", "not_configured") else "needs_setup",
+            )
+        except Exception as exc:
+            logger.exception("send_whatsapp_alerts failed")
+            step("send_whatsapp_alerts", {"status": "failed", "error": str(exc)}, "ok")
+
         finished = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         status.update({
             "status": "success",
@@ -291,6 +310,12 @@ def run_daily_update_agent(
                 "marketListingsHarvested": harvest.get("count", 0),
                 "opportunitiesScored": snapshot.get("totalScored", 0),
                 "notificationCounts": notifications.get("counts") or {},
+                "whatsappAlerts": {
+                    "status": whatsapp_result.get("status"),
+                    "sent": whatsapp_result.get("sent"),
+                    "failed": whatsapp_result.get("failed"),
+                    "total": whatsapp_result.get("total"),
+                },
                 "officialReferenceSources": reference_sources,
                 "dataSummary": summary,
             },
