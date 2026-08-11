@@ -1383,6 +1383,46 @@ def _yebtah_price(name: str) -> float | None:
     return float(match.group(1).replace(",", "")) if match else None
 
 
+def _yebtah_bedrooms(name: str) -> int | None:
+    """عدد غرف النوم من «6-Bed Chalet …» أو «Studio»."""
+    match = re.search(r"(\d+)\s*-?\s*bed", name, re.I)
+    if match:
+        return int(match.group(1))
+    if "studio" in name.lower():
+        return 0
+    return None
+
+
+def _yebtah_arabic_summary(
+    name: str,
+    transaction: str,
+    area_ar: str,
+    gov_ar: str,
+    price: float | None,
+    fallback_type: str,
+) -> str:
+    """بناء وصف عربي مقروء من بيانات Yebtah بدل العنوان الإنجليزي الخام
+    («6-Bed Chalet For Sale in Ahmadi …» ← «شاليه 6 غرف للبيع في الأحمدي — 95,000 د.ك»)."""
+    prop_type = _yebtah_type(name, fallback_type)
+    beds = _yebtah_bedrooms(name)
+    parts = [prop_type]
+    if beds is not None:
+        parts.append(f"{beds} غرفة" if beds > 0 else "استوديو")
+    parts.append(transaction or "")
+    location_parts = [part for part in (area_ar, gov_ar) if part]
+    if location_parts:
+        parts.append("في " + "، ".join(location_parts))
+    summary = "، ".join(part for part in parts if part)
+    if price:
+        # نفس قاعدة التحويل في listing_from_text: بيع بيت/أرض/عمارة بأقل من 10 آلاف
+        # يُفهم كألف د.ك (المصادر تكتب «95 KWD» وتعني 95,000) — نعرض السعر الفعلي الموحّد
+        display_price = price
+        if transaction == "للبيع" and prop_type in {"بيت", "أرض", "عمارة"} and price < 10_000:
+            display_price = price * 1000
+        summary += f" — {display_price:,.0f} د.ك"
+    return summary or clean_text(name)[:200]
+
+
 def _fetch_yebtah_page(mode: str, fallback_transaction: str) -> tuple[list[Listing], dict[str, Any]]:
     """جلب صفحة Yebtah (for_sale/for_rent) وتحويل كروت ItemList إلى إعلانات."""
     url = f"https://yebtah.com/en/{mode}"
@@ -1407,19 +1447,26 @@ def _fetch_yebtah_page(mode: str, fallback_transaction: str) -> tuple[list[Listi
                 code = "YEB-" + href.rstrip("/").split("/")[-1]
                 transaction = _yebtah_transaction(name, fallback_transaction)
                 area_ar, gov_ar = _yebtah_place(name)
+                price = _yebtah_price(name)
+                # العنوان الإنجليزي الخام لا يفيد المستخدم — نبني وصفًا عربيًا مقروءًا
+                # («شاليه 6 غرف للبيع في الأحمدي — 95,000 د.ك») مع حفظ النص الأصلي للدليل.
+                arabic = _yebtah_arabic_summary(name, transaction, area_ar, gov_ar, price, "")
                 listing = listing_from_text(
                     source="Yebtah",
                     code=code,
                     url=href,
-                    title=name,
-                    description=name,
-                    price=_yebtah_price(name),
+                    title=arabic,
+                    description=arabic,
+                    price=price,
                     transaction=transaction,
                     fallback_type=_yebtah_type(name, ""),
                 )
                 # المنطقة/المحافظة إنجليزية في الاسم → نملأ العربية المعادلة للفلاتر والتقييم
                 listing.area = area_ar or listing.area
                 listing.governorate = gov_ar or listing.governorate
+                # النص الإنجليزي الأصلي يُحفظ كدليل وليس كملخص معروض
+                listing.raw = dict(listing.raw or {})
+                listing.raw["originalTitle"] = name
                 listings.append(listing)
     return listings, {
         "status": "success" if listings else ("no_results" if not error else "failed"),

@@ -2170,14 +2170,17 @@ function renderSimilarExternal(report) {
   box.innerHTML = items.map((item) => {
     const price = item.priceText || formatMoney(item.price) || "غير معلن";
     const space = item.space ? `${item.space} م²` : "مساحة غير مذكورة";
-    const priceDelta = signedNumber(item.priceDelta, " د.ك");
-    const spaceDelta = signedNumber(item.spaceDelta, " م²");
     const published = dateText(item.publishedDate);
     const views = viewsText(item);
     const reasons = (item.reasons || []).slice(0, 5).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("");
     const link = item.originalUrl
       ? `<a href="${escapeHtml(item.originalUrl)}" target="_blank" rel="noreferrer">فتح المصدر</a>`
       : "";
+    // صفوف الفروق تُعرض فقط عندما تكون محسوبة فعلًا — لا «غير محسوب» بلا فائدة
+    const deltas = [
+      item.priceDelta != null ? `<span><b>فرق السعر</b>${escapeHtml(signedNumber(item.priceDelta, " د.ك"))}</span>` : "",
+      item.spaceDelta != null ? `<span><b>فرق المساحة</b>${escapeHtml(signedNumber(item.spaceDelta, " م²"))}</span>` : "",
+    ].join("");
     return `
       <article class="similar-external-card">
         <div>
@@ -2190,8 +2193,7 @@ function renderSimilarExternal(report) {
           <span><b>المساحة</b>${escapeHtml(space)}</span>
           <span><b>تاريخ الإعلان</b>${escapeHtml(published)}</span>
           <span><b>المشاهدات</b>${escapeHtml(views)}</span>
-          <span><b>فرق السعر</b>${escapeHtml(priceDelta)}</span>
-          <span><b>فرق المساحة</b>${escapeHtml(spaceDelta)}</span>
+          ${deltas}
         </div>
         <details>
           <summary>سبب التشابه والدليل</summary>

@@ -431,12 +431,20 @@ class LiveSourceParsingTests(unittest.TestCase):
         self.assertEqual(sale.governorate, "محافظة حولي")
         self.assertEqual(sale.price, 350000)
         self.assertIn("yebtah.com/en/property/abc123", sale.original_url)
+        # الملخص المعروض عربي مقروء وليس العنوان الإنجليزي الخام، والنص الأصلي محفوظ كدليل
+        self.assertIn("بيت", sale.summary)
+        self.assertIn("6 غرفة", sale.summary)
+        self.assertIn("السالمية", sale.summary)
+        self.assertNotIn("Villa", sale.summary)
+        self.assertEqual((sale.raw or {}).get("originalTitle"), "6-Bed Villa For Sale in Salmiya, Hawalli - 350,000 KWD")
         rent = next(item for item in listings if item.code == "YEB-def456")
         self.assertEqual(rent.transaction, "للإيجار")
         self.assertEqual(rent.property_type, "شقة")
         self.assertEqual(rent.area, "قرطبة")
         self.assertEqual(rent.governorate, "محافظة العاصمة")
         self.assertEqual(rent.price, 420)
+        self.assertIn("استوديو" if False else "3 غرفة", rent.summary)
+        self.assertNotIn("Apartment", rent.summary)
 
     def test_yebtah_broad_scan_keeps_both_sale_and_rent(self) -> None:
         from unittest import mock
