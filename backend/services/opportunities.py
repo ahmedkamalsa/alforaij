@@ -59,7 +59,7 @@ from backend.connectors.live_sources import (
 )
 from backend.models import PropertyRequest
 from backend.services.official_valuation import get_area_benchmark
-from backend.services.valuation import comparable_pool, price_label
+from backend.services.valuation import comparable_pool, price_label, sale_rental_yield, investment_verdict
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 CLIENTS_PATH = DATA_DIR / "potential_leads.csv"
@@ -426,6 +426,15 @@ def _listing_opportunity(listing, valuation, clients: list[dict[str, Any]]) -> d
         opportunity["medianRent"] = valuation.median_rent
         opportunity["capitalValue"] = valuation.capital_value
         opportunity["rentalYieldPercent"] = valuation.rental_yield_percent
+    # العائد الإيجاري السنوي لعروض البيع المؤجرة («مؤجر ب 1200 شهرياً» / «دخله X»):
+    # الدخل مذكور في الإعلان نفسه فيُحسب العائد من السعر المطلوب ويظهر في بطاقة الفرصة
+    else:
+        annual_rent, sale_yield = sale_rental_yield(listing.price, getattr(listing, "rental_income", None), getattr(listing, "rental_income_period", ""))
+        if sale_yield is not None:
+            opportunity["annualRent"] = annual_rent
+            opportunity["rentalYieldPercent"] = sale_yield
+            opportunity["rentalYieldVerdict"] = investment_verdict(sale_yield)
+            opportunity["rentalYieldNote"] = f"الدخل المذكور {'شهري' if getattr(listing, 'rental_income_period', '') == 'monthly' else 'سنوي'} في الإعلان"
     # ربط العملاء المحتملين — يُربط بعروض البيع فقط؛ ميزانية شراء العميل لا تُقارن بإيجار شهري
     opportunity["clients"] = (
         []

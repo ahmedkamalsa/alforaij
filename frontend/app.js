@@ -544,6 +544,34 @@ function parseQueryFilters(text) {
   return parsed;
 }
 
+// استخراج الدخل الإيجاري من نص إعلان/طلب في المتصفح («مؤجر ب 1200 شهرياً»، «دخله 20 الف»)
+// — مطابق لمنطق extract_rental_income في الباك إند للوضع الثابت بلا خادم
+function clientExtractRentalIncome(text) {
+  let normalized = String(text || "").replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+    .replace(/[إأآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/ـ/g, "")
+    .replace(/\s+/g, " ").trim();
+  const patterns = [
+    // مؤجر/مؤجره (ب) X (فترة) — الافتراضي شهري
+    { re: /مؤجره?\s+(?:ب)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:دينار|د\.ك|ك\s*د)?\s*(شهريا?|سنويا?|بالشهر|بالسنه|في الشهر|فى الشهر|للشهر|كل شهر)?/, defaultPeriod: "monthly" },
+    // دخلها/دخله/ايجارها/قيمه ايجارها X (فترة) — الافتراضي سنوي
+    { re: /(?:دخل(?:ها|ه)?|الدخل|مدخولها|ايجارها|قيمه ايجارها|قيمه ايجاره)\s*(?:ب)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:دينار|د\.ك|ك\s*د)?\s*(?:الف|ألف)?\s*(شهريا?|سنويا?|بالشهر|بالسنه|في الشهر|فى الشهر|للشهر|كل شهر)?/, defaultPeriod: "annual" },
+  ];
+  for (const { re, defaultPeriod } of patterns) {
+    const m = normalized.match(re);
+    if (!m) continue;
+    let amount = parseFloat(m[1]);
+    if (m[0].includes("الف") || m[0].includes("ألف")) amount *= 1000;
+    else if (amount < 100) amount *= 1000;
+    const periodRaw = m[2] || "";
+    let period = defaultPeriod;
+    if (periodRaw.includes("شهري") || periodRaw.includes("الشهر") || periodRaw.includes("كل شهر")) period = "monthly";
+    else if (periodRaw.includes("سنوي") || periodRaw.includes("السنه")) period = "annual";
+    return { amount, period };
+  }
+  return null;
+}
+
 function staticAnalyzeReport(payload) {
   const filters = payload.filters || {};
   const text = String(payload.text || "");
@@ -554,6 +582,8 @@ function staticAnalyzeReport(payload) {
   const minArea = Number(filters.minArea || parsed.minArea || 0);
   const maxArea = Number(filters.maxArea || parsed.maxArea || 0);
   const budget = Number(filters.budget || filters.rentBudget || parsed.budget || 0);
+  // الدخل الإيجاري من نص الطلب («مؤجر ب 1200 شهرياً») — لحساب العائد في الوضع الثابت
+  const requestIncome = clientExtractRentalIncome(text);
   const sourceScope = selectedBoardPlatforms();
   let rows = (boardState.allRecords || boardState.records || []).slice();
 
@@ -594,6 +624,10 @@ function staticAnalyzeReport(payload) {
         url: other.originalUrl,
         summary: other.summary,
       }));
+    const isRentalRow = normalizeArabic(row.transaction).includes("إيجار");
+    const annualRent = !isRentalRow && requestIncome && price ? (requestIncome.period === "monthly" ? requestIncome.amount * 12 : requestIncome.amount) : null;
+    const rentalYieldPercent = annualRent && price ? Math.round(annualRent / price * 1000) / 10 : null;
+    const rentalYieldVerdict = rentalYieldPercent != null ? (rentalYieldPercent >= 6 ? "قوي" : rentalYieldPercent >= 4 ? "متوسط" : "ضعيف") : "";
     return {
       code: row.code || "STATIC",
       area: row.area,
@@ -609,6 +643,9 @@ function staticAnalyzeReport(payload) {
       publishedDate: row.publishedDate,
       originalUrl: row.originalUrl,
       phone: row.phone || "",
+      annualRent,
+      rentalYieldPercent,
+      rentalYieldVerdict,
       summary: row.summary || row.features || "",
       features: row.features || "",
       recommendationScore: Math.round(score),
@@ -2046,6 +2083,21 @@ function scoreItem(label, value, type = "") {
   return `<div class="score-item ${type}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
 }
 
+// حكم استثماري للعائد الإيجاري السنوي: قوي (≥6%) / متوسط (4-6%) / ضعيف (<4%)
+function yieldVerdictLabel(verdict) {
+  if (verdict === "قوي") return "استثماري قوي";
+  if (verdict === "متوسط") return "استثماري متوسط";
+  if (verdict === "ضعيف") return "استثماري ضعيف";
+  return "";
+}
+
+function yieldVerdictTone(verdict) {
+  if (verdict === "قوي") return "yield-strong";
+  if (verdict === "متوسط") return "yield-mid";
+  if (verdict === "ضعيف") return "yield-weak";
+  return "";
+}
+
 function sourceItem(label, source) {
   if (!source) return "";
   const value = source.display ?? source.value ?? "غير متاح";
@@ -2404,10 +2456,10 @@ function renderReport(report) {
       scoreItem("السعر", item.priceText || item.price),
       scoreItem("المساحة", item.space ? `${item.space} م²` : "غير مذكورة"),
       scoreItem("تاريخ الإعلان", dateText(item.publishedDate)),
-      scoreItem("المشاهدات", viewsText(item)),
-      scoreItem("وسيط المقارنات", formatMoney(item.marketMedian)),
-      scoreItem("فجوة السعر (سعر ÷ وسيط المنطقة)", gapText(item)),
-      scoreItem("مطابقة الطلب", `${Math.round(item.matchScore || 0)} / 100`),
+      scoreItem("المشاهدات", viewsText(item)),    scoreItem("وسيط المقارنات", formatMoney(item.marketMedian)),
+    scoreItem("فجوة السعر (سعر ÷ وسيط المنطقة)", gapText(item)),
+    item.rentalYieldPercent != null ? scoreItem("العائد الإيجاري السنوي", `${item.rentalYieldPercent}% — ${yieldVerdictLabel(item.rentalYieldVerdict)}`, yieldVerdictTone(item.rentalYieldVerdict)) : "",
+    scoreItem("مطابقة الطلب", `${Math.round(item.matchScore || 0)} / 100`),
     ].join("");
     const quality = item.dataQuality || {};
     const trust = item.sourceTrust || {};
@@ -2877,6 +2929,10 @@ function oppWhatsAppSummary(item) {
   ];
   if (item.space) lines.push(`📐 المساحة: ${item.space} م²`);
   if (!isRental && item.pricePerSqm) lines.push(`💵 سعر المتر: ${item.pricePerSqm} د.ك/م²`);
+  if (!isRental && item.rentalYieldPercent != null) {
+    const verdict = item.rentalYieldVerdict ? ` (${item.rentalYieldVerdict})` : "";
+    lines.push(`📈 العائد الإيجاري: ${item.rentalYieldPercent}% سنويًا${verdict}`);
+  }
   if (item.valuationLabel) {
     const official = item.officialValue ? ` (قيمة مقدرة ${oppMoney(item.officialValue)})` : "";
     lines.push(`📊 التقييم: ${item.valuationLabel}${official}`);
@@ -2954,6 +3010,7 @@ function oppCard(item, index) {
     scoreItem("التقييم", oppMoney(item.officialValue)),
     scoreItem("أساس التقييم", oppSourceKindLabel(item)),
     scoreItem("مقارنات", item.comparablesCount),
+    item.rentalYieldPercent != null ? scoreItem("العائد الإيجاري السنوي", `${item.rentalYieldPercent}% — ${yieldVerdictLabel(item.rentalYieldVerdict)}`, yieldVerdictTone(item.rentalYieldVerdict)) : "",
     scoreItem("الثقة", `${Math.round((item.confidence || 0) * 100)}%`, "confidence"),
     scoreItem("جاذبية السعر", `${Math.round(item.dealScore || 0)}/100`),
   ];

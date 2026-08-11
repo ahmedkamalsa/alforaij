@@ -2372,6 +2372,30 @@ button:hover {
   border-color: #b7dfc2;
 }
 
+/* ألوان الحكم الاستثماري للعائد الإيجاري السنوي: قوي/متوسط/ضعيف */
+.score-item.yield-strong {
+  background: var(--green-soft);
+  border-color: #b7dfc2;
+}
+
+.score-item.yield-mid {
+  background: var(--accent-soft, var(--blue-soft, #EFF6FF));
+  border-color: #BFDBFE;
+}
+
+.score-item.yield-weak {
+  background: var(--warn-soft, #FFF7ED);
+  border-color: #FDBA74;
+}
+
+[data-theme="light"] .score-item.yield-mid {
+  background: #EFF6FF;
+}
+
+[data-theme="light"] .score-item.yield-weak {
+  background: #FFF7ED;
+}
+
 .result-insights {
   display: flex;
   flex-wrap: wrap;

@@ -206,6 +206,18 @@ def ranked_to_dict(item: RankedListing) -> dict:
         ),
         "source": property_profile["source"],
     }
+    # العائد الإيجاري السنوي: عروض الإيجار من خط حسابها، وعروض البيع المؤجرة من
+    # دخلها المذكور في الطلب/الإعلان («مؤجر ب X شهرياً») — يُعرض في بطاقة النتيجة
+    sale_yield = ((listing.raw or {}).get("saleRentalYield") or {})
+    annual_rent = (
+        number_sources.get("annualRent", {}).get("value") if rental
+        else sale_yield.get("annualRent")
+    )
+    rental_yield_percent = (
+        number_sources.get("rentalYield", {}).get("value") if rental
+        else sale_yield.get("percent")
+    )
+    rental_yield_verdict = sale_yield.get("verdict") or ""
     return {
         "code": listing.code,
         "source": listing.source,
@@ -231,8 +243,9 @@ def ranked_to_dict(item: RankedListing) -> dict:
         "phone": getattr(listing, "phone", "") or "",
         "rental": rental,
         "monthlyRent": listing.price if rental else None,
-        "annualRent": number_sources.get("annualRent", {}).get("value") if rental else None,
-        "rentalYieldPercent": number_sources.get("rentalYield", {}).get("value") if rental else None,
+        "annualRent": annual_rent,
+        "rentalYieldPercent": rental_yield_percent,
+        "rentalYieldVerdict": rental_yield_verdict,
         "matchScore": item.match_score,
         "outsideArea": any("خارج المنطقة المطلوبة" in str(w) for w in item.warnings),
         "recommendationScore": item.recommendation_score,
@@ -348,7 +361,9 @@ def _request_filters(request: PropertyRequest) -> list[dict[str, str]]:
     add("ميزانية البيع", f"{request.budget:,.0f} د.ك" if request.budget else "")
     add("ميزانية الإيجار", f"{request.rent_budget:,.0f} د.ك" if request.rent_budget else "")
     add("الغرف", request.bedrooms)
-    add("الدخل", f"{request.income:,.0f} د.ك" if request.income else "")
+    if request.income:
+        period_label = "شهريًا" if request.income_period == "monthly" else ("سنويًا" if request.income_period == "annual" else "")
+        add("الدخل", f"{request.income:,.0f} د.ك {period_label}".strip() if period_label else f"{request.income:,.0f} د.ك")
     add("الحالة", request.condition)
     add("مميزات الموقع", request.features)
     add("أرقام مستبعدة من المساحة", request.excluded_area_numbers, "حماية من خلط الارتداد/الواجهة بالمساحة")

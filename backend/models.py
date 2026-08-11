@@ -17,7 +17,8 @@ class PropertyRequest:
     budget: float | None = None
     rent_budget: float | None = None
     bedrooms: int | None = None
-    income: float | None = None
+    income: float | None = None  # الدخل الإيجاري المستخرج من النص
+    income_period: str = ""  # monthly | annual (وحدة الدخل: شهري أو سنوي)
     condition: list[str] = field(default_factory=list)
     features: list[str] = field(default_factory=list)
     excluded_area_numbers: dict[str, float] = field(default_factory=dict)
@@ -44,6 +45,8 @@ class Listing:
     listing_type: str = "غير محدد"  # مباشر | مكتب | غير محدد
     seller_info: str = ""  # معلومات إضافية عن البائع
     phone: str = ""  # رقم تواصل المعلن (بصيغة E.164 +965xxxxxxxx) — يُستخرج من صفحة التفاصيل
+    rental_income: float | None = None  # الدخل الإيجاري المذكور في الإعلان (مؤجر ب X / دخله X)
+    rental_income_period: str = ""  # monthly | annual — وحدة الدخل المذكور
     raw: dict[str, Any] = field(default_factory=dict)
 
 

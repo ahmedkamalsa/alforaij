@@ -8,6 +8,7 @@ from backend.connectors.official_data import get_official_transaction_rate
 from backend.connectors.official_indicators import get_official_rate as get_live_official_rate
 from backend.models import Listing, PropertyRequest, RankedListing
 from backend.services.official_valuation import calculate_valuation, assess_deal_quality, derive_market_benchmark
+from backend.services.request_parser import extract_rental_income
 
 
 @dataclass
@@ -44,6 +45,39 @@ def is_rental(listing: Listing) -> bool:
     """هل هذا الإعلان عرض إيجار (شهري) وليس عرض بيع؟"""
     text = f"{listing.transaction or ''} {listing.listing_mode or ''}"
     return "للإيجار" in text or "ايجار" in text
+
+
+def sale_rental_yield(
+    price: float | None,
+    income: float | None,
+    period: str = "",
+) -> tuple[float | None, float | None]:
+    """العائد الإيجاري السنوي لِعرض بيع مؤجر.
+
+    «مؤجر ب 1200 شهرياً» على سعر 260 ألف → إيجار سنوي 14,400 وعائد 5.5%.
+    يعيد (الإيجار السنوي، النسبة المئوية للعائد) أو (None, None) عند نقص البيانات.
+    """
+    if not price or price <= 0 or not income:
+        return None, None
+    annual = income * 12 if period == "monthly" else income
+    yield_pct = annual / price * 100
+    return round(annual, 1), round(yield_pct, 1)
+
+
+def investment_verdict(yield_pct: float | None) -> str:
+    """حكم استثماري على العائد الإيجاري السنوي.
+
+    سوق الكويت العقاري يُسعّر الإيجار الشهري بين 4%-6% سنويًا من قيمة العقار
+    (مقارنة بعائد ~2% على الودائع) — لذلك:
+      ≥ 6% قوي · 4%-6% متوسط (النطاق الطبيعي) · < 4% ضعيف.
+    """
+    if yield_pct is None:
+        return ""
+    if yield_pct >= 6:
+        return "قوي"
+    if yield_pct >= 4:
+        return "متوسط"
+    return "ضعيف"
 
 
 def comparable_pool(
@@ -716,8 +750,33 @@ def enrich_rankings(request: PropertyRequest, ranked, all_listings: list[Listing
             reasons.append(f"تم استخدام مقارنات داخل {valuation.comparable_scope}")
         else:
             warnings.append("لا توجد مقارنات كافية للتقييم")
-        if request.income and listing.property_type in {"عمارة", "تجاري"}:
-            reasons.append("الطلب يحتوي دخل عقاري؛ يلزم تقييم دخل تفصيلي عند توفر صفقات")
+        # العائد الإيجاري السنوي لعروض البيع المؤجرة: دخل الطلب أولًا (نص الإعلان
+        # الذي أُلصقه المستخدم: «مؤجر ب 1200 شهرياً»)، ثم دخل الإعلان نفسه إن ذُكر.
+        # لا يُطبَّق على عروض الإيجار (سعرها الشهري لا يُقاس عائدًا بنفس الطريقة).
+        annual_rent, sale_yield = None, None
+        if not is_rental(listing):
+            # أولوية الدخل: الطلب (نص الإعلان الذي أُلصقه المستخدم) → حقل الدخل الهيكلي
+            # (الإعلانات الخارجية) → تحليل نص الإعلان نفسه (الفريج المحلي وغيرها)
+            if request.income is not None:
+                income, income_period = request.income, request.income_period
+            elif getattr(listing, "rental_income", None) is not None:
+                income, income_period = listing.rental_income, listing.rental_income_period
+            else:
+                income, income_period = extract_rental_income(f"{listing.summary or ''} {listing.features or ''}")
+            annual_rent, sale_yield = sale_rental_yield(listing.price, income, income_period)
+        number_sources_item = number_sources(listing, valuation)
+        if sale_yield is not None:
+            verdict = investment_verdict(sale_yield)
+            number_sources_item["rentalYield"] = {
+                "value": sale_yield,
+                "display": f"{sale_yield:.1f}% سنويًا (إيجار سنوي {annual_rent:,.0f} د.ك ÷ سعر {listing.price:,.0f} د.ك)",
+                "source": "الدخل المذكور في الطلب/الإعلان",
+                "note": f"الدخل المذكور {'شهري' if income_period == 'monthly' else 'سنوي'} — حكم استثماري: {verdict}",
+            }
+            reasons.append(
+                f"العائد الإيجاري السنوي {sale_yield:.1f}% ({verdict}): إيجار سنوي {annual_rent:,.0f} د.ك "
+                f"مقابل سعر {listing.price:,.0f} د.ك"
+            )
 
         rec_score, rec_breakdown = recommendation_breakdown(score, valuation, warnings)
         output.append(
@@ -733,11 +792,22 @@ def enrich_rankings(request: PropertyRequest, ranked, all_listings: list[Listing
                 price_ratio=round(valuation.price_ratio, 3) if valuation.price_ratio else None,
                 match_breakdown=match_breakdown,
                 recommendation_breakdown=rec_breakdown,
-                number_sources=number_sources(listing, valuation),
+                number_sources=number_sources_item,
                 reasons=reasons,
                 warnings=warnings,
                 comparables=valuation.evidence,
             )
         )
+        if sale_yield is not None:
+            # الإضافة بعد بناء RankedListing: لا يمكن تمرير حقول مخصصة عبر المنشئ،
+            # فنخزنها في raw لتصل للتقرير والواجهة بلا تغيير في النموذج.
+            listing_raw = dict(listing.raw or {})
+            listing_raw["saleRentalYield"] = {
+                "annualRent": annual_rent,
+                "percent": sale_yield,
+                "verdict": investment_verdict(sale_yield),
+                "period": income_period,
+            }
+            listing.raw = listing_raw
     output.sort(key=lambda row: (row.recommendation_score, row.match_score, row.confidence), reverse=True)
     return output

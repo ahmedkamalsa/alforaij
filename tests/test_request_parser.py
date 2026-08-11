@@ -56,3 +56,83 @@ class RequestParserTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RentalIncomeExtractionTests(unittest.TestCase):
+    """استخراج الدخل الإيجاري من نص الإعلان وصيغه المختلفة."""
+
+    def _extract(self, text: str):
+        from backend.services.request_parser import extract_rental_income
+        return extract_rental_income(text)
+
+    def test_mojar_monthly(self) -> None:
+        amount, period = self._extract("مؤجر ب 1200 شهرياً")
+        self.assertEqual(amount, 1200)
+        self.assertEqual(period, "monthly")
+
+    def test_mojar_without_b_and_period_defaults_monthly(self) -> None:
+        amount, period = self._extract("شاليه مؤجره 1200")
+        self.assertEqual(amount, 1200)
+        self.assertEqual(period, "monthly")
+
+    def test_mojar_bashahr(self) -> None:
+        amount, period = self._extract("مؤجرة بـ 350 بالشهر")
+        self.assertEqual(amount, 350)
+        self.assertEqual(period, "monthly")
+
+    def test_dakhlaha_annual(self) -> None:
+        amount, period = self._extract("عمارة دخلها 9000")
+        self.assertEqual(amount, 9000)
+        self.assertEqual(period, "annual")
+
+    def test_dakhla_thousands_word(self) -> None:
+        amount, period = self._extract("بيت دخله 20 الف")
+        self.assertEqual(amount, 20000)
+        self.assertEqual(period, "annual")
+
+    def test_dakhla_short_number_scaled(self) -> None:
+        amount, period = self._extract("عمارة دخله 25")
+        self.assertEqual(amount, 25000)
+        self.assertEqual(period, "annual")
+
+    def test_ejara_monthly(self) -> None:
+        amount, period = self._extract("شقة ايجارها 400 شهرياً")
+        self.assertEqual(amount, 400)
+        self.assertEqual(period, "monthly")
+
+    def test_qeemt_ejara(self) -> None:
+        amount, period = self._extract("قيمه ايجارها 30 الف سنوياً")
+        self.assertEqual(amount, 30000)
+        self.assertEqual(period, "annual")
+
+    def test_arabic_digits_normalized(self) -> None:
+        amount, period = self._extract("مؤجر ب ١٢٠٠ شهرياً")
+        self.assertEqual(amount, 1200)
+        self.assertEqual(period, "monthly")
+
+    def test_no_income(self) -> None:
+        amount, period = self._extract("بيت للبيع في بيان قطعه 12")
+        self.assertIsNone(amount)
+        self.assertEqual(period, "")
+
+    def test_user_ad_full_text(self) -> None:
+        # نص إعلان المستخدم الأصلي: مؤجر ب 1200 شهرياً على مراجعة 260 ألف
+        amount, period = self._extract(
+            "للبيع شاليه صف ثاني المساحه 454 م بطن وظهر ارتداد فوق 100 متر "
+            "في المرحلة الثالثه قريب من مول سكوير الخير مكون دورين ونصف ومسبح "
+            "سبع غرف ماستر وصالتين وداونيه وغرفه عامله ماستر وغرفه حارس ماستر "
+            "مؤثث بالكامل ومطبخ مجهز بالكامل مؤجر ب 1200 شهرياً مراجعة 260 الف "
+            "بدون اخلاء وثيقه حره"
+        )
+        self.assertEqual(amount, 1200)
+        self.assertEqual(period, "monthly")
+
+    def test_parse_request_carries_income_and_period(self) -> None:
+        request = parse_request("شاليه للبيع مؤجر ب 1200 شهرياً مراجعة 260 الف")
+        self.assertEqual(request.income, 1200)
+        self.assertEqual(request.income_period, "monthly")
+        self.assertEqual(request.budget, 260000)
+
+
+if __name__ == "__main__":
+    unittest.main()

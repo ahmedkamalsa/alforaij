@@ -23,7 +23,7 @@ from backend.connectors.official_data import search as search_official_transacti
 from backend.connectors.official_indicators import search as search_official_indicators
 from backend.models import Listing, PropertyRequest
 from backend.services.request_parser import KNOWN_AREAS as REQUEST_KNOWN_AREAS
-from backend.services.request_parser import PROPERTY_TYPES, normalize_text, detect_seller_type, extract_area_range, excluded_numbers, text_has_area
+from backend.services.request_parser import PROPERTY_TYPES, normalize_text, detect_seller_type, extract_area_range, excluded_numbers, text_has_area, extract_rental_income
 
 
 USER_AGENT = (
@@ -442,6 +442,9 @@ def listing_from_text(
     area = detect_area(full_text)
     space = space_override or parse_space(full_text) or extract_space_from_title(full_text)
     property_type = detect_property_type(full_text, fallback_type)
+    # الدخل الإيجاري المذكور في الإعلان («مؤجر ب 1200 شهرياً»، «دخله 20 الف»…) —
+    # أساس حساب العائد الإيجاري السنوي لِعروض البيع المؤجرة
+    rental_income, rental_income_period = extract_rental_income(full_text)
 
     # Use parsed price from text first; fall back to provided price
     price_value = extract_price_from_title(full_text) or parse_price(full_text, price)
@@ -487,6 +490,8 @@ def listing_from_text(
         published_date="",
         original_url=url,
         source=source,
+        rental_income=rental_income,
+        rental_income_period=rental_income_period,
         raw={
             "priceSource": (
                 f"استخراج مباشر من صفحة {source}، والرقم عومل كألف د.ك لأنه بيع {property_type}"

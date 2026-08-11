@@ -249,7 +249,7 @@ def parse_money(text: str) -> float | None:
         candidates.append(value)
     if not candidates:
         return None
-    money_words = ("ميزانيه", "حدود", "سعر", "مطلوب", "بياع", "ايجار", "دينار", "د.ك", "دك")
+    money_words = ("ميزانيه", "حدود", "سعر", "مطلوب", "بياع", "ايجار", "دينار", "د.ك", "دك", "مراجعه", "سوم", "سومها", "بسوم")
     if any(word in text for word in money_words):
         return max(candidates)
     return None
@@ -317,6 +317,47 @@ def extract_area_range(text: str) -> tuple[float | None, float | None, dict[str,
             return value, value, excluded
 
     return None, None, excluded
+
+
+def extract_rental_income(text: str) -> tuple[float | None, str]:
+    """استخراج الدخل الإيجاري من نص عربي/إعلان.
+
+    يلتقط الصيغ الشائعة: «مؤجر ب 1200 شهرياً»، «مؤجره بـ 350»، «دخلها 20 الف»،
+    «دخله 25000 سنوياً»، «ايجارها 400 بالشهر»، «قيمه ايجارها 30 الف» …
+
+    يعيد (المبلغ بالدينار، الفترة) حيث الفترة "monthly" أو "annual":
+      - ورود «شهرياً/بالشهر/للشهر» → شهري، «سنوياً/بالسنه» → سنوي
+      - بدون فترة: صيغ «مؤجر» تُفسَّر شهرية (الإيجارات الكويتية تُسعّر شهريًا)
+        وصيغ «دخل/ايجارها» تُفسَّر سنوية (الدخل السنوي للعقار).
+    يعيد (None, "") عند عدم وجود دخل إيجاري في النص.
+    """
+    normalized = normalize_text(str(text or "")).replace("ـ", "")
+    patterns = [
+        # «مؤجر/مؤجره (بـ) X (فترة)» — الافتراضي شهري
+        (r"مؤجره?\s+(?:ب)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:دينار|د\.ك|ك\s*د)?\s*(شهريا?|سنويا?|بالشهر|بالسنه|في الشهر|فى الشهر|للشهر|كل شهر)?", "monthly"),
+        # «دخلها/دخله/الدخل/مدخولها/ايجارها/قيمه ايجارها (بـ) X (فترة)» — الافتراضي سنوي
+        (r"(?:دخل(?:ها|ه)?|الدخل|مدخولها|ايجارها|قيمه ايجارها|قيمه ايجاره)\s*(?:ب)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:دينار|د\.ك|ك\s*د)?\s*(?:الف|ألف)?\s*(شهريا?|سنويا?|بالشهر|بالسنه|في الشهر|فى الشهر|للشهر|كل شهر)?", "annual"),
+    ]
+    for pattern, default_period in patterns:
+        match = re.search(pattern, normalized)
+        if not match:
+            continue
+        amount = float(match.group(1))
+        # كلمة «ألف» بعد المبلغ → ×1000
+        if any(word in match.group(0) for word in ("الف", "ألف")):
+            amount *= 1000
+        elif amount < 100:
+            # مبلغ مختصر («دخلها 20» = 20 ألف سنويًا)
+            amount *= 1000
+        period_raw = (match.group(2) or "").strip()
+        if "شهري" in period_raw or "الشهر" in period_raw or "كل شهر" in period_raw:
+            period = "monthly"
+        elif "سنوي" in period_raw or "السنه" in period_raw:
+            period = "annual"
+        else:
+            period = default_period
+        return round(amount, 2), period
+    return None, ""
 
 
 def parse_request(raw_text: str) -> PropertyRequest:
@@ -392,13 +433,8 @@ def parse_request(raw_text: str) -> PropertyRequest:
     # الغرف
     bedrooms_match = re.search(r"([0-9]+)\s*(?:غرف|غرفه|غرفة)", normalized)
 
-    # الدخل
-    income_match = re.search(r"(?:دخلها|الدخل|مدخولها)\s*([0-9]+)\s*(?:الف|ألف)?", normalized)
-    income = None
-    if income_match:
-        income = float(income_match.group(1))
-        if income < 100:
-            income *= 1000
+    # الدخل الإيجاري: «مؤجر ب 1200 شهرياً»، «دخله 20 الف»، «ايجارها 350» …
+    income, income_period = extract_rental_income(raw_text)
 
     # الحالة ومميزات الموقع
     condition = [word for word in ("هدام", "صالح للسكن", "سكن المالك", "جديد") if normalize_text(word) in normalized]
@@ -427,6 +463,7 @@ def parse_request(raw_text: str) -> PropertyRequest:
         rent_budget=rent_budget,
         bedrooms=int(bedrooms_match.group(1)) if bedrooms_match else None,
         income=income,
+        income_period=income_period,
         condition=condition,
         features=list(set(features + site_features)),
         excluded_area_numbers=excluded,

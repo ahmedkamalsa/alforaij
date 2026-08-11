@@ -629,6 +629,18 @@ def _detail_top_result(story: list, item: dict, styles: dict[str, ParagraphStyle
             "هاتف المعلن (واتساب)",
             f"{ar_link('اضغط هنا للتواصل عبر واتساب', f'https://wa.me/{phone_digits}')}<br/>{ar(phone)}",
         ))
+    # العائد الإيجاري السنوي لعروض البيع المؤجرة («مؤجر ب 1200 شهرياً»)
+    sale_yield = item.get("rentalYieldPercent")
+    if sale_yield is not None and not item.get("rental"):
+        annual = item.get("annualRent")
+        verdict = item.get("rentalYieldVerdict") or ""
+        price_value = item.get("price") or 0
+        yield_text = f"{ar(sale_yield)}% سنويًا"
+        if annual:
+            yield_text += f" — إيجار سنوي {ar(f'{annual:,.0f}')} د.ك مقابل سعر {ar(f'{price_value:,.0f}')} د.ك"
+        if verdict:
+            yield_text += f" — حكم استثماري: {ar(verdict)}"
+        summary_rows.append(("العائد الإيجاري السنوي", yield_text))
     story.append(_info_table(summary_rows, [40 * mm, 140 * mm]))
     story.append(Spacer(1, 6))
 

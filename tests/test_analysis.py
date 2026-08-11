@@ -425,3 +425,75 @@ class AnalysisTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RentalYieldForSaleTests(unittest.TestCase):
+    """العائد الإيجاري السنوي لعروض البيع المؤجرة: حساب + حكم + وصوله للتقرير."""
+
+    def test_sale_rental_yield_monthly(self) -> None:
+        from backend.services.valuation import sale_rental_yield
+
+        annual, yield_pct = sale_rental_yield(260000, 1200, "monthly")
+        self.assertEqual(annual, 14400)
+        self.assertEqual(yield_pct, 5.5)
+
+    def test_sale_rental_yield_annual(self) -> None:
+        from backend.services.valuation import sale_rental_yield
+
+        annual, yield_pct = sale_rental_yield(200000, 20000, "annual")
+        self.assertEqual(annual, 20000)
+        self.assertEqual(yield_pct, 10.0)
+
+    def test_sale_rental_yield_missing_data(self) -> None:
+        from backend.services.valuation import sale_rental_yield
+
+        self.assertEqual(sale_rental_yield(None, 1200, "monthly"), (None, None))
+        self.assertEqual(sale_rental_yield(260000, None, "monthly"), (None, None))
+
+    def test_investment_verdict_thresholds(self) -> None:
+        from backend.services.valuation import investment_verdict
+
+        self.assertEqual(investment_verdict(6.0), "قوي")
+        self.assertEqual(investment_verdict(5.5), "متوسط")
+        self.assertEqual(investment_verdict(4.0), "متوسط")
+        self.assertEqual(investment_verdict(3.9), "ضعيف")
+        self.assertEqual(investment_verdict(None), "")
+
+    def test_enrich_rankings_adds_yield_from_request_income(self) -> None:
+        from backend.services.valuation import enrich_rankings
+        from backend.services.matching import top_matches
+
+        request = parse_request("شاليه للبيع في المطلاع مؤجر ب 1200 شهرياً مراجعة 260 الف")
+        listings = [listing("AF-1", 260000, 454), listing("AF-2", 265000, 454)]
+        ranked = top_matches(request, listings)
+        enriched = enrich_rankings(request, ranked, listings)
+
+        self.assertIsNotNone(enriched[0].listing.raw.get("saleRentalYield"))
+        sale_yield = enriched[0].listing.raw["saleRentalYield"]
+        self.assertEqual(sale_yield["percent"], 5.5)
+        self.assertEqual(sale_yield["annualRent"], 14400)
+        self.assertEqual(sale_yield["verdict"], "متوسط")
+        # يظهر كسبب توصية + مصدر رقم في بطاقة النتيجة
+        self.assertTrue(any("العائد الإيجاري السنوي" in reason for reason in enriched[0].reasons))
+        self.assertIn("rentalYield", enriched[0].number_sources)
+
+    def test_listing_own_income_surfaces_in_report(self) -> None:
+        from backend.services.report_generator import ranked_to_dict
+        from backend.services.valuation import enrich_rankings
+        from backend.services.matching import top_matches
+
+        # إعلان بيع يذكر دخله بنفسه (بدون دخل في الطلب)
+        rented = listing("AF-9", 200000, 400, "بيت مؤجر ب 900 شهرياً في المطلاع")
+        request = parse_request("بيت للبيع في المطلاع")
+        ranked = top_matches(request, [rented])
+        enriched = enrich_rankings(request, ranked, [rented])
+        report_item = ranked_to_dict(enriched[0])
+
+        self.assertIsNotNone(report_item["rentalYieldPercent"])
+        self.assertEqual(report_item["rentalYieldPercent"], 5.4)
+        self.assertEqual(report_item["annualRent"], 10800)
+        self.assertEqual(report_item["rentalYieldVerdict"], "متوسط")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,18 +1,9 @@
 {
-  "generatedAt": "2026-08-12T01:06:07",
-  "count": 6,
+  "generatedAt": "2026-08-12T02:02:14",
+  "count": 5,
   "status": "success",
-  "note": "جمع 6 تطورًا، 3/11 مصادر عقارية، 0/5 منصات مرشحة متاحة",
+  "note": "جمع 5 تطورًا، 2/11 مصادر عقارية، 0/5 منصات مرشحة متاحة",
   "developments": [
-    {
-      "url": "https://www.alanba.com.kw/1371550",
-      "title": "هل تختفي جاذبية الأرض 7 ثوان بسبب الكسوف؟ الحقيقة وراء الشائعة المتداولة",
-      "source": "alanba",
-      "source_name": "الأنباء",
-      "category": "أخبار السوق",
-      "published": "",
-      "summary": ""
-    },
     {
       "url": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports/Real-estate-reports.html",
       "title": "Real estate Reports",
@@ -102,9 +93,9 @@
     },
     {
       "name": "الأنباء",
-      "status": "success",
-      "records": 1,
-      "note": "1 عنوانًا إجمالًا، 1 عقاريًا",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
       "fetchMethod": "HTML",
       "endpoint": "https://www.alanba.com.kw/rss/"
     },
