@@ -76,17 +76,25 @@ def main() -> None:
     history = guarded("opportunities-history", lambda: build_history_series([opportunities]), {"series": []})
     delta = guarded("opportunity-delta", lambda: build_opportunity_delta(None, opportunities), {"added": [], "removed": []})
 
+    # إجمالي كل المصادر في اللقطة الثابتة (مثل /api/health الحي): الفريج + حصاد المواقع
+    _market_counts = supabase_store.fetch_market_listing_source_counts()
+    _external_total = sum(int(s.get("count") or 0) for s in _market_counts)
     health = {
         "staticSnapshot": True,
         "status": "static",
         "records": len(listings),
         "recordsMeaning": "Static GitHub Pages snapshot generated from the backend data pipeline.",
+        "totalRecords": len(listings) + _external_total,
+        "localRecords": len(listings),
+        "externalRecords": _external_total,
+        "bySource": _market_counts,
         "supabase": False,
         "aiAnalysis": False,
         "dataSummary": {
             "listings": len(listings),
             "opportunities": opportunities.get("totalScored", 0),
             "sources": len(source_registry()),
+            "externalHarvested": _external_total,
         },
     }
     clients = {"staticSnapshot": True, "clients": _load_clients()}

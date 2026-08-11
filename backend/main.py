@@ -492,13 +492,30 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urlparse(self.path).path
         if path == "/api/health":
+            # الإجمالي عبر كل المصادر: الفريج المحلي + حصاد المواقع الخارجية (market_listings)
+            # + إعلانات السوق الحية (market_ads) — لا نكتفي بعدد الفريج المحلي وحده.
             listings = load_listings()
+            data_summary = supabase_data_summary(len(listings))
+            tables = (data_summary or {}).get("tables") or {}
+            market_harvested = int((tables.get("market_listings") or {}).get("count") or 0)
+            market_live = int((tables.get("market_ads") or {}).get("count") or 0)
+            external_total = market_harvested + market_live
+            by_source: list[dict] = []
+            try:
+                from backend.services.supabase_store import fetch_market_listing_source_counts
+                by_source = fetch_market_listing_source_counts() or []
+            except Exception as exc:
+                logger.warning("Health bySource failed: %s", exc)
             json_response(self, {
                 "status": "ok",
                 "records": len(listings),
-                "recordsMeaning": "عدد إعلانات الفريج المحلية المحملة كخط أساس، وليس إجمالي كل المصادر.",
+                "recordsMeaning": "إعلانات الفريج المحلية المحملة كخط أساس.",
+                "totalRecords": len(listings) + external_total,
+                "localRecords": len(listings),
+                "externalRecords": external_total,
+                "bySource": by_source,
                 "supabase": supabase_is_configured(),
-                "dataSummary": supabase_data_summary(len(listings)),
+                "dataSummary": data_summary,
                 "aiAnalysis": bool(AGENT_ROUTER_API_KEY),
             })
             return

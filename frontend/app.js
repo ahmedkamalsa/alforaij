@@ -3269,7 +3269,20 @@ async function boot() {
   try {
     const health = await getJson("/api/health");
     const aiStatus = health.aiAnalysis ? "التحليل الذكي متاح" : "تحليل محلي";
-    setStatus(`البيانات: ${health.records} إعلان | قاعدة البيانات: ${health.supabase ? "متصلة" : "غير مضبوطة"} | ${aiStatus}`);
+    // إجمالي كل المصادر: الفريج المحلي + حصاد المواقع الخارجية — لا نكتفي بعدد الفريج وحده.
+    const total = Number(health.totalRecords || health.records || 0);
+    const local = Number(health.localRecords ?? health.records ?? 0);
+    const external = Number(health.externalRecords || 0);
+    const dbState = health.supabase ? "متصلة" : "غير مضبوطة";
+    const statusEl = $("healthStatus");
+    if (statusEl) {
+      const breakdown = [`الفريج ${local}`, ...(external > 0 ? [`المواقع الخارجية ${external}`] : [])].join(" + ");
+      const bySource = (health.bySource || []).map((s) => `${s.source}: ${s.count}`).join(" · ");
+      statusEl.title = `تفصيل البيانات — ${breakdown}${bySource ? ` · ${bySource}` : ""}`;
+      setStatus(`البيانات: ${total} إعلان من كل المصادر (${breakdown}) | القاعدة: ${dbState} | ${aiStatus}`);
+    } else {
+      setStatus(`البيانات: ${total} إعلان من كل المصادر | القاعدة: ${dbState} | ${aiStatus}`);
+    }
     const tableCount = Object.keys((health.dataSummary && health.dataSummary.tables) || {}).length;
     setTabCount("tabCountSources", tableCount);
   } catch {

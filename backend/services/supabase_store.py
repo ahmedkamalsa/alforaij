@@ -540,6 +540,29 @@ def fetch_market_listings(
     return _fetch_rows(endpoint)
 
 
+def fetch_market_listing_source_counts(limit: int = 5000) -> list[dict[str, Any]]:
+    """عدّاد لكل موقع من market_listings (العمود source فقط — استعلام خفيف).
+
+    يعيد قائمة مرتبة تنازليًا [{source, count}, ...] ليُعرض توزيع إعلانات المواقع
+    في ترويسة الموقع. متسامح تمامًا: غياب الجدول أو فشل القراءة يعيد [] بدل كسر الطلب.
+    """
+    if not market_listings_table_available():
+        return []
+    try:
+        rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_listings?select=source&limit={int(limit)}")
+    except Exception as exc:
+        logger.warning("Market listing source counts failed: %s", exc)
+        return []
+    counts: dict[str, int] = {}
+    for row in rows or []:
+        src = str(row.get("source") or "غير محدد").strip() or "غير محدد"
+        counts[src] = counts.get(src, 0) + 1
+    return [
+        {"source": src, "count": n}
+        for src, n in sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+    ]
+
+
 def fetch_market_analytics(limit: int = 5000) -> dict[str, Any]:
     """تحليلات الحصاد المتراكم من market_listings لكل موقع على حدة.
 
