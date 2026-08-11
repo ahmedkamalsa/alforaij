@@ -127,6 +127,22 @@ def main() -> None:
     write_json("outreach-stats.json", outreach)
     write_json("health.json", health)
 
+    # رابط القاعدة الحية للموقع المنشور: عندما تتوفر بيانات Supabase في بيئة البناء،
+    # يُصدَّر ملف إعداد يسمح للواجهة الثابتة بالقراءة المباشرة من القاعدة (قراءة anon فقط،
+    # تسمح بها سياسات RLS للجداول العامة) — فيصبح الموقع المرفوع ديناميكيًا فعليًا،
+    # ويبقى السقوط للقطة إن غابت البيانات أو انقطع الاتصال.
+    import os as _os
+    _url = _os.getenv("SUPABASE_URL", "").rstrip("/")
+    _anon = _os.getenv("SUPABASE_ANON_KEY", "")
+    if _url and _anon:
+        write_json("live-db.json", {
+            "url": _url,
+            "anonKey": _anon,
+            "note": "قراءة مباشرة من قاعدة البيانات الحية عبر المفتاح العام (anon) — الجداول العامة فقط عبر RLS.",
+        })
+    else:
+        write_json("live-db.json", {"available": False, "note": "Supabase anon key غير متاح في بيئة البناء."})
+
 
 if __name__ == "__main__":
     main()

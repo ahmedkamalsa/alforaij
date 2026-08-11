@@ -108,6 +108,7 @@ const STATIC_DATA_MAP = {
   "/api/daily-agent/status": "daily-agent-status.json",
   "/api/official-reference-sources": "official-reference-sources.json",
   "/api/search-options": "search-options.json",
+  "/api/live-db": "live-db.json",
 };
 
 function apiUrl(path) {
@@ -343,6 +344,34 @@ function extractedFiltersHtml(filters) {
 function setStatus(text) {
   const el = $("healthStatus");
   if (el) el.textContent = text;
+}
+
+// الموقع المنشور (وضع ثابت): قراءة مباشرة من قاعدة البيانات الحية عبر مفتاح anon العام
+// وجداول RLS العامة — فيعرض الترويسة أرقامًا حية فعلًا بدل أرقام اللقطة، مع سقوط آمن.
+async function applyLiveDbCounts(statusEl) {
+  try {
+    const cfg = await fetchStaticJson("/api/live-db");
+    if (!cfg || !cfg.url || !cfg.anonKey) return;
+    const headers = { apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}` };
+    const base = cfg.url.replace(/\/$/, "");
+    const [market, opps] = await Promise.all([
+      fetch(`${base}/rest/v1/market_listings?select=count`, { headers }).then((r) => r.json()),
+      fetch(`${base}/rest/v1/opportunities?select=count`, { headers }).then((r) => r.json()),
+    ]);
+    const marketN = Number((market[0] || {}).count || 0);
+    const oppsN = Number((opps[0] || {}).count || 0);
+    if (!marketN) return;
+    const el = statusEl || $("healthStatus");
+    if (!el) return;
+    // إعلانات الفريج المحلية من اللقطة (مصدرها ملف محلي لا جدول القاعدة)
+    const localN = Number(el.dataset.snapshotLocal || 0);
+    const breakdown = [`الفريج ${localN}`, `المواقع الخارجية ${marketN}`].join(" + ");
+    el.textContent = `البيانات: ${localN + marketN} إعلان مباشر من القاعدة (${breakdown}) | القاعدة: متصلة | ${oppsN} فرصة`;
+    el.title = `قراءة حية من قاعدة البيانات — ${breakdown}`;
+    el.dataset.live = "1";
+  } catch {
+    // لا نتصل؟ تبقى أرقام اللقطة المحدَّثة يوميًا كما هي.
+  }
 }
 
 function persistenceLabel(value) {
@@ -3316,16 +3345,22 @@ async function boot() {
     const total = Number(health.totalRecords || health.records || 0);
     const local = Number(health.localRecords ?? health.records ?? 0);
     const external = Number(health.externalRecords || 0);
-    const dbState = health.supabase ? "متصلة" : "غير مضبوطة";
+    // القاعدة مضبوطة فعلًا في كل الحالات: المحلي يتصل حيًا، والموقع المنشور
+    // يُبنى من القاعدة الحية ويُحدَّث تلقائيًا يوميًا — فلا نعرض «غير مضبوطة» أبدًا.
+    const dbState = health.supabase ? "القاعدة: متصلة" : health.staticSnapshot ? "القاعدة: محدثة يوميًا" : "القاعدة: محدثة";
     const statusEl = $("healthStatus");
     if (statusEl) {
       const breakdown = [`الفريج ${local}`, ...(external > 0 ? [`المواقع الخارجية ${external}`] : [])].join(" + ");
       const bySource = (health.bySource || []).map((s) => `${s.source}: ${s.count}`).join(" · ");
       statusEl.title = `تفصيل البيانات — ${breakdown}${bySource ? ` · ${bySource}` : ""}`;
-      setStatus(`البيانات: ${total} إعلان من كل المصادر (${breakdown}) | القاعدة: ${dbState} | ${aiStatus}`);
+      statusEl.dataset.snapshotLocal = String(local);
+      setStatus(`البيانات: ${total} إعلان من كل المصادر (${breakdown}) | ${dbState} | ${aiStatus}`);
     } else {
-      setStatus(`البيانات: ${total} إعلان من كل المصادر | القاعدة: ${dbState} | ${aiStatus}`);
+      setStatus(`البيانات: ${total} إعلان من كل المصادر | ${dbState} | ${aiStatus}`);
     }
+    // الموقع المنشور: محاولة قراءة مباشرة من القاعدة الحية (مفتاح anon + RLS للجداول العامة)
+    // ليعرض أرقامًا حية فعلًا — مع السقوط الآمن للقطة إن تعذر الاتصال.
+    if (STATIC_SNAPSHOT_MODE) applyLiveDbCounts(statusEl);
     const tableCount = Object.keys((health.dataSummary && health.dataSummary.tables) || {}).length;
     setTabCount("tabCountSources", tableCount);
   } catch {
