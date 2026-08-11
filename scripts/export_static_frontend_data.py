@@ -76,6 +76,22 @@ def main() -> None:
     history = guarded("opportunities-history", lambda: build_history_series([opportunities]), {"series": []})
     delta = guarded("opportunity-delta", lambda: build_opportunity_delta(None, opportunities), {"added": [], "removed": []})
 
+    # اتجاهات الأسعار الشهرية للرسوم الزمنية — من القاعدة الحية إن أمكن (يُملأ يوميًا
+    # من الحصاد)، وإلا نحسبها محليًا من الحصاد المتاح حتى لا تبقى الرسوم فارغة.
+    _price_trends = guarded(
+        "price-trends",
+        lambda: {"rows": supabase_store.fetch_price_trends(limit=2000), "tableOk": True},
+        {"rows": [], "tableOk": False},
+    )
+    if not _price_trends.get("rows"):
+        # الاحتياط: نحسب الوسيط من الحصاد المتراكم (market_listings) + الإعلانات المحلية
+        # حتى لا تبقى الرسوم الزمنية فارغة على الموقع المرفوع قبل أول ملء للجدول.
+        from backend.services.daily_update_agent import _build_price_trends
+        _external_rows = supabase_store.fetch_market_listings(limit=5000)
+        _local_trends = _build_price_trends(_external_rows, listings)
+        if _local_trends:
+            _price_trends = {"rows": _local_trends, "tableOk": True, "note": "مُحسوبة من الحصاد المتراكم (بدل قراءة جدول price_trends)."}
+
     # إجمالي كل المصادر في اللقطة الثابتة (مثل /api/health الحي): الفريج + حصاد المواقع
     _market_counts = supabase_store.fetch_market_listing_source_counts()
     _external_total = sum(int(s.get("count") or 0) for s in _market_counts)
@@ -107,6 +123,7 @@ def main() -> None:
 
     write_json("dashboard-summary.json", dashboard)
     write_json("opportunities.json", opportunities)
+    write_json("price-trends.json", _price_trends)
     write_json("market-matching.json", matching)
     write_json("weekly-digest.json", weekly)
     write_json("whatsapp-alerts.json", alerts)

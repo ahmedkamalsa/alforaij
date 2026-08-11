@@ -329,6 +329,7 @@ def supabase_data_summary(local_records: int = 0) -> dict[str, Any]:
     tables = {
         "listings": "إعلانات الفريج/المصادر المحفوظة",
         "market_listings": "إعلانات السوق الخارجية المحصودة من كل المواقع",
+        "price_trends": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
         "market_ads": "إعلانات السوق الحية من المواقع/لوحات العرض",
         "official_transactions": "صفقات رسمية مستوردة",
         "official_market_indicators": "مؤشرات سعرية رسمية/مرجعية",
@@ -495,6 +496,73 @@ def save_market_listings(rows: list[dict[str, Any]]) -> dict[str, Any]:
     except Exception:
         logger.exception("market_listings save failed")
         return {"status": "failed", "count": 0, "error": "unexpected error"}
+
+
+# ─── price_trends (اتجاهات الأسعار الشهرية من الحصاد) ────────────────
+
+
+def save_price_trends(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """حفظ/تحديث اتجاهات الأسعار الشهرية في جدول price_trends (upsert على الخلية).
+
+    كل صف وسيط شهري لخلية (منطقة × نوع × شهر × معاملة). المفتاح المركّب
+    (area, property_type, month, transaction) يجعل إعادة التشغيل في الشهر نفسه
+    تحديثًا لا تكرارًا. متسامح تمامًا: غياب الجدول أو تعذر الكتابة يُسجَّل السبب
+    ولا يكسر التشغيل اليومي.
+    """
+    if not rows:
+        return {"status": "empty", "count": 0, "error": ""}
+    if not is_configured():
+        return {"status": "not_configured", "count": 0, "error": ""}
+    try:
+        for index in range(0, len(rows), 250):
+            _post("price_trends", rows[index:index + 250], upsert=True, conflict="area,property_type,month,transaction")
+        return {"status": "saved", "count": len(rows), "error": ""}
+    except RuntimeError as exc:
+        logger.warning("price_trends save failed: %s", exc)
+        return {"status": "failed", "count": 0, "error": str(exc)}
+    except Exception:
+        logger.exception("price_trends save failed")
+        return {"status": "failed", "count": 0, "error": "unexpected error"}
+
+
+def price_trends_table_available() -> bool:
+    """هل جدول price_trends موجود فعلًا؟ (فحص خفيف دون كشف الأخطاء)."""
+    if not is_configured():
+        return False
+    request = urllib.request.Request(
+        f"{SUPABASE_URL}/rest/v1/price_trends?select=id&limit=1",
+        method="GET",
+        headers=_headers(),
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return response.status == 200
+    except Exception:
+        return False
+
+
+def fetch_price_trends(
+    area: str | None = None,
+    property_type: str | None = None,
+    transaction: str | None = None,
+    limit: int = 2000,
+) -> list[dict[str, Any]]:
+    """قراءة اتجاهات الأسعار الشهرية (أحدث شهر أولًا) مع فلاتر اختيارية.
+
+    تُستخدم لتغذية الرسوم الزمنية في تبويب الأداء: وسيط سعر المتر لكل منطقة
+    عبر الأشهر. متسامح تمامًا: غياب الجدول أو فشل القراءة يعيد [].
+    """
+    if not price_trends_table_available():
+        return []
+    params: list[str] = [f"limit={int(limit)}"]
+    if area:
+        params.append(f"area=ilike.*{urllib.parse.quote(area)}*")
+    if property_type:
+        params.append(f"property_type=ilike.*{urllib.parse.quote(property_type)}*")
+    if transaction:
+        params.append(f"transaction=ilike.*{urllib.parse.quote(transaction)}*")
+    params.append("order=month.desc")
+    return _fetch_rows(f"{SUPABASE_URL}/rest/v1/price_trends?{'&'.join(params)}")
 
 
 def market_listings_table_available() -> bool:

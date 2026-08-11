@@ -98,6 +98,7 @@ const STATIC_DATA_MAP = {
   "/api/dashboard/summary": "dashboard-summary.json",
   "/api/opportunities": "opportunities.json",
   "/api/opportunities/history": "opportunities-history.json",
+  "/api/price-trends": "price-trends.json",
   "/api/market-matching": "market-matching.json",
   "/api/opportunity-delta": "opportunity-delta.json",
   "/api/weekly-digest": "weekly-digest.json",
@@ -348,6 +349,31 @@ function setStatus(text) {
 
 // الموقع المنشور (وضع ثابت): قراءة مباشرة من قاعدة البيانات الحية عبر مفتاح anon العام
 // وجداول RLS العامة — فيعرض الترويسة أرقامًا حية فعلًا بدل أرقام اللقطة، مع سقوط آمن.
+async function liveDbConfig() {
+  try {
+    const cfg = await fetchStaticJson("/api/live-db");
+    return cfg && cfg.url && cfg.anonKey ? cfg : null;
+  } catch {
+    return null;
+  }
+}
+
+// قراءة اتجاهات الأسعار حيًا من جدول price_trends عبر REST (موقع منشور بلا باك إند)
+// — جدول عام بسياسة RLS للقراءة العامة، لذا يعمل مباشرة من المتصفح مثل market_listings.
+async function fetchLivePriceTrends() {
+  const cfg = await liveDbConfig();
+  if (!cfg) return null;
+  try {
+    const headers = { apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}` };
+    const res = await fetch(`${cfg.url.replace(/\/$/, "")}/rest/v1/price_trends?select=area,property_type,month,transaction,median_price,median_price_per_m2,sample_count&order=month.desc&limit=2000`, { headers });
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    return { rows, tableOk: true, live: true };
+  } catch {
+    return null;
+  }
+}
+
 async function applyLiveDbCounts(statusEl) {
   try {
     const cfg = await fetchStaticJson("/api/live-db");
@@ -2682,7 +2708,72 @@ function oppClicksBarChart(buckets, labelKey) {
     </div>`;
 }
 
+// رسم اتجاهات الأسعار الشهرية من جدول price_trends (يُملأ يوميًا من الحصاد)
+// — وسيط سعر المتر لكل منطقة/نوع عبر الأشهر: خط لكل منطقة بأحدث قيمة فقط.
+function renderPriceTrendsChart(root) {
+  const data = oppState.priceTrends;
+  const rows = (data && data.rows) || [];
+  if (!rows.length) {
+    return "";
+  }
+  // أحدث 8 أشهر مرتبة تصاعديًا، وخط لكل منطقة (وسيط سعر المتر) إن توفرت نقطتان+
+  const months = [...new Set(rows.map((r) => r.month))].sort().slice(-8);
+  const byArea = {};
+  for (const row of rows) {
+    if (!months.includes(row.month)) continue;
+    (byArea[row.area] ||= []).push(row);
+  }
+  const series = Object.entries(byArea)
+    .map(([area, pts]) => ({ area, pts: pts.sort((a, b) => a.month.localeCompare(b.month)) }))
+    .filter((s) => s.pts.filter((p) => p.median_price_per_m2 != null).length >= 2);
+  if (!series.length) {
+    // لا توجد سلسلة سعر متر كافية — نعرض ملخص أحدث الوسيطات بدل رسم فارغ
+    const latest = rows.filter((r) => r.month === months[months.length - 1]);
+    if (!latest.length) return "";
+    const items = latest.slice(0, 12).map((r) => `
+      <span class="filter-chip"><b>${escapeHtml(r.area)}</b>${r.median_price_per_m2 != null ? `${r.median_price_per_m2} د.ك/م²` : `${r.median_price ?? "—"} د.ك`} · ${escapeHtml(r.property_type || "عام")} · ${escapeHtml(r.month)}</span>`);
+    return `
+      <div class="trends-block">
+        <h3>اتجاهات الأسعار الشهرية (من الحصاد)</h3>
+        <p class="scope-note">أحدث وسيط سعر متر لكل منطقة من ${rows.length} شهرًا محصودًا في جدول price_trends.</p>
+        <div class="similar-external-list">${items.join("")}</div>
+      </div>`;
+  }
+  const colors = ["#1a7f4f", "#2b6cb0", "#c05621", "#6b46c1", "#b83280", "#2c7a7b", "#d69e2e", "#3182ce"];
+  const width = 720;
+  const height = 240;
+  const padL = 44;
+  const padR = 12;
+  const padT = 14;
+  const padB = 22;
+  const xFor = (i) => padL + (months.length <= 1 ? width / 2 : (i / (months.length - 1)) * (width - padL - padR));
+  const allVals = series.flatMap((s) => s.pts.map((p) => p.median_price_per_m2)).filter((v) => v != null);
+  const min = Math.min(...allVals);
+  const max = Math.max(...allVals);
+  const span = (max - min) || 1;
+  const yFor = (v) => padT + (1 - (v - min) / span) * (height - padT - padB);
+  const lines = series.map((s, idx) => {
+    const pts = s.pts.map((p, i) => `${xFor(months.indexOf(p.month)).toFixed(1)},${yFor(p.median_price_per_m2).toFixed(1)}`).join(" ");
+    return `<polyline fill="none" stroke="${colors[idx % colors.length]}" stroke-width="2.5" points="${pts}"/>`;
+  }).join("");
+  const legend = series.map((s, idx) => `
+    <span class="hist-legend-item"><i style="background:${colors[idx % colors.length]}"></i>${escapeHtml(s.area)}</span>`).join("");
+  return `
+    <div class="trends-block">
+      <h3>اتجاهات الأسعار الشهرية (من الحصاد)</h3>
+      <p class="scope-note">وسيط سعر المتر (د.ك/م²) لكل منطقة عبر الأشهر — من جدول price_trends المملوء يوميًا بالحصاد.</p>
+      <div class="hist-chart">
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="اتجاهات أسعار المتر عبر الأشهر">
+          ${months.map((m, i) => `<text x="${xFor(i).toFixed(1)}" y="${height - 4}" class="hist-date">${escapeHtml(m.slice(5))}</text>`).join("")}
+          ${lines}
+        </svg>
+      </div>
+      <div class="hist-legend">${legend}</div>
+    </div>`;
+}
+
 function renderHistoryTab(root) {
+  const trendsHtml = renderPriceTrendsChart(root);
   const data = oppState.history;
   let historyHtml = '<div class="empty">لا توجد لقطات تاريخية كافية بعد. حدّث «أفضل الفرص» بانتظام لتُبنى سلسلة الأداء مع الوقت.</div>';
   if (data && data.series && data.series.length) {
@@ -2781,7 +2872,7 @@ function renderHistoryTab(root) {
         </div>`;
     }
   }
-  root.innerHTML = historyHtml + outreachHtml;
+  root.innerHTML = trendsHtml + historyHtml + outreachHtml;
 }
 
 // ---------------------------------------------------------------------------
@@ -3252,12 +3343,17 @@ async function loadOpportunityTab(tier) {
       oppState.digest = await getJson("/api/weekly-digest");
       renderDigestTab(root);
     } else if (tier === "history") {
-      const [historyRes, outreachRes] = await Promise.all([
+      const [historyRes, outreachRes, priceTrendsRes] = await Promise.all([
         getJson("/api/opportunities/history"),
         getJson("/api/outreach/stats").catch(() => null),
+        getJson("/api/price-trends").catch(() => null),
       ]);
       oppState.history = historyRes;
       oppState.outreach = outreachRes;
+      // اللقطة بلا اتجاهات؟ الموقع المرفوع يقرأ الجدول حيًا مباشرة (جدول عام عبر RLS)
+      oppState.priceTrends = (priceTrendsRes && priceTrendsRes.rows && priceTrendsRes.rows.length)
+        ? priceTrendsRes
+        : (await fetchLivePriceTrends()) || priceTrendsRes;
       renderHistoryTab(root);
     } else if (tier === "matching") {
       oppState.matching = await getJson("/api/market-matching");

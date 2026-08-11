@@ -733,6 +733,17 @@ class Handler(BaseHTTPRequestHandler):
                 logger.exception("Opportunities history build failed")
                 json_response(self, {"error": "History build failed", "detail": str(exc)}, status=500)
             return
+        if path == "/api/price-trends":
+            # اتجاهات الأسعار الشهرية من جدول price_trends (يُملأ يوميًا من الحصاد)
+            # — وسيط سعر المتر لكل منطقة/نوع عبر الأشهر لتغذية الرسوم الزمنية.
+            from backend.services.supabase_store import fetch_price_trends
+            params = parse_qs(urlparse(self.path).query)
+            area = (params.get("area") or [""])[0]
+            json_response(self, {
+                "rows": fetch_price_trends(area=area or None, limit=2000),
+                "tableOk": True,
+            })
+            return
         if path == "/api/market-matching":
             # العرض والطلب: التوفيق العملي بين طلبات «مطلوب للشراء/للإيجار» وأفضل الفرص المقيّمة
             from backend.services.opportunities import build_market_matching, build_opportunities

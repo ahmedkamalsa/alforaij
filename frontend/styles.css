@@ -1463,6 +1463,10 @@ button:hover {
   outline: 1px solid rgba(96, 117, 240, .45);
 }
 
+.trends-block {
+  margin-bottom: 16px;
+}
+
 .similar-external-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
