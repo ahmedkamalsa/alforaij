@@ -112,7 +112,14 @@ def main() -> None:
     write_json("whatsapp-alerts.json", alerts)
     write_json("opportunities-history.json", history)
     write_json("opportunity-delta.json", delta)
+    from backend.services.request_parser import KNOWN_AREAS, PROPERTY_TYPES
     write_json("sources.json", {"staticSnapshot": True, "sources": source_registry()})
+    write_json("search-options.json", {
+        "staticSnapshot": True,
+        "areas": KNOWN_AREAS,
+        "propertyTypes": list(PROPERTY_TYPES.keys()),
+        "transactions": ["للبيع", "للإيجار", "مطلوب للشراء", "مطلوب للإيجار"],
+    })
     write_json("update-notifications.json", load_update_notifications() | {"staticSnapshot": True})
     write_json("daily-agent-status.json", load_daily_agent_status() | {"staticSnapshot": True})
     write_json("official-reference-sources.json", official)

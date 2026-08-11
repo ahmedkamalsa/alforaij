@@ -107,6 +107,7 @@ const STATIC_DATA_MAP = {
   "/api/update-notifications": "update-notifications.json",
   "/api/daily-agent/status": "daily-agent-status.json",
   "/api/official-reference-sources": "official-reference-sources.json",
+  "/api/search-options": "search-options.json",
 };
 
 function apiUrl(path) {
@@ -836,6 +837,7 @@ async function loadDashboardBoard() {
     setOptions("boardAreas", uniqueValues([...recentAreas, ...boardState.records.map((row) => row.area)]));
     setOptions("boardTransactions", uniqueValues(boardState.records.map((row) => row.transaction)));
     setOptions("boardPropertyTypes", uniqueValues(boardState.records.map((row) => row.propertyType)));
+    populateAdvancedOptions();
     const modeSelect = $("boardListingModeFilter");
     if (modeSelect) {
       modeSelect.innerHTML = '<option value="">كل الأنماط</option>' + uniqueValues(boardState.records.map((row) => row.listingMode))
@@ -881,6 +883,39 @@ function buildTextFromFilters(filters) {
 }
 
 // ---- بثّ تقدم البحث الحي: فقاعة تعرض المراحل والمصادر لحظيًا بدل «جاري البحث» الثابتة ----
+// قوائم الاختيار لحقول «اكتب أو اختر» في الخيارات المتقدمة — سقوط آمن عند غياب الباك إند
+const ADV_FALLBACK_TYPES = ["بيت", "شقة", "أرض", "عمارة", "تجاري", "مكتب", "دور", "مخزن", "قسيمة"];
+const ADV_FALLBACK_TRANSACTIONS = ["للبيع", "للإيجار", "مطلوب للشراء", "مطلوب للإيجار"];
+const ADV_FALLBACK_AREAS = [
+  "الديرة", "القبلة", "الشرق", "المرقاب", "الصوابر", "دسمان", "بنيد القار", "كيفان", "الدسمة", "الروضة",
+  "الخالدية", "الفيحاء", "اليرموك", "القادسية", "النهضة", "الأندلس", "الشويخ", "السرة", "الرابية", "الفردوس",
+  "حولي", "السالمية", "الجابرية", "مشرف", "بيان", "الراس", "الشهداء", "البدع", "النقرة", "الجابرية",
+  "الفروانية", "الرقعي", "حطين", "جليب الشيوخ", "العارضية", "صباح السالم", "ابو فطيرة", "الري", "الأندلس", "العمرية",
+  "القرين", "صباح الناصر", "المنقف", "فهد الاحمد", "الظهر", "الفحيحيل", "المهبولة", "ابو حليفة", "الصليبيخات", "الشدادية",
+  "السالمي", "النعيم", "الجهراء", "القصر", "الواحة", "تيماء", "النسيم", "العيون", "القيروان", "امغرة",
+];
+
+// قوائم «اكتب أو اختر» في الخيارات المتقدمة: تُملأ من الباك إند (قوائم المحلل الرسمية)
+// مع سقوط آمن للقوائم الثابتة وبيانات اللوحة — تعمل في الوضع الحي والثابت على حد سواء.
+function populateAdvancedOptions() {
+  const boardRows = (boardState.records || []).map((r) => r).filter(Boolean);
+  const boardAreas = uniqueValues(boardRows.map((r) => r.area).filter(Boolean));
+  const boardTypes = uniqueValues(boardRows.map((r) => r.propertyType).filter(Boolean));
+  const boardTx = uniqueValues(boardRows.map((r) => r.transaction).filter(Boolean));
+  setOptions("advTypes", uniqueValues([...ADV_FALLBACK_TYPES, ...boardTypes]));
+  setOptions("advTransactions", uniqueValues([...ADV_FALLBACK_TRANSACTIONS, ...boardTx]));
+  setOptions("advAreas", uniqueValues([...boardAreas, ...ADV_FALLBACK_AREAS]));
+  getJson("/api/search-options")
+    .then((opts) => {
+      if (opts && Array.isArray(opts.areas) && opts.areas.length) setOptions("advAreas", opts.areas);
+      if (opts && Array.isArray(opts.propertyTypes) && opts.propertyTypes.length) setOptions("advTypes", opts.propertyTypes);
+      if (opts && Array.isArray(opts.transactions) && opts.transactions.length) setOptions("advTransactions", opts.transactions);
+    })
+    .catch(() => {
+      // الوضع الثابت بلا باك إند: تبقى قوائم اللوحة + القوائم الثابتة — كافية للاختيار
+    });
+}
+
 const PROGRESS_STAGE_LABELS = {
   parse: "تحليل الطلب وفهم النية",
   local: "تحميل الإعلانات المحلية",
@@ -3258,6 +3293,7 @@ async function boot() {
   bindMainTabs();
   switchMainTab("search");
   bindOppEvents();
+  populateAdvancedOptions();
   loadDashboardBoard();
   loadOpportunities();
   scheduleDailySixAM();

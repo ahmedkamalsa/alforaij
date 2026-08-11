@@ -10,8 +10,8 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260811-totaldata">
-  <script src="config.js?v=20260811-totaldata"></script>
+  <link rel="stylesheet" href="styles.css?v=20260811-advoptions">
+  <script src="config.js?v=20260811-advoptions"></script>
 </head>
 <body>
   <header class="topbar">
@@ -211,9 +211,12 @@
       <details class="advanced-fields">
         <summary>خيارات متقدمة</summary>
         <div class="fields">
-          <label>نوع العملية<input id="transactionField" type="text"></label>
-          <label>نوع العقار<input id="typeField" type="text"></label>
-          <label class="wide">المناطق<input id="areasField" type="text"></label>
+          <label>نوع العملية<input id="transactionField" type="text" list="advTransactions" placeholder="اكتب أو اختر: للبيع / للإيجار…" autocomplete="off"></label>
+          <label>نوع العقار<input id="typeField" type="text" list="advTypes" placeholder="اكتب أو اختر: بيت / شقة / أرض…" autocomplete="off"></label>
+          <label class="wide">المناطق<input id="areasField" type="text" list="advAreas" placeholder="اكتب أو اختر: النهضة / السالمية / الصليبيخات…" autocomplete="off"></label>
+          <datalist id="advTransactions"></datalist>
+          <datalist id="advTypes"></datalist>
+          <datalist id="advAreas"></datalist>
           <label>أقل مساحة<input id="minAreaField" type="number" min="0"></label>
           <label>أعلى مساحة<input id="maxAreaField" type="number" min="0"></label>
           <label>ميزانية البيع<input id="budgetField" type="number" min="0"></label>
@@ -486,6 +489,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260811-totaldata"></script>
+  <script src="app.js?v=20260811-advoptions"></script>
 </body>
 </html>

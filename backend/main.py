@@ -522,6 +522,16 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/sources":
             json_response(self, {"sources": source_registry()})
             return
+        if path == "/api/search-options":
+            # قوائم الاختيار الرسمية لحقول «اكتب أو اختر» في الخيارات المتقدمة
+            # (نفس قوائم المحلل بالضبط حتى يطابق الاختيار المكتوب النية المفهومة)
+            from backend.services.request_parser import KNOWN_AREAS, PROPERTY_TYPES
+            json_response(self, {
+                "areas": KNOWN_AREAS,
+                "propertyTypes": list(PROPERTY_TYPES.keys()),
+                "transactions": ["للبيع", "للإيجار", "مطلوب للشراء", "مطلوب للإيجار"],
+            })
+            return
         if path == "/api/analyze/progress":
             # تقدم البحث الحي: الواجهة تقترع كل ~0.7 ثانية أثناء تشغيل POST /api/analyze
             params = parse_qs(urlparse(self.path).query)
