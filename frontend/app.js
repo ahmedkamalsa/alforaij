@@ -73,6 +73,7 @@ const boardState = {
   matching: null,
   expandedGovernorates: new Set(),
   activeMetric: "movement",
+  selectedCell: null, // { governorate, area, metric } — الخلية المختارة في جدول المحافظات
 };
 
 const boardMetricLabels = {
@@ -815,6 +816,14 @@ function renderGovernorateTable(rows) {
   const body = $("governorateTableBody");
   if (!body) return;
   const governorates = uniqueValues(rows.map((row) => row.governorate));
+  const activeMetric = boardState.activeMetric || "movement";
+  const axisPill = $("govAxisPill");
+  if (axisPill) axisPill.textContent = `المحور: ${boardMetricLabels[activeMetric] || "حركة الدلال"}`;
+  // تمييز عمود المحور النشط في رأس الجدول
+  const head = $("govTableHead");
+  if (head) {
+    head.querySelectorAll("th").forEach((th) => th.classList.toggle("col-active", th.dataset.govCol === activeMetric));
+  }
   if (!governorates.length) {
     body.innerHTML = '<tr><td colspan="7">لا توجد بيانات حسب الفلاتر الحالية.</td></tr>';
     return;
@@ -824,25 +833,29 @@ function renderGovernorateTable(rows) {
     const govRows = rows.filter((row) => row.governorate === governorate);
     const cells = metricCells(rows, governorate);
     const expanded = boardState.expandedGovernorates.has(governorate);
+    const sel = boardState.selectedCell;
+    const govCellCls = (cell) => (sel && sel.governorate === governorate && !sel.area && sel.metric === cell.metric) ? " selected" : "";
     html.push(`
       <tr class="gov-row${expanded ? " expanded" : ""}" data-board-governorate="${escapeHtml(governorate)}">
-        <td>
-          <button class="gov-toggle" type="button" data-board-toggle-gov="${escapeHtml(governorate)}">${expanded ? "▲" : "▼"}</button>
+        <td class="gov-name-cell">
+          <button class="gov-toggle" type="button" data-board-toggle-gov="${escapeHtml(governorate)}" aria-label="${expanded ? "طي" : "فتح"} مناطق ${escapeHtml(governorate)}">${expanded ? "▲" : "▼"}</button>
           <strong>${escapeHtml(governorate)}</strong>
+          <span class="gov-areas-btn" role="button" tabindex="0" data-board-toggle-gov="${escapeHtml(governorate)}">المناطق</span>
         </td>
         ${cells.map((cell) => `
-          <td><button class="count-button" type="button" data-board-gov="${escapeHtml(governorate)}" data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"}>${cell.count.toLocaleString("en-US")}</button></td>
+          <td class="${govCellCls(cell)}"><button class="count-button${activeMetric === cell.metric ? " axis" : ""}" type="button" data-board-gov="${escapeHtml(governorate)}" data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"}>${cell.count.toLocaleString("en-US")}</button></td>
         `).join("")}
       </tr>
     `);
     if (expanded) {
       for (const area of uniqueValues(govRows.map((row) => row.area))) {
         const areaCells = metricCells(rows, governorate, area);
+        const areaCellCls = (cell) => (sel && sel.governorate === governorate && sel.area === area && sel.metric === cell.metric) ? " selected" : "";
         html.push(`
           <tr class="area-row" data-board-area="${escapeHtml(area)}">
             <td><span class="area-indent">${escapeHtml(area)}</span></td>
             ${areaCells.map((cell) => `
-              <td><button class="count-button area-count" type="button" data-board-gov="${escapeHtml(governorate)}" data-board-area-run="${escapeHtml(area)}" data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"}>${cell.count.toLocaleString("en-US")}</button></td>
+              <td class="${areaCellCls(cell)}"><button class="count-button area-count${activeMetric === cell.metric ? " axis" : ""}" type="button" data-board-gov="${escapeHtml(governorate)}" data-board-area-run="${escapeHtml(area)}" data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"}>${cell.count.toLocaleString("en-US")}</button></td>
             `).join("")}
           </tr>
         `);
@@ -2056,10 +2069,53 @@ function renderReport(report) {
     renderedIndex += 1;
     node.querySelector(".rank-cell").textContent = renderedIndex;
     node.querySelector("h3").textContent = `${item.code} - ${item.area || "منطقة غير محددة"}`;
+    // شارات التصنيف: مكتب/مباشر (نمط الإدراج) + نوع المعاملة + المصدر
+    const modeEl = node.querySelector(".mode-pill");
+    if (modeEl) {
+      const mode = String(item.listingMode || "").trim();
+      if (mode) {
+        const isOffice = normalizeArabic(mode).includes("مكتب");
+        modeEl.textContent = mode;
+        modeEl.className = `pill mode-pill ${isOffice ? "mode-office" : "mode-direct"}`;
+        modeEl.hidden = false;
+      }
+    }
+    const txEl = node.querySelector(".tx-pill");
+    if (txEl) {
+      const tx = String(item.transaction || "").trim();
+      if (tx) {
+        txEl.textContent = tx;
+        txEl.className = `pill tx-pill ${normalizeArabic(tx).includes("إيجار") ? "tx-rent" : "tx-sale"}`;
+        txEl.hidden = false;
+      }
+    }
+    const srcEl = node.querySelector(".src-pill");
+    if (srcEl) {
+      srcEl.textContent = item.fallbackFor ? `${item.source || "مصدر"} ← ${item.fallbackFor}` : (item.source || "مصدر غير محدد");
+    }
     const sourceLabel = item.fallbackFor
       ? `${item.source || "مصدر غير محدد"} (عبر بديل ${item.fallbackFor})`
       : (item.source || "مصدر غير محدد");
-    node.querySelector(".meta").textContent = `${sourceLabel} | ${item.governorate || ""} | ${item.transaction || ""} | ${item.propertyType || item.detailClass || ""} | ${item.listingType || "غير محدد"}`;
+    node.querySelector(".meta").textContent = `${sourceLabel} | ${item.governorate || ""} | ${item.propertyType || item.detailClass || ""}`;
+    // شبكة الحقائق: صف أول (كود/محافظة/منطقة/نوع) + صف ثانٍ (سعر/مساحة/تاريخ/مشاهدات)
+    const factsEl = node.querySelector(".card-facts");
+    if (factsEl) {
+      factsEl.innerHTML = [
+        ["كود الإعلان", item.code || "—"],
+        ["المحافظة", item.governorate || "—"],
+        ["المنطقة", item.area || "—"],
+        ["نوع العقار", item.propertyType || item.detailClass || "—"],
+        ["السعر", item.priceText || (item.price ? formatMoney(item.price) : "غير معلن")],
+        ["المساحة", item.space ? `${item.space} م²` : "غير محدد"],
+        ["تاريخ النشر", dateText(item.publishedDate)],
+        ["المشاهدات", viewsText(item)],
+      ].map(([label, value]) => `
+        <div class="fact-cell">
+          <span class="fact-label">${escapeHtml(label)}</span>
+          <strong class="fact-value">${escapeHtml(value)}</strong>
+        </div>
+      `).join("");
+    }
     const outsideBadge = node.querySelector(".outside-area");
     if (outsideBadge) {
       const labels = (item.warnings || []).filter((w) => String(w).includes("خارج المنطقة المطلوبة"));
@@ -2197,6 +2253,20 @@ function renderReport(report) {
       clientsBlock.innerHTML = chips ? `<h4>عملاء محتملون للشراء</h4>${chips}` : "";
     }
 
+    const detailsBox = node.querySelector(".result-details");
+    const detailsBtn = node.querySelector(".details-btn");
+    if (detailsBox && detailsBtn) {
+      const toggleDetails = () => {
+        detailsBox.open = !detailsBox.open;
+        detailsBtn.textContent = detailsBox.open ? "إخفاء التفاصيل" : "عرض التفاصيل";
+      };
+      detailsBtn.addEventListener("click", toggleDetails);
+      // «التفاصيل والأدلة» في الدليل الداخلي يفتح البطاقة نفسها
+      const summary = detailsBox.querySelector("summary");
+      if (summary) summary.addEventListener("click", (ev) => { ev.preventDefault(); toggleDetails(); });
+    }
+    const pubDate = node.querySelector(".pub-date");
+    if (pubDate) pubDate.textContent = `تاريخ النشر: ${dateText(item.publishedDate)}`;
     const link = node.querySelector(".open-link");
     link.href = item.originalUrl || "#";
     link.hidden = !item.originalUrl;
@@ -3671,6 +3741,7 @@ function bind() {
       for (const input of platformInputs) input.checked = input.value === "__all";
     }
     boardState.activeMetric = "movement";
+    boardState.selectedCell = null;
     loadDashboardBoard();
   });
   on("openEvidenceQuick", () => {
@@ -3682,12 +3753,18 @@ function bind() {
     const el = $(id);
     if (!el) return;
     el.addEventListener("input", () => {
-      if (id === "boardMetricFilter") boardState.activeMetric = el.value || "movement";
+      if (id === "boardMetricFilter") {
+        boardState.activeMetric = el.value || "movement";
+        boardState.selectedCell = null;
+      }
       if (id === "boardAreaFilter" && el.value.trim()) rememberRecentArea(el.value.trim());
       renderBoard();
     });
     el.addEventListener("change", () => {
-      if (id === "boardMetricFilter") boardState.activeMetric = el.value || "movement";
+      if (id === "boardMetricFilter") {
+        boardState.activeMetric = el.value || "movement";
+        boardState.selectedCell = null;
+      }
       if (id === "boardAreaFilter" && el.value.trim()) rememberRecentArea(el.value.trim());
       renderBoard();
     });
@@ -3729,6 +3806,7 @@ function bind() {
       if (areaFilter) areaFilter.value = area;
       if (govFilter && gov) govFilter.value = gov;
       boardState.activeMetric = "movement";
+      boardState.selectedCell = { governorate: gov, area, metric: "movement" };
       const metricFilter = $("boardMetricFilter");
       if (metricFilter) metricFilter.value = "movement";
       renderBoard();
@@ -3755,6 +3833,7 @@ function bind() {
       if (govFilter) govFilter.value = gov;
       if (areaFilter) areaFilter.value = area;
       boardState.activeMetric = metric;
+      boardState.selectedCell = { governorate: gov, area: area || "", metric };
       renderBoard();
       runBoardAnalysis({ metric, governorate: gov, area });
     }

@@ -140,8 +140,28 @@
 /* رؤوس الجداول — أزرق ثابت مقروء على الفاتح */
 [data-theme="light"] .governorate-table th,
 [data-theme="light"] .minitable th {
-  background: linear-gradient(120deg, #2563eb, #1d4ed8);
+  background: linear-gradient(120deg, #1d4ed8, #2563eb);
   color: #fff;
+}
+
+[data-theme="light"] .governorate-table th.col-active {
+  border-bottom: 3px solid #f59e0b;
+  background: linear-gradient(120deg, #1e40af, #3b82f6);
+}
+
+/* بطاقات النتائج على الفاتح: خلفية بيضاء وإطارات ناعمة */
+[data-theme="light"] .result-card {
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 6px 22px rgba(30, 41, 59, .10);
+}
+
+[data-theme="light"] .fact-cell,
+[data-theme="light"] .score-item {
+  background: #f4f7fd;
+}
+
+[data-theme="light"] .src-pill {
+  background: #eef2f9;
 }
 
 /* فقاعات الشات */
@@ -896,7 +916,9 @@ textarea {
 .governorate-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 680px;
+  min-width: 720px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .governorate-table th,
@@ -907,11 +929,18 @@ textarea {
   vertical-align: middle;
 }
 
+/* رأس الجدول: شريط داكن كامل مع تمييز عمود المحور النشط */
 .governorate-table th {
-  background: linear-gradient(120deg, rgba(91, 140, 255, .28), rgba(37, 84, 217, .30));
+  background: linear-gradient(120deg, #0f172a, #1e3a8a);
   color: #fff;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 900;
+  border-bottom: 3px solid transparent;
+}
+
+.governorate-table th.col-active {
+  border-bottom: 3px solid #f59e0b;
+  background: linear-gradient(120deg, #172554, #1e40af);
 }
 
 .governorate-table td:first-child,
@@ -919,21 +948,49 @@ textarea {
   text-align: right;
 }
 
+/* صف المحافظة: كارت ملخص بخلفية فاتحة وزر المناطق */
 .gov-row {
-  background: rgba(255, 255, 255, .03);
+  background: rgba(91, 140, 255, .07);
+  border-top: 2px solid rgba(91, 140, 255, .35);
 }
 
 .gov-row.expanded {
-  background: rgba(56, 120, 255, .08);
+  background: rgba(56, 120, 255, .12);
+}
+
+.gov-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gov-areas-btn {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 8px;
+  padding: 10px 14px;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(91, 140, 255, .5);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gov-areas-btn:hover {
+  background: var(--blue);
+  color: #fff;
 }
 
 .area-row {
-  background: rgba(255, 255, 255, .03);
+  background: rgba(255, 255, 255, .02);
 }
 
 .gov-toggle {
-  width: 32px;
-  min-height: 32px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   margin-left: 8px;
   border-radius: 7px;
@@ -954,6 +1011,8 @@ textarea {
   border-color: rgba(91, 140, 255, .4);
   color: var(--blue);
   background: var(--blue-soft);
+  border-radius: 9px;
+  font-weight: 800;
 }
 
 .count-button:not(:disabled):hover {
@@ -962,12 +1021,46 @@ textarea {
 }
 
 .count-button:disabled {
-  opacity: .55;
+  opacity: .5;
   cursor: default;
+}
+
+.count-button.axis {
+  box-shadow: 0 0 0 1.5px #f59e0b;
+}
+
+/* الخلية المختارة: خلفية زرقاء + إطار سفلي برتقالي (نفس الشكل المرجعي) */
+.governorate-table td.selected {
+  background: rgba(37, 99, 235, .16);
+  box-shadow: inset 0 0 0 1.5px rgba(37, 99, 235, .65);
+}
+
+.governorate-table td.selected .count-button {
+  background: var(--blue);
+  color: #fff;
 }
 
 .area-count {
   background: var(--panel);
+}
+
+/* كبسولة المحور النشط */
+.gov-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.axis-pill {
+  flex-shrink: 0;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, .55);
+  background: rgba(245, 158, 11, .12);
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .section-title {
@@ -2077,9 +2170,146 @@ button:hover {
   gap: 12px;
 }
 
+.result-head-main {
+  min-width: 0;
+}
+
 .result-card h3 {
   margin-bottom: 6px;
   font-size: 21px;
+}
+
+/* شارات التصنيف في رأس البطاقة: مكتب/مباشر + نوع المعاملة + المصدر */
+.result-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+
+.result-pills .pill {
+  font-size: 11.5px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 3px 11px;
+  line-height: 1.6;
+}
+
+.mode-pill.mode-office {
+  background: rgba(52, 211, 153, .16);
+  color: var(--green);
+  border: 1px solid rgba(52, 211, 153, .45);
+}
+
+.mode-pill.mode-direct {
+  background: var(--blue-soft);
+  color: var(--blue);
+  border: 1px solid rgba(91, 140, 255, .45);
+}
+
+.tx-pill.tx-rent {
+  background: var(--blue-soft);
+  color: var(--blue);
+  border: 1px solid rgba(91, 140, 255, .45);
+}
+
+.tx-pill.tx-sale {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border: 1px solid rgba(251, 191, 36, .5);
+}
+
+.src-pill {
+  background: rgba(255, 255, 255, .06);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+/* شبكة الحقائق: صفان × أربع خانات */
+.card-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.fact-cell {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  padding: 7px 11px;
+  min-width: 0;
+}
+
+.fact-label {
+  display: block;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+
+.fact-value {
+  display: block;
+  font-size: 13.5px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* تذييل البطاقة: التاريخ + زرا التفاصيل والفتح */
+.card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--line);
+}
+
+.pub-date {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.details-btn {
+  padding: 8px 16px;
+  border-radius: 9px;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 800;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.details-btn:hover {
+  filter: brightness(1.1);
+}
+
+.open-link {
+  padding: 8px 16px;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--blue);
+  font-weight: 800;
+  border: 1px solid rgba(91, 140, 255, .55);
+  text-decoration: none;
+}
+
+.open-link:hover {
+  background: var(--blue-soft);
+}
+
+.open-link[hidden] {
+  display: none;
 }
 
 .meta,

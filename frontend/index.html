@@ -10,7 +10,7 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260811-heatmap">
+  <link rel="stylesheet" href="styles.css?v=20260811-redesign">
   <script src="config.js?v=20260811-trends"></script>
 </head>
 <body>
@@ -148,21 +148,24 @@
           <div id="boardMarketMatches" class="board-market-matches"></div>
         </section>
         <section class="governorate-board">
-          <div class="section-title compact-title">
-            <h3>الأرقام حسب المحافظات</h3>
-            <span>اضغط المحافظة لفتح مناطقها، أو اضغط الرقم لتصفية وتحليل نفس الاختيار.</span>
+          <div class="section-title compact-title gov-title-row">
+            <div>
+              <h3>الأرقام حسب المحافظات</h3>
+              <span>اضغط المحافظة لفتح مناطقها، أو اضغط الرقم لتصفية وتحليل نفس الاختيار.</span>
+            </div>
+            <span id="govAxisPill" class="axis-pill">المحور: حركة الدلال</span>
           </div>
           <div class="table-scroll">
             <table class="governorate-table">
               <thead>
-                <tr>
-                  <th>المحافظة / المنطقة</th>
-                  <th>الحركة</th>
-                  <th>الفرص</th>
-                  <th>للبيع</th>
-                  <th>شراء</th>
-                  <th>إيجار</th>
-                  <th>طلب إيجار</th>
+                <tr id="govTableHead">
+                  <th data-gov-col="name">المحافظة / المنطقة</th>
+                  <th data-gov-col="movement">الحركة</th>
+                  <th data-gov-col="opportunities">الفرص</th>
+                  <th data-gov-col="saleOffers">للبيع</th>
+                  <th data-gov-col="buyRequests">شراء</th>
+                  <th data-gov-col="rentOffers">إيجار</th>
+                  <th data-gov-col="rentRequests">طلب إيجار</th>
                 </tr>
               </thead>
               <tbody id="governorateTableBody">
@@ -486,8 +489,13 @@
       <div class="rank-cell"></div>
       <div class="result-body">
         <div class="result-head">
-          <div>
+          <div class="result-head-main">
             <h3></h3>
+            <div class="result-pills">
+              <span class="pill mode-pill" hidden></span>
+              <span class="pill tx-pill" hidden></span>
+              <span class="pill src-pill"></span>
+            </div>
             <p class="meta"></p>
             <span class="outside-area pill warn" hidden></span>
             <span class="price-gap-badge" hidden></span>
@@ -498,13 +506,14 @@
           </div>
         </div>
 
+        <div class="card-facts"></div>
+
         <div class="score-grid"></div>
         <div class="result-insights">
           <span class="data-quality"></span>
           <span class="source-trust"></span>
         </div>
         <p class="decision-line"></p>
-        <a class="open-link" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>
 
         <details class="result-details">
           <summary>التفاصيل والأدلة</summary>
@@ -533,10 +542,18 @@
             <div class="recommendation-breakdown"></div>
           </details>
         </details>
+
+        <div class="card-footer">
+          <span class="pub-date"></span>
+          <div class="card-actions">
+            <button type="button" class="details-btn">عرض التفاصيل</button>
+            <a class="open-link" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>
+          </div>
+        </div>
       </div>
     </article>
   </template>
 
-  <script src="app.js?v=20260811-heatmap"></script>
+  <script src="app.js?v=20260811-redesign"></script>
 </body>
 </html>
