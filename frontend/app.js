@@ -869,10 +869,6 @@ async function loadDashboardBoard() {
       });
     const governorates = uniqueValues(boardState.records.map((row) => row.governorate));
     const recentAreas = readRecentAreas();
-    setOptions("boardGovernorates", governorates);
-    setOptions("boardAreas", uniqueValues([...recentAreas, ...boardState.records.map((row) => row.area)]));
-    setOptions("boardTransactions", uniqueValues(boardState.records.map((row) => row.transaction)));
-    setOptions("boardPropertyTypes", uniqueValues(boardState.records.map((row) => row.propertyType)));
     populateAdvancedOptions();
     const modeSelect = $("boardListingModeFilter");
     if (modeSelect) {
@@ -1079,6 +1075,16 @@ function initAreaChips() {
   attachTypeahead("areasField", "advAreas", (value) => addAreaChip(value));
   attachTypeahead("transactionField", "advTransactions", (value, input) => { input.value = value; input.dispatchEvent(new Event("change")); });
   attachTypeahead("typeField", "advTypes", (value, input) => { input.value = value; input.dispatchEvent(new Event("change")); });
+  // فلاتر اللوحة بنفس نمط «اكتب أو اختر» مع القوائم الرسمية (تُعبَّأ في populateAdvancedOptions)
+  const boardSelect = (value, input) => {
+    input.value = value;
+    input.dispatchEvent(new Event("change"));
+    if (input.id === "boardAreaFilter") rememberRecentArea(value);
+  };
+  attachTypeahead("boardGovernorateFilter", "boardGovernorates", boardSelect);
+  attachTypeahead("boardTransactionFilter", "boardTransactions", boardSelect);
+  attachTypeahead("boardPropertyTypeFilter", "boardPropertyTypes", boardSelect);
+  attachTypeahead("boardAreaFilter", "boardAreas", boardSelect);
   field.addEventListener("change", () => addAreaChip(field.value));
   field.addEventListener("keydown", (e) => {
     if (e.typeaheadConsumed) return;
@@ -1092,19 +1098,39 @@ function initAreaChips() {
   });
 }
 
-function populateAdvancedOptions() {
-  const boardRows = (boardState.records || []).map((r) => r).filter(Boolean);
-  const boardAreas = uniqueValues(boardRows.map((r) => r.area).filter(Boolean));
-  const boardTypes = uniqueValues(boardRows.map((r) => r.propertyType).filter(Boolean));
-  const boardTx = uniqueValues(boardRows.map((r) => r.transaction).filter(Boolean));
+// القوائم الرسمية من /api/search-options — مصدر الحقيقة لحقول «اكتب أو اختر»
+// (الخيارات المتقدمة + فلاتر اللوحة) حتى يطابق الاختيار المكتوب نية المحلل بالضبط.
+let officialSearchOptions = null;
+
+function fillAdvancedLists(boardAreas, boardTypes, boardTx, boardGovernorates) {
   setOptions("advTypes", uniqueValues([...ADV_FALLBACK_TYPES, ...boardTypes]));
   setOptions("advTransactions", uniqueValues([...ADV_FALLBACK_TRANSACTIONS, ...boardTx]));
   setOptions("advAreas", uniqueValues([...boardAreas, ...ADV_FALLBACK_AREAS]));
+  // فلاتر اللوحة: القوائم الرسمية أولًا ثم ما يظهر في البيانات (لا نكتفي بالمشتق من البيانات)
+  setOptions("boardGovernorates", uniqueValues([...boardGovernorates, ...(officialSearchOptions?.governorates || [])]));
+  setOptions("boardAreas", uniqueValues([...(officialSearchOptions?.areas || []), ...boardAreas]));
+  setOptions("boardTransactions", uniqueValues([...(officialSearchOptions?.transactions || []), ...boardTx]));
+  setOptions("boardPropertyTypes", uniqueValues([...(officialSearchOptions?.propertyTypes || []), ...boardTypes]));
+  if (officialSearchOptions) {
+    setOptions("advAreas", uniqueValues([...officialSearchOptions.areas, ...ADV_FALLBACK_AREAS]));
+    setOptions("advTypes", uniqueValues([...officialSearchOptions.propertyTypes, ...ADV_FALLBACK_TYPES]));
+    setOptions("advTransactions", uniqueValues([...officialSearchOptions.transactions, ...ADV_FALLBACK_TRANSACTIONS]));
+  }
+}
+
+function populateAdvancedOptions() {
+  const boardRows = (boardState.records || []).map((r) => r).filter(Boolean);
+  const boardAreas = uniqueValues([...readRecentAreas(), ...boardRows.map((r) => r.area).filter(Boolean)]);
+  const boardTypes = uniqueValues(boardRows.map((r) => r.propertyType).filter(Boolean));
+  const boardTx = uniqueValues(boardRows.map((r) => r.transaction).filter(Boolean));
+  const boardGovernorates = uniqueValues(boardRows.map((r) => r.governorate).filter(Boolean));
+  fillAdvancedLists(boardAreas, boardTypes, boardTx, boardGovernorates);
   getJson("/api/search-options")
     .then((opts) => {
-      if (opts && Array.isArray(opts.areas) && opts.areas.length) setOptions("advAreas", opts.areas);
-      if (opts && Array.isArray(opts.propertyTypes) && opts.propertyTypes.length) setOptions("advTypes", opts.propertyTypes);
-      if (opts && Array.isArray(opts.transactions) && opts.transactions.length) setOptions("advTransactions", opts.transactions);
+      if (opts && (Array.isArray(opts.areas) || Array.isArray(opts.propertyTypes) || Array.isArray(opts.transactions) || Array.isArray(opts.governorates))) {
+        officialSearchOptions = opts;
+        fillAdvancedLists(boardAreas, boardTypes, boardTx, boardGovernorates);
+      }
     })
     .catch(() => {
       // الوضع الثابت بلا باك إند: تبقى قوائم اللوحة + القوائم الثابتة — كافية للاختيار

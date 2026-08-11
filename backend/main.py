@@ -623,11 +623,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/search-options":
             # قوائم الاختيار الرسمية لحقول «اكتب أو اختر» في الخيارات المتقدمة
             # (نفس قوائم المحلل بالضبط حتى يطابق الاختيار المكتوب النية المفهومة)
-            from backend.services.request_parser import KNOWN_AREAS, PROPERTY_TYPES
+            from backend.services.request_parser import GOVERNORATE_AREA_NAMES, KNOWN_AREAS, PROPERTY_TYPES
             json_response(self, {
                 "areas": KNOWN_AREAS,
                 "propertyTypes": list(PROPERTY_TYPES.keys()),
                 "transactions": ["للبيع", "للإيجار", "مطلوب للشراء", "مطلوب للإيجار"],
+                "governorates": sorted(GOVERNORATE_AREA_NAMES),
             })
             return
         if path == "/api/analyze/progress":
