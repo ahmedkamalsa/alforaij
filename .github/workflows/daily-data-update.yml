@@ -30,3 +30,15 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           AGENT_ROUTER_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
           OFFICIAL_TRANSACTIONS_SOURCE: ${{ vars.OFFICIAL_TRANSACTIONS_SOURCE }}
+      - name: Trigger static redeploy with fresh data
+        env:
+          TOKEN: ${{ secrets.ALFORAIJBOARD_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "ALFORAIJBOARD_TOKEN not configured; relying on the scheduled redeploy instead."
+            exit 0
+          fi
+          # إعادة بناء فورية بعد الحصاد حتى يصل الحصاد الجديد للموقع المرفوع خلال دقائق
+          # (الجدول اليومي 04:00 UTC احتياط إن فشل هذا التشغيل).
+          gh workflow run deploy-alforaijboard.yml
+          gh workflow run deploy-static.yml

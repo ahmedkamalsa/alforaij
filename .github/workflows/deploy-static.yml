@@ -11,6 +11,10 @@ on:
       - "scripts/export_static_frontend_data.py"
       - "netlify.toml"
       - ".github/workflows/deploy-static.yml"
+  # إعادة بناء تلقائية يوميًا بعد الحصاد (03:00 UTC) لتبقى اللقطة الثابتة
+  # محدثة من قاعدة البيانات الحية دون أي خطوة يدوية — 04:00 UTC = 07:00 القاهرة.
+  schedule:
+    - cron: "0 4 * * *"
 
 permissions:
   contents: read
