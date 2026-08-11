@@ -1072,15 +1072,24 @@ async function loadInsights() {
   }
 }
 
-// خريطة حرارية للمناطق: فجوة سعر كل منطقة (وسيط سعر المتر) مقابل وسيط محافظتها
+// خريطة حرارية للمناطق: فجوة سعر كل منطقة (وسيط سعر المتر) مقابل وسيط محافظتها،
+// وعائد الإيجار السنوي = (وسيط الإيجار × 12) ÷ وسيط سعر البيع
 function computeAreaHeatmap(rows) {
-  const saleRows = (rows || []).filter((row) => String(row.transaction || "").includes("بيع") && Number(row.price) > 0 && Number(row.space) > 0);
+  const all = rows || [];
+  const saleRows = all.filter((row) => String(row.transaction || "").includes("بيع") && Number(row.price) > 0 && Number(row.space) > 0);
+  const rentRows = all.filter((row) => String(row.transaction || "").includes("إيجار") && Number(row.price) > 0);
   const perM2ByArea = {};
   const perM2ByGov = {};
+  const salePriceByArea = {};
+  const rentPriceByArea = {};
   for (const row of saleRows) {
     const perM2 = Number(row.price) / Number(row.space);
     (perM2ByArea[row.area] ||= []).push(perM2);
+    (salePriceByArea[row.area] ||= []).push(Number(row.price));
     if (row.governorate) (perM2ByGov[row.governorate] ||= []).push(perM2);
+  }
+  for (const row of rentRows) {
+    (rentPriceByArea[row.area] ||= []).push(Number(row.price));
   }
   const medianOf = (arr) => {
     if (!arr || !arr.length) return null;
@@ -1097,15 +1106,59 @@ function computeAreaHeatmap(rows) {
     const gov = row && row.governorate ? row.governorate : "";
     const base = govMedian[gov];
     if (med == null || !base) continue;
+    const saleMedian = medianOf(salePriceByArea[area]);
+    const rentMedian = medianOf(rentPriceByArea[area]);
+    let yieldPct = null;
+    if (saleMedian && rentMedian && saleMedian > rentMedian * 12) {
+      yieldPct = Math.round(((rentMedian * 12) / saleMedian) * 1000) / 10;
+    }
     areas.push({
       area,
       governorate: gov,
       count: arr.length,
+      rentCount: (rentPriceByArea[area] || []).length,
       perM2: med,
       gapPct: Math.round(((med / base) - 1) * 1000) / 10,
+      yieldPct,
     });
   }
   return areas.sort((a, b) => a.gapPct - b.gapPct);
+}
+
+// وضع تلوين الخريطة: «فجوة السعر» (افتراضي) أو «عائد الإيجار» — يُحفظ في المتصفح
+const heatmapModeKey = "alforaij_heatmap_mode_v1";
+let heatmapMode = (() => {
+  try {
+    return localStorage.getItem(heatmapModeKey) === "yield" ? "yield" : "gap";
+  } catch {
+    return "gap";
+  }
+})();
+
+function setHeatmapMode(mode) {
+  heatmapMode = mode === "yield" ? "yield" : "gap";
+  try {
+    localStorage.setItem(heatmapModeKey, heatmapMode);
+  } catch {
+    // تجاهل بصمت
+  }
+  document.querySelectorAll(".heatmap-mode-switch .mode-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.heatMode === heatmapMode);
+  });
+  syncHeatmapLegends();
+  renderBoardHeatmap(boardState.records);
+  renderInsightsHeatmap(insightsState.data);
+}
+
+function syncHeatmapLegends() {
+  const isYield = heatmapMode === "yield";
+  const html = isYield
+    ? '<i class="legend-swatch" style="background:hsl(120 72% 42% / .85)"></i>عائد مرتفع (فرصة)<i class="legend-swatch" style="background:hsl(60 72% 42% / .85)"></i>عائد متوسط<i class="legend-swatch" style="background:hsl(0 72% 42% / .85)"></i>عائد منخفض'
+    : '<i class="legend-swatch legend-cheap"></i>أرخص من وسيط المحافظة (فرصة)<i class="legend-swatch legend-neutral"></i>قريب من الوسيط<i class="legend-swatch legend-expensive"></i>أعلى من الوسيط (مضخم)';
+  const boardLegend = $("boardHeatmapLegend");
+  const insightsLegend = $("insightsHeatmapLegend");
+  if (boardLegend) boardLegend.innerHTML = html;
+  if (insightsLegend) insightsLegend.innerHTML = html;
 }
 
 // لون متدرج من الأخضر (فرصة) عبر الكهرماني إلى الأحمر (مضخم) حسب فجوة ±30%
@@ -1115,21 +1168,37 @@ function heatColor(gapPct) {
   return `hsl(${hue} 72% 42% / .85)`;
 }
 
+// لون حسب العائد السنوي: أخضر عند ≥6% (فرصة استثمارية) عبر الكهرماني إلى أحمر عند ≤2%
+function yieldColor(yieldPct) {
+  if (yieldPct == null) return "hsl(220 20% 45% / .7)";
+  const t = Math.max(0, Math.min(1, (yieldPct - 2) / 4)); // 0 عند 2% ... 1 عند 6%
+  const hue = Math.round(120 * t); // 0 أحمر → 120 أخضر
+  return `hsl(${hue} 72% 42% / .85)`;
+}
+
 function heatmapCellsHtml(areas) {
+  const isYield = heatmapMode === "yield";
   return areas.map((a) => {
-    const color = heatColor(a.gapPct);
-    const cheap = a.gapPct <= -8, expensive = a.gapPct >= 8, fair = !cheap && !expensive;
-    const cls = cheap ? "heat-cheap" : expensive ? "heat-expensive" : "heat-fair";
-    const sign = a.gapPct > 0 ? "+" : "";
+    // كل خلية تحمل القيمتين (الفجوة والعائد) — اللون والنص حسب الوضع المختار
+    const value = isYield ? a.yieldPct : a.gapPct;
+    const color = isYield ? yieldColor(value) : heatColor(value);
+    const cls = isYield
+      ? value >= 6 ? "heat-cheap" : value <= 2 ? "heat-expensive" : "heat-fair"
+      : a.gapPct <= -8 ? "heat-cheap" : a.gapPct >= 8 ? "heat-expensive" : "heat-fair";
+    const sign = !isYield && value > 0 ? "+" : "";
+    const unit = isYield ? "% عائد سنوي" : "% فجوة";
+    const title = isYield
+      ? `${escapeHtml(a.area)} — عائد إيجار سنوي ${value != null ? value.toLocaleString("en-US", { maximumFractionDigits: 1 }) : "—"}% (بيع ${a.saleCount ?? a.count ?? 0} + إيجار ${a.rentCount ?? 0})`
+      : `${escapeHtml(a.area)} — وسيط ${a.perM2.toLocaleString("en-US")} د.ك/م² مقابل وسيط ${escapeHtml(a.governorate || "" )}: ${sign}${value}% (${a.count} إعلان بيع)`;
     const watched = isWatchedArea(a.area);
     return `
       <div class="heat-cell-wrap">
         <button type="button" class="heat-cell ${cls}" data-heat-area="${escapeHtml(a.area)}" data-heat-gov="${escapeHtml(a.governorate)}"
-          style="--heat:${color}" title="${escapeHtml(a.area)} — وسيط ${a.perM2.toLocaleString("en-US")} د.ك/م² مقابل وسيط ${escapeHtml(a.governorate || "" )}: ${sign}${a.gapPct}% (${a.count} إعلان بيع)">
+          style="--heat:${color}" title="${title}">
           <b>${escapeHtml(a.area)}</b>
-          <span>${sign}${a.gapPct.toLocaleString("en-US", { maximumFractionDigits: 1 })}%</span>
+          <span>${value != null ? `${sign}${value.toLocaleString("en-US", { maximumFractionDigits: 1 })}%` : "—"}</span>
         </button>
-        <button type="button" class="heat-watch-btn${watched ? " watched" : ""}" data-watch-area="${escapeHtml(a.area)}" data-watch-gov="${escapeHtml(a.governorate)}" data-watch-gap="${a.gapPct}" title="${watched ? "إلغاء مراقبة المنطقة" : "احجز هذه المنطقة لمراقبة تغيّر فجوتها"}">${watched ? "★ مراقَبة" : "☆ احجز"}</button>
+        <button type="button" class="heat-watch-btn${watched ? " watched" : ""}" data-watch-area="${escapeHtml(a.area)}" data-watch-gov="${escapeHtml(a.governorate)}" data-watch-gap="${a.gapPct}" data-watch-yield="${a.yieldPct ?? ""}" title="${watched ? "إلغاء مراقبة المنطقة" : "احجز هذه المنطقة لمراقبة تغيّر فجوتها"}">${watched ? "★ مراقَبة" : "☆ احجز"}</button>
       </div>`;
   }).join("");
 }
@@ -1170,12 +1239,15 @@ function computeInsightsHeatmap(data) {
     const med = a.medianSalePerM2 == null ? null : Number(a.medianSalePerM2);
     const base = govMedian[a.governorate];
     if (med == null || !base || !a.governorate) continue;
+    const yieldPct = a.rentalYield != null ? Math.round(Number(a.rentalYield) * 10) / 10 : null;
     out.push({
       area: a.area,
       governorate: a.governorate,
       count: Number(a.saleCount) || 0,
+      rentCount: Number(a.rentCount) || 0,
       perM2: med,
       gapPct: Math.round(((med / base) - 1) * 1000) / 10,
+      yieldPct,
     });
   }
   return out.sort((x, y) => x.gapPct - y.gapPct);
@@ -1203,21 +1275,22 @@ function renderWatchedAreas(root, currentAreas) {
   }
   const byArea = {};
   for (const area of currentAreas || []) byArea[normalizeArabic(area.area)] = area;
+  const isYield = heatmapMode === "yield";
   root.innerHTML = watched.map((item) => {
     const current = byArea[normalizeArabic(item.area)];
-    const gap = current ? current.gapPct : item.gapAtBooking;
-    const sign = gap != null && gap > 0 ? "+" : "";
-    const color = gap != null ? heatColor(gap) : "hsl(220 20% 45% / .7)";
+    const value = current ? (isYield ? current.yieldPct : current.gapPct) : (isYield ? null : item.gapAtBooking);
+    const sign = value != null && value > 0 && !isYield ? "+" : "";
+    const color = value != null ? (isYield ? yieldColor(value) : heatColor(value)) : "hsl(220 20% 45% / .7)";
     const changed = current && item.gapAtBooking != null && Math.abs(current.gapPct - item.gapAtBooking) > 0.5;
     const delta = changed
-      ? `تغيّرت من ${signOld(item.gapAtBooking)} إلى ${signOld(current.gapPct)}`
+      ? `تغيّرت فجوتها من ${signOld(item.gapAtBooking)} إلى ${signOld(current.gapPct)}`
       : "";
     return `
       <div class="watched-area" style="--heat:${color}">
         <span class="watched-dot"></span>
         <b>${escapeHtml(item.area)}</b>
         <small>${escapeHtml(item.governorate || "غير محددة")}</small>
-        <strong>${gap != null ? `${sign}${gap.toLocaleString("en-US", { maximumFractionDigits: 1 })}%` : "—"}</strong>
+        <strong>${value != null ? `${sign}${value.toLocaleString("en-US", { maximumFractionDigits: 1 })}%` : "—"}</strong>
         ${changed ? `<span class="watched-delta">${escapeHtml(delta)}</span>` : ""}
         <span class="watched-date">منذ ${dateText(item.savedAt ? item.savedAt.slice(0, 10) : "")}</span>
         <button type="button" class="heat-watch-btn watched-remove" data-watch-area="${escapeHtml(item.area)}" data-watch-gov="${escapeHtml(item.governorate || "")}" title="إلغاء مراقبة ${escapeHtml(item.area)}">✕ إلغاء</button>
@@ -3970,6 +4043,12 @@ function bind() {
       renderBoard();
       return;
     }
+    const modeBtn = ev.target.closest?.("[data-heat-mode]");
+    if (modeBtn) {
+      ev.preventDefault();
+      setHeatmapMode(modeBtn.dataset.heatMode);
+      return;
+    }
     const watchBtn = ev.target.closest?.("[data-watch-area]");
     if (watchBtn) {
       ev.preventDefault();
@@ -4211,6 +4290,12 @@ async function boot() {
   populateAdvancedOptions();
   initAreaChips();
   initDealSimulator();
+  // تفعيل أزرار تبديل الخريطة الحرارية وحالة الوضع المحفوظ عند الإقلاع
+  // (النقر عبر المعالج المفوض [data-heat-mode] في bind)
+  document.querySelectorAll(".heatmap-mode-switch .mode-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.heatMode === heatmapMode);
+  });
+  syncHeatmapLegends();
   loadDashboardBoard();
   loadOpportunities();
   scheduleDailySixAM();

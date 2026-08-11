@@ -2607,6 +2607,31 @@ button:hover {
   border: 1px solid #fbbf24;
 }
 
+/* مفتاح تبديل أساس تلوين الخريطة: فجوة السعر / عائد الإيجار */
+.heatmap-mode-switch {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mode-btn {
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
 /* قائمة المناطق المراقبة */
 .watched-areas {
   display: grid;

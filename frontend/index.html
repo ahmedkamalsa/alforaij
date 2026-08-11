@@ -10,7 +10,7 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260811-watchlist">
+  <link rel="stylesheet" href="styles.css?v=20260811-heat-mode">
   <script src="config.js?v=20260811-trends"></script>
 </head>
 <body>
@@ -120,12 +120,18 @@
       <div id="boardMetricCards" class="board-metrics"></div>
 
       <div class="section-title compact-title heatmap-title">
-        <h3>خريطة حرارية للمناطق — فجوة السعر</h3>
-        <span class="heatmap-legend">
-          <i class="legend-swatch legend-cheap"></i>أرخص من وسيط المحافظة (فرصة)
-          <i class="legend-swatch legend-neutral"></i>قريب من الوسيط
-          <i class="legend-swatch legend-expensive"></i>أعلى من الوسيط (مضخم)
-        </span>
+        <div>
+          <h3>خريطة حرارية للمناطق</h3>
+          <span class="heatmap-legend" id="boardHeatmapLegend">
+            <i class="legend-swatch legend-cheap"></i>أرخص من وسيط المحافظة (فرصة)
+            <i class="legend-swatch legend-neutral"></i>قريب من الوسيط
+            <i class="legend-swatch legend-expensive"></i>أعلى من الوسيط (مضخم)
+          </span>
+        </div>
+        <div class="heatmap-mode-switch" role="group" aria-label="أساس تلوين الخريطة">
+          <button type="button" class="mode-btn" data-heat-mode="gap">فجوة السعر</button>
+          <button type="button" class="mode-btn" data-heat-mode="yield">عائد الإيجار</button>
+        </div>
       </div>
       <div id="boardHeatmap" class="board-heatmap"></div>
 
@@ -192,12 +198,18 @@
         <span id="insightsMeta" class="filter-summary"></span>
       </div>
       <div class="section-title compact-title heatmap-title">
-        <h3>خريطة حرارية للمناطق — فجوة السعر</h3>
-        <span class="heatmap-legend">
-          <i class="legend-swatch legend-cheap"></i>أرخص من وسيط المحافظة (فرصة)
-          <i class="legend-swatch legend-neutral"></i>قريب من الوسيط
-          <i class="legend-swatch legend-expensive"></i>أعلى من الوسيط (مضخم)
-        </span>
+        <div>
+          <h3>خريطة حرارية للمناطق</h3>
+          <span class="heatmap-legend" id="insightsHeatmapLegend">
+            <i class="legend-swatch legend-cheap"></i>أرخص من وسيط المحافظة (فرصة)
+            <i class="legend-swatch legend-neutral"></i>قريب من الوسيط
+            <i class="legend-swatch legend-expensive"></i>أعلى من الوسيط (مضخم)
+          </span>
+        </div>
+        <div class="heatmap-mode-switch" role="group" aria-label="أساس تلوين الخريطة">
+          <button type="button" class="mode-btn" data-heat-mode="gap">فجوة السعر</button>
+          <button type="button" class="mode-btn" data-heat-mode="yield">عائد الإيجار</button>
+        </div>
       </div>
       <div id="insightsHeatmap" class="board-heatmap">
         <div class="empty">جاري تحميل الخريطة الحرارية...</div>
@@ -572,6 +584,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260811-watchlist"></script>
+  <script src="app.js?v=20260811-heat-mode"></script>
 </body>
 </html>
