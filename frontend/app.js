@@ -132,12 +132,38 @@ async function fetchStaticJson(path) {
   return response.json();
 }
 
+// تحليل استجابة JSON بأمان: بعض المضيفين (GitHub Pages، خادم ثابت) يرجعون
+// صفحة HTML عند نقطة غير موجودة فيفشل response.json() بخطأ «Unexpected token <»
+// الغامض — هنا نفحص نوع الرد ونعطي رسالة واضحة بالعربية مع سياق حقيقي.
+async function readJsonResponse(response, context = "") {
+  const text = await response.text();
+  if (!text.trim()) {
+    throw new Error(`الخادم أعاد ردًا فارغًا${context ? ` (${context})` : ""}.`);
+  }
+  const trimmed = text.trim();
+  const isJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+  if (!isJson) {
+    const snippet = trimmed.replace(/\s+/g, " ").slice(0, 120);
+    throw new Error(
+      `تعذر الاتصال بالخادم${context ? ` (${context})` : ""}: استجاب بصفحة ${response.status || ""} بدل JSON (${snippet}). ` +
+      (STATIC_SNAPSHOT_MODE
+        ? "هذه النسخة المنشورة لا تستضيف خادم API — الميزة تتطلب تشغيل الخادم المحلي."
+        : "تأكد أن الخادم يعمل وأن النقطة صحيحة.")
+    );
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch (err) {
+    throw new Error(`استجابة JSON غير صالحة من الخادم${context ? ` (${context})` : ""}.`);
+  }
+}
+
 async function getJson(path) {
   if (STATIC_SNAPSHOT_MODE) return fetchStaticJson(path);
   try {
     const response = await fetch(apiUrl(path));
     if (!response.ok) throw new Error(await response.text());
-    return await response.json();
+    return await readJsonResponse(response);
   } catch (err) {
     const fallback = staticDataUrl(path);
     if (!fallback) throw err;
@@ -606,7 +632,7 @@ async function postJson(path, payload) {
       body: JSON.stringify(payload),
     });
     if (!response.ok) throw new Error(await response.text());
-    return await response.json();
+    return await readJsonResponse(response, path);
   } catch (err) {
     // أي مضيف بلا API (خادم ثابت محلي، رابط مضبوط غير متاح): التحليل يعمل داخل المتصفح على اللقطة
     if (path === "/api/analyze") return staticAnalyzeReport(payload);
@@ -3514,6 +3540,14 @@ async function runDailyAgentNow() {
   const stateEl = $("dailyAgentState");
   const inlineStateEl = $("dailyAgentStateInline");
   const originals = buttons.map((button) => button.textContent);
+  // النسخة المنشورة (GitHub Pages) لا تستضيف خادم API — الوكيل يعمل على الخادم
+  // المباشر فقط؛ هنا نوضح ذلك بدل إرسال طلب لنقطة غير موجودة يعيد صفحة HTML.
+  if (STATIC_SNAPSHOT_MODE) {
+    const msg = "وكيل التحديث يعمل على الخادم المباشر فقط — هذه النسخة المنشورة تعرض أحدث لقطة (تُحدَّث تلقائيًا يوميًا).";
+    if (stateEl) stateEl.textContent = msg;
+    if (inlineStateEl) inlineStateEl.textContent = msg;
+    return;
+  }
   buttons.forEach((button) => {
     button.disabled = true;
     button.textContent = "جاري تشغيل الوكيل...";
@@ -3526,7 +3560,7 @@ async function runDailyAgentNow() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ includeExternal: true }),
     });
-    const result = await response.json();
+    const result = await readJsonResponse(response, "/api/daily-agent/run");
     if (!response.ok) throw new Error(result.error || result.detail || "فشل تشغيل الوكيل");
     if (stateEl) stateEl.textContent = `اكتمل التشغيل: ${result.status}`;
     if (inlineStateEl) inlineStateEl.textContent = `اكتمل التشغيل: ${result.status}`;
