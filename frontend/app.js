@@ -817,6 +817,13 @@ async function loadDashboardBoard() {
     const data = await getJson(`/api/dashboard/summary${suffix}`);
     boardState.allRecords = data.records || [];
     setTabCount("tabCountBoard", boardState.allRecords.length);
+    // تلميح يشرح ماذا يعدّ عدّاد اللوحة: الفريج المحلي + حصاد المواقع الخارجية الموثق
+    const boardEl = $("tabCountBoard");
+    if (boardEl) {
+      const localCount = boardState.allRecords.filter((row) => (row.source || "").includes("الفريج")).length;
+      const externalCount = boardState.allRecords.length - localCount;
+      boardEl.title = `لوحة السوق: ${boardState.allRecords.length} سجلًا (الفريج ${localCount} + المواقع الخارجية ${externalCount}) — كل رقم برابطه الأصلي ووقت جليه`;
+    }
     boardState.records = STATIC_SNAPSHOT_MODE
       ? boardState.allRecords.filter((row) => sourceMatchesPlatformScope(row, platforms))
       : boardState.allRecords;

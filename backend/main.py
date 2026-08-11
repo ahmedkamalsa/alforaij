@@ -190,26 +190,124 @@ def _is_local_platform_selected(selected: set[str]) -> bool:
     return bool(selected & local_names)
 
 
+def _market_row_to_record(row: dict) -> dict:
+    """تحويل صف market_listings (الحصاد المتراكم من كل المواقع) إلى سجل لوحة."""
+    return {
+        "code": str(row.get("code") or ""),
+        "transaction": row.get("transaction") or "",
+        "governorate": row.get("governorate") or "",
+        "area": row.get("area") or "",
+        "propertyType": row.get("property_type") or "",
+        "detailClass": row.get("detail_class") or "خارجي",
+        "price": row.get("price"),
+        "priceText": row.get("price_text") or "",
+        "space": row.get("space"),
+        "listingMode": row.get("listing_mode") or "خارجي",
+        "publishedDate": row.get("published_date") or "",
+        "source": row.get("source") or "السوق الخارجي",
+        "summary": row.get("summary") or "",
+        "features": row.get("features") or "",
+        "originalUrl": row.get("original_url") or "",
+        "fetchedAt": str(row.get("fetched_at") or "")[:19],
+        "harvested": True,
+    }
+
+
+def _market_ad_row_to_record(row: dict) -> dict:
+    """تحويل صف market_ads (إعلانات حية محفوظة مثل بوشملان) إلى سجل لوحة."""
+    raw_source = str(row.get("source_name") or "السوق المباشر")
+    code = str(row.get("source_listing_id") or "") or str(row.get("id") or "")
+    return {
+        "code": f"LIVE-{raw_source}-{code}",
+        "transaction": "للإيجار" if "rent" in str(row.get("source_url") or "").lower() else "للبيع",
+        "governorate": "",
+        "area": row.get("region") or "",
+        "propertyType": row.get("property_type") or "",
+        "detailClass": "خارجي مباشر",
+        "price": row.get("asking_price"),
+        "priceText": f"{row.get('asking_price') or ''} د.ك" if row.get("asking_price") is not None else "",
+        "space": row.get("land_area_m2") or row.get("built_up_area_m2"),
+        "listingMode": "خارجي مباشر",
+        "publishedDate": "",
+        "source": raw_source,
+        "summary": row.get("title") or "",
+        "features": row.get("title") or "",
+        "originalUrl": row.get("source_url") or "",
+        "fetchedAt": str(row.get("fetched_at") or "")[:19],
+        "harvested": True,
+    }
+
+
 def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> list[dict]:
+    """سجلات السوق الخارجية: الحصاد المتراكم من القاعدة (market_listings) هو المصدر
+    الأساسي بدل الفحص الحي الصغير — فكل إعلان موثق برابطه الأصلي ووقت جليه، وتتسق
+    الأرقام مع إجمالي القاعدة. إعلانات market_ads الحية تُدمج بلا تكرار، والفحص الحي
+    يُستخدم كسقوط آمن فقط عند غياب القاعدة."""
     market_names = {"السوق المباشر", "بوشملان", "OpenSooq", "Mourjan", "Q8Aqar", "Sakan", "Waseet", "4Sale", "Bu3qar", "Aqarat", "NabdAqar", "Yebtah"}
-    records = []
-    if not selected or selected & market_names:
+    records: list[dict] = []
+    known_codes: set[str] = set()
+
+    def _accept(raw_source: str) -> bool:
+        return not selected or _platform_match(raw_source, selected) or "السوق المباشر" in selected
+
+    # 1) الحصاد المتراكم من market_listings (المصدر الأساسي — كل المواقع الموثقة)
+    harvested = []
+    try:
+        from backend.services.supabase_store import fetch_market_listings
+        harvested = fetch_market_listings(limit=2000) or []
+    except Exception as exc:
+        logger.warning("Dashboard harvested market records skipped: %s", exc)
+    for row in harvested:
+        raw_source = str(row.get("source") or "السوق المباشر")
+        if not _accept(raw_source):
+            continue
+        record = _market_row_to_record(row)
+        _normalize_dashboard_place(record, area_map)
+        records.append(record)
+        if record["code"]:
+            known_codes.add(record["code"])
+
+    # 2) إعلانات market_ads الحية المحفوظة (بوشملان وغيرها) — بلا تكرار مع الحصاد
+    try:
+        from backend.services.supabase_store import _fetch_rows, SUPABASE_URL
+        live_rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_ads?select=*&limit=2000") or []
+        for row in live_rows:
+            raw_source = str(row.get("source_name") or "السوق المباشر")
+            if not _accept(raw_source):
+                continue
+            record = _market_ad_row_to_record(row)
+            _normalize_dashboard_place(record, area_map)
+            if record["code"] in known_codes:
+                continue
+            records.append(record)
+            if record["code"]:
+                known_codes.add(record["code"])
+    except Exception as exc:
+        logger.warning("Dashboard live saved market records skipped: %s", exc)
+
+    # 3) الفحص الحي — سقوط آمن فقط عند غياب القاعدة (أو عند طلب منصة بعينها غير محصودة)
+    if not harvested and (not selected or selected & market_names):
         try:
             from backend.connectors.market_ads import search as search_market_ads
             from backend.models import PropertyRequest
 
             listings, _status = search_market_ads(PropertyRequest(raw_text=""))
         except Exception as exc:
-            logger.warning("Dashboard market records skipped: %s", exc)
+            logger.warning("Dashboard live market records skipped: %s", exc)
             listings = []
         for listing in listings:
             raw_source = str((listing.raw or {}).get("source_name") or listing.source or "السوق المباشر")
-            if selected and not _platform_match(raw_source, selected) and "السوق المباشر" not in selected:
+            if not _accept(raw_source):
+                continue
+            code = str(listing.code or "")
+            if code and code in known_codes:
                 continue
             record = _dashboard_record(listing)
             _normalize_dashboard_place(record, area_map)
             record["source"] = raw_source
             records.append(record)
+            if code:
+                known_codes.add(code)
     if not selected or _platform_match("الحسبة - الصفقات المسجلة العامة", selected):
         try:
             from backend.connectors.official_data import load_transactions, _transaction_listing
