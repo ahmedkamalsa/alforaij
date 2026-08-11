@@ -93,6 +93,65 @@ class LiveSourceParsingTests(unittest.TestCase):
         self.assertEqual(price, 220000)
         self.assertEqual(space, 300)
 
+    def test_detail_fields_extracts_place_from_jsonld_and_title(self) -> None:
+        from backend.connectors.live_sources import _detail_fields
+
+        body = (
+            '<meta property="product:price:amount" content="225,000">'
+            '<meta property="product:property:size" content="300">'
+            "<script type=\"application/ld+json\">"
+            '{"@type": "RealEstateListing", "address": '
+            '{"addressLocality": "Khaitan", "addressRegion": "Farwaniya"}}'
+            "</script>"
+        )
+        fields = _detail_fields(body)
+        self.assertEqual(fields["price"], 225000)
+        self.assertEqual(fields["space"], 300)
+        self.assertEqual(fields["area"], "خيطان")
+        self.assertEqual(fields["governorate"], "محافظة الفروانية")
+
+    def test_enrich_listings_from_details_fills_missing_fields(self) -> None:
+        from unittest.mock import patch
+
+        from backend.connectors.live_sources import enrich_listings_from_details
+        from backend.models import Listing
+
+        detail_body = (
+            '<meta property="product:price:amount" content="175,000">'
+            '<meta property="product:property:size" content="320">'
+            "<title>بيت للبيع في الرميثية، محافظة حولي</title>"
+        )
+
+        def fake_fetch_url(url, extra_headers=None):
+            return detail_body, 200, 100.0, None, 1
+
+        listings = [
+            Listing(
+                code="T1", transaction="للبيع", governorate="", area="",
+                property_type="بيت", detail_class="مصدر خارجي", price=None,
+                price_text="غير معلن", space=None, listing_mode="خارجي مباشر",
+                summary="بيت في الرميثية", features="", published_date="",
+                original_url="https://example.com/detail/1", source="TestSource",
+            ),
+            Listing(
+                code="T2", transaction="للبيع", governorate="محافظة حولي", area="السالمية",
+                property_type="بيت", detail_class="مصدر خارجي", price=200000,
+                price_text="200,000 د.ك", space=320, listing_mode="خارجي مباشر",
+                summary="بيت في السالمية", features="", published_date="",
+                original_url="https://example.com/detail/2", source="TestSource",
+            ),
+        ]
+        with patch("backend.connectors.live_sources.fetch_url", side_effect=fake_fetch_url):
+            stats = enrich_listings_from_details(listings, max_pages=10)
+        self.assertEqual(stats["enriched"], 1)
+        self.assertEqual(stats["read"], 1)  # الإعلان الثاني مكتمل — لا يُقرأ
+        self.assertEqual(listings[0].price, 175000)
+        self.assertEqual(listings[0].space, 320)
+        self.assertEqual(listings[0].area, "الرميثية")
+        self.assertEqual(listings[0].governorate, "محافظة حولي")
+        self.assertIn("enrichedFromDetails", listings[0].raw)
+        self.assertEqual(listings[1].price, 200000)  # لم يُقرأ لأنه مكتمل سابقًا
+
     def test_sakan_embedded_extraction(self) -> None:
         from backend.connectors.live_sources import _extract_sakan_embedded
 

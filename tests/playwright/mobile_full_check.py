@@ -160,8 +160,20 @@ with sync_playwright() as p:
     }
     page.screenshot(path="tests/playwright/mobile_insights.png")
 
-    # ── 5) المصادر والتشغيل ──
+    # ── 5) التطورات (وكيل الاكتشاف اليومي) ──
     tab_click(page, 4)
+    page.wait_for_timeout(2000)
+    results["developments"] = {
+        "overflow": page_overflow(page),
+        "cards": page.locator(".development-card").count(),
+        "agentStateShown": page.locator("#developmentsAgentState").count(),
+        "offenders": offenders(page),
+        "touch": touch_audit(page),
+    }
+    page.screenshot(path="tests/playwright/mobile_developments.png")
+
+    # ── 6) المصادر والتشغيل ──
+    tab_click(page, 5)
     page.wait_for_timeout(2000)
     results["sources"] = {
         "overflow": page_overflow(page),
@@ -179,7 +191,7 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 
 sub = results["opportunities"]["subTabs"]
 failed = (
-    any(results[s]["overflow"] or results[s]["offenders"] or results[s]["touch"] for s in ("search", "opportunities", "board", "insights", "sources"))
+    any(results[s]["overflow"] or results[s]["offenders"] or results[s]["touch"] for s in ("search", "opportunities", "board", "insights", "developments", "sources"))
     or any(sub[t]["overflow"] or sub[t]["offenders"] or sub[t]["contentLen"] == 0 or sub[t]["touch"] for t in sub)
     or results["search"]["resultCards"] == 0
     or results["opportunities"]["cards"] == 0

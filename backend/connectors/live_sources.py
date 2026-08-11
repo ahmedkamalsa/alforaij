@@ -229,8 +229,14 @@ def _is_transient_error(exc: BaseException) -> bool:
     return False
 
 
+# تحويل الأرقام العربية الهندية (٠-٩) وفواصلها إلى الإنجليزية (0-9) عند دخول النص
+# — كل الأرقام المعروضة في المنصة بالإنجليزية مهما كان مصدر النص.
+_AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩٫٬", "0123456789.,")
+
+
 def clean_text(value: str) -> str:
     value = html.unescape(re.sub(r"<[^>]+>", " ", value or ""))
+    value = value.translate(_AR_DIGITS)
     return re.sub(r"\s+", " ", value).strip()
 
 
@@ -940,6 +946,26 @@ def search_nabdaqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
     )
 
 
+def _detail_fields(body: str) -> dict[str, Any]:
+    """استخراج السعر والمساحة والمنطقة والمحافظة من صفحة تفاصيل إعلان.
+
+    الوسوم الوصفية أولًا ثم JSON-LD ثم نص صريح — لكل حقل على حدة حتى يكتمل
+    الإعلان من صفحة التفاصيل عندما لا تحمل القائمة السابقة الحقل.
+    """
+    price, space = _detail_price_space(body)
+    area, governorate = _detail_place(body)
+    fields: dict[str, Any] = {}
+    if price is not None:
+        fields["price"] = price
+    if space is not None:
+        fields["space"] = space
+    if area:
+        fields["area"] = area
+    if governorate:
+        fields["governorate"] = governorate
+    return fields
+
+
 def _detail_price_space(body: str) -> tuple[float | None, float | None]:
     """استخراج السعر والمساحة من صفحة تفاصيل إعلان (وسوم وصفية أولًا ثم JSON-LD ثم نص صريح)."""
     price: float | None = None
@@ -984,6 +1010,63 @@ def _detail_price_space(body: str) -> tuple[float | None, float | None]:
     return price, space
 
 
+def _detail_place(body: str) -> tuple[str, str]:
+    """استخراج المنطقة والمحافظة من صفحة تفاصيل إعلان (JSON-LD address ثم وسوم ثم نص صريح)."""
+    area = ""
+    governorate = ""
+    # JSON-LD address هو الأكثر دقة (addressLocality/addressRegion)
+    for raw_json in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S):
+        try:
+            data = json.loads(raw_json)
+        except json.JSONDecodeError:
+            continue
+        for node in walk_dicts(data):
+            if not isinstance(node, dict):
+                continue
+            addr = node.get("address") or {}
+            if not isinstance(addr, dict):
+                continue
+            locality = str(addr.get("addressLocality") or addr.get("addressRegion") or "")
+            if locality and not area:
+                area = detect_area(locality)
+            region = str(addr.get("addressRegion") or "")
+            if region and not governorate:
+                governorate = _detail_governorate(region)
+    # وسوم العنوان (og:title / title) تكمل ما لم يظهر في JSON-LD
+    if not area or not governorate:
+        for pattern in (
+            r'property="og:title"\s+content="([^"]+)"',
+            r'<title[^>]*>(.*?)</title>',
+        ):
+            match = re.search(pattern, body, re.I | re.S)
+            if not match:
+                continue
+            title_text = clean_text(match.group(1))
+            if not area:
+                area = detect_area(title_text)
+            if not governorate:
+                governorate = _detail_governorate(title_text)
+            if area and governorate:
+                break
+    return area, governorate
+
+
+def _detail_governorate(text: str) -> str:
+    """محافظة كويتية من نص إنجليزي/عربي (العاصمة/حولي/الفروانية/الأحمدي/الجهراء/مبارك الكبير)."""
+    lowered = text.lower()
+    for key, gov in (
+        (("al-asimah", "capital", "kuwait city", "كويت سيتي"), "محافظة العاصمة"),
+        (("hawally", "hawalli", "حولي", "السالمية", "الجابرية", "الرميثية", "بيان", "سلوى"), "محافظة حولي"),
+        (("farwaniya", "الفروانية", "خيطان", "الفردوس", "الرابية", "العارضية"), "محافظة الفروانية"),
+        (("ahmadi", "الأحمدي", "الفحيحيل", "المهبولة", "الوفرة"), "محافظة الأحمدي"),
+        (("jahra", "الجهراء", "المطلاع", "القصر", "النعيم"), "محافظة الجهراء"),
+        (("mubarak", "مبارك الكبير", "صباح السالم", "أبو فطيرة", "القرين"), "محافظة مبارك الكبير"),
+    ):
+        if any(token in lowered for token in key):
+            return gov
+    return ""
+
+
 def _number(value: Any) -> float | None:
     if value in (None, ""):
         return None
@@ -1015,6 +1098,101 @@ def search_q8aqar_details(hrefs: list[str]) -> dict[str, tuple[float | None, flo
             if price or space:
                 detail[href] = (price, space)
     return detail
+
+
+def enrich_listings_from_details(
+    listings: list[Listing],
+    *,
+    max_pages: int = 10,
+    workers: int = 4,
+) -> dict[str, Any]:
+    """وكيل إكمال التفاصيل: يقرأ صفحة تفاصيل كل إعلان ناقص لاستكمال الحقول المفقودة.
+
+    الإعلانات القادمة من صفحات القوائم (Q8Aqar/Mourjan/OpenSooq/…) كثيرًا ما تفتقر
+    للسعر أو المساحة أو المنطقة لأن قائمة البحث تعرض ملخصًا فقط. هذا الوكيل:
+      1) يحدد الإعلانات التي ينقصها سعر أو مساحة أو منطقة أو محافظة،
+      2) يجلب صفحة التفاصيل الخاصة بها بالتوازي (حد أقصى max_pages لئلا يطيل زمن التحليل)،
+      3) يستخرج الحقول الناقصة من الصفحة (وسوم + JSON-LD + نص صريح)،
+      4) يحدّث الإعلان في مكانه حتى تكتمل بياناته قبل المطابقة بالفلاتر والتقييم،
+      5) يوثّق ما اكتمل في listing.raw["enrichedFromDetails"] ليكون شفافًا في التقرير.
+
+    يعيد إحصائية: كم صفحة قُرئت، كم إعلان اكتمل، وما الحقول المستكملة، وما فشل.
+    """
+    incomplete = [
+        listing for listing in listings
+        if listing.original_url
+        and (
+            not listing.price
+            or not listing.space
+            or not listing.area
+            or not listing.governorate
+        )
+    ]
+    if not incomplete:
+        return {"status": "no_data", "read": 0, "enriched": 0, "fields": {}, "failed": 0, "note": "كل الإعلانات مكتملة — لا حاجة لقراءة تفاصيل."}
+    targets = incomplete[:max_pages]
+
+    def _fetch_one(listing: Listing) -> tuple[Listing, dict[str, Any]]:
+        body, _status, _ms, error, _attempts = fetch_url(listing.original_url)
+        if not body or error:
+            return listing, {"error": error or "صفحة فارغة"}
+        return listing, _detail_fields(body)
+
+    results: list[tuple[Listing, dict[str, Any]]] = []
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for listing, fields in pool.map(_fetch_one, targets):
+            results.append((listing, fields))
+
+    fields_filled: dict[str, int] = {}
+    enriched = 0
+    failed = 0
+    for listing, fields in results:
+        if fields.get("error"):
+            failed += 1
+            continue
+        changed: list[str] = []
+        if not listing.price and fields.get("price"):
+            listing.price = float(fields["price"])
+            listing.price_text = f"{listing.price:,.0f} د.ك"
+            changed.append("price")
+        if not listing.space and fields.get("space"):
+            listing.space = float(fields["space"])
+            changed.append("space")
+        if not listing.area and fields.get("area"):
+            listing.area = str(fields["area"])
+            changed.append("area")
+        if not listing.governorate and fields.get("governorate"):
+            listing.governorate = str(fields["governorate"])
+            changed.append("governorate")
+        if changed:
+            enriched += 1
+            for field in changed:
+                fields_filled[field] = fields_filled.get(field, 0) + 1
+            raw = dict(listing.raw or {})
+            raw["enrichedFromDetails"] = {
+                "fields": changed,
+                "url": listing.original_url,
+                "note": "أُكملت الحقول الناقصة من صفحة تفاصيل الإعلان نفسها.",
+            }
+            listing.raw = raw
+
+    parts = [f"قراءة {len(targets)} صفحة تفاصيل"]
+    if enriched:
+        parts.append(f"اكتمل {enriched} إعلان")
+    if fields_filled:
+        labels = {"price": "سعر", "space": "مساحة", "area": "منطقة", "governorate": "محافظة"}
+        filled = ", ".join(f"{labels.get(k, k)}: {v}" for k, v in sorted(fields_filled.items()))
+        parts.append(f"({filled})")
+    if failed:
+        parts.append(f"فشل {failed} صفحة")
+    return {
+        "status": "success" if enriched else ("failed" if failed else "no_data"),
+        "read": len(targets),
+        "enriched": enriched,
+        "fields": fields_filled,
+        "failed": failed,
+        "note": "، ".join(parts),
+    }
 
 
 def _extract_sakan_embedded(body: str) -> list[dict[str, Any]]:

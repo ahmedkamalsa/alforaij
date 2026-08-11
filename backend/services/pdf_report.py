@@ -92,8 +92,13 @@ def _shape(text: str) -> str:
     return get_display(reshaped)
 
 
+# كل الأرقام في PDF بالإنجليزية: تحويل العربية الهندية (٠-٩) وفواصلها عند التضمين.
+_PDF_AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩٫٬", "0123456789.,")
+
+
 def _esc(value: Any) -> str:
-    return str(value if value is not None else "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    text = str(value if value is not None else "").translate(_PDF_AR_DIGITS)
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def ar(text: Any) -> str:

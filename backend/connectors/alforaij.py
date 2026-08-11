@@ -3,10 +3,19 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from backend.config import BOARD_HTML_PATH, SEED_LISTINGS_PATH
 from backend.models import Listing
 from backend.services.request_parser import extract_area_range, normalize_text
+
+# كل الأرقام المعروضة في المنصة بالإنجليزية: تحويل الأرقام العربية الهندية (٠-٩)
+# وفواصلها في نصوص الإعلانات المحلية عند التحميل — قبل الحفظ والقاعدة والتقارير.
+_AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩٫٬", "0123456789.,")
+
+
+def _latin_text(value: Any) -> str:
+    return str(value or "").translate(_AR_DIGITS)
 
 
 def _payload_from_html(path: Path) -> dict:
@@ -65,11 +74,11 @@ def load_listings() -> list[Listing]:
                 property_type=str(row.get("property_type") or ""),
                 detail_class=str(row.get("detail_class") or ""),
                 price=float(row["price"]) if row.get("price") not in (None, "") else None,
-                price_text=str(row.get("priceText") or ""),
+                price_text=_latin_text(row.get("priceText")),
                 space=_safe_space(row),
                 listing_mode=str(row.get("listingMode") or ""),
-                summary=str(row.get("summary") or ""),
-                features=str(row.get("features") or ""),
+                summary=_latin_text(row.get("summary")),
+                features=_latin_text(row.get("features")),
                 published_date=str(row.get("publishedDate") or ""),
                 original_url=str(row.get("originalUrl") or ""),
                 raw=row,

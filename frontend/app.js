@@ -155,6 +155,7 @@ const STATIC_DATA_MAP = {
   "/api/search-options": "search-options.json",
   "/api/live-db": "live-db.json",
   "/api/market-insights": "market-insights.json",
+  "/api/developments": "developments.json",
 };
 
 function apiUrl(path) {
@@ -214,8 +215,18 @@ async function getJson(path) {
   }
 }
 
-function escapeHtml(value) {
+// كل الأرقام المعروضة بالإنجليزية (0-9) مهما حمل النص أرقامًا عربية هندية (٠-٩)
+// من المصادر أو القاعدة — تحويل عند العرض كطبقة أمان فوق تحويل الواجهة الخلفية.
+const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+function latinDigits(value) {
   return String(value ?? "")
+    .replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)))
+    .replace(/٫/g, ".")
+    .replace(/٬/g, ",");
+}
+
+function escapeHtml(value) {
+  return latinDigits(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -632,7 +643,7 @@ function staticAnalyzeReport(payload) {
   }).sort((a, b) => b.recommendationScore - a.recommendationScore).slice(0, 20);
 
   return {
-    generatedAt: new Date().toLocaleString("ar-KW"),
+    generatedAt: new Date().toLocaleString("ar-KW-u-nu-latn"),
     analysisMethod: "local",
     summary: results.length
       ? `تم تحليل ${results.length} نتيجة من أحدث بيانات السوق. أفضل نتيجة ${results[0].code} بدرجة ${results[0].recommendationScore}/100.`
@@ -941,7 +952,7 @@ function formatKd(value) {
   if (value == null || value === "") return "—";
   const n = Number(value);
   if (!isFinite(n)) return "—";
-  return n >= 1000 ? `${(n / 1000).toLocaleString("ar-KW", { maximumFractionDigits: 1 })} ألف` : n.toLocaleString("ar-KW", { maximumFractionDigits: 0 });
+  return n >= 1000 ? `${(n / 1000).toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 1 })} ألف` : n.toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 0 });
 }
 
 function renderInsights() {
@@ -969,7 +980,7 @@ function renderInsights() {
       <div class="insight-card ${tier}">
         <div class="insight-card-head">
           <strong>${escapeHtml(a.area)}</strong>
-          <span class="yield-pct">${pct.toLocaleString("ar-KW", { maximumFractionDigits: 1 })}%</span>
+          <span class="yield-pct">${pct.toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 1 })}%</span>
         </div>
         <div class="insight-card-body">
           <span>بيع: ${formatKd(a.medianSalePrice)} <small>(${a.saleCount})</small></span>
@@ -1677,7 +1688,7 @@ function progressBubbleHtml(jobId) {
     <div class="lp-bar-wrap" hidden><div class="lp-bar"><div class="lp-bar-fill"></div></div><span class="lp-bar-label"></span></div>
     <div class="lp-detail">تحضير الطلب...</div>
     <div class="lp-sources"></div>
-    <div class="meta">(${new Date().toLocaleTimeString()})</div>
+    <div class="meta">(${new Date().toLocaleTimeString("ar-KW-u-nu-latn")})</div>
   </div>`;
 }
 
@@ -1795,7 +1806,7 @@ async function sendChat() {
     const bubbleEl = win.querySelector('.chat-message.assistant:last-child .live-progress');
     startProgressPolling(jobId, bubbleEl, () => !state.chatSubmitting);
   } else {
-    addChatMessage('assistant', `<div class="bubble assistant">جاري البحث والتقييم... <div class="meta">(${new Date().toLocaleTimeString()})</div></div>`);
+    addChatMessage('assistant', `<div class="bubble assistant">جاري البحث والتقييم... <div class="meta">(${new Date().toLocaleTimeString("ar-KW-u-nu-latn")})</div></div>`);
   }
 
   try {
@@ -1813,7 +1824,7 @@ async function sendChat() {
           ? `<p class="scope-note">${escapeHtml(report.searchScope.note)}</p>`
           : "";
         const detectedAreas = requestedAreas(report).join("، ") || "غير محددة";
-        const generatedAt = report.generatedAt || new Date().toLocaleString();
+        const generatedAt = report.generatedAt || new Date().toLocaleString("ar-KW-u-nu-latn");
         last.innerHTML = `<div class="bubble assistant">
           <strong>النتيجة:</strong>
           <p class="scope-note">منطقة البحث المكتشفة: ${escapeHtml(detectedAreas)} | تاريخ التحليل: ${escapeHtml(generatedAt)}</p>
@@ -1821,7 +1832,7 @@ async function sendChat() {
           ${scopeText}
           <p>${formatSummary(summaryLead(report.summary || ''))}</p>
           <div class="chat-results-preview">${report.results && report.results.length ? `<strong>عدد النتائج:</strong> ${report.results.length} — أفضل توصية: ${Math.round(report.results[0].recommendationScore || 0)}/100` : 'لا توجد نتائج.'}</div>
-          <div class="meta">${new Date().toLocaleTimeString()}</div>
+          <div class="meta">${new Date().toLocaleTimeString("ar-KW-u-nu-latn")}</div>
         </div>`;
       }
     }
@@ -2331,12 +2342,12 @@ function renderReport(report) {
     }
     const srcEl = node.querySelector(".src-pill");
     if (srcEl) {
-      srcEl.textContent = item.fallbackFor ? `${item.source || "مصدر"} ← ${item.fallbackFor}` : (item.source || "مصدر غير محدد");
+      srcEl.textContent = latinDigits(item.fallbackFor ? `${item.source || "مصدر"} ← ${item.fallbackFor}` : (item.source || "مصدر غير محدد"));
     }
     const sourceLabel = item.fallbackFor
       ? `${item.source || "مصدر غير محدد"} (عبر بديل ${item.fallbackFor})`
       : (item.source || "مصدر غير محدد");
-    node.querySelector(".meta").textContent = `${sourceLabel} | ${item.governorate || ""} | ${item.propertyType || item.detailClass || ""}`;
+    node.querySelector(".meta").textContent = latinDigits(`${sourceLabel} | ${item.governorate || ""} | ${item.propertyType || item.detailClass || ""}`);
     // شبكة الحقائق: صف أول (كود/محافظة/منطقة/نوع) + صف ثانٍ (سعر/مساحة/تاريخ/مشاهدات)
     const factsEl = node.querySelector(".card-facts");
     if (factsEl) {
@@ -2411,13 +2422,13 @@ function renderReport(report) {
     const insights = node.querySelector(".result-insights");
     if (insights) insights.insertAdjacentHTML("afterend", propertyProfileHtml(item.propertyProfile));
     const decisionEl = node.querySelector(".decision-line");
-    if (decisionEl) decisionEl.textContent = item.decisionLine || "";
+    if (decisionEl) decisionEl.textContent = latinDigits(item.decisionLine || "");
     // قصّ النصوص الطويلة مع زر «عرض المزيد» عند النقر — لا كلام مكرر ظاهر بلا فائدة
     const reasonEl = node.querySelector(".valuation-reason");
-    reasonEl.textContent = item.valuationReason || "لا يوجد سبب تقييم كاف.";
+    reasonEl.textContent = latinDigits(item.valuationReason || "لا يوجد سبب تقييم كاف.");
     attachClampToggle(reasonEl);
     const descEl = node.querySelector(".description");
-    descEl.textContent = item.summary || item.features || "";
+    descEl.textContent = latinDigits(item.summary || item.features || "");
     if (descEl.textContent) attachClampToggle(descEl);
 
     const financingBlock = node.querySelector(".financing-info");
@@ -2612,7 +2623,7 @@ function staticDownloadPdf() {
 </head>
 <body>
   <h1>تقرير تقييم عقاري</h1>
-  <p class="meta">${escapeHtml(report.generatedAt || new Date().toLocaleString("ar-KW"))} · تحليل من أحدث بيانات السوق المنشورة · احفظ الصفحة PDF من نافذة الطباعة</p>
+  <p class="meta">${escapeHtml(report.generatedAt || new Date().toLocaleString("ar-KW-u-nu-latn"))} · تحليل من أحدث بيانات السوق المنشورة · احفظ الصفحة PDF من نافذة الطباعة</p>
   <div class="note">${escapeHtml((report.searchScope && report.searchScope.note) || "يعتمد التحليل على أحدث بيانات السوق المنشورة من جميع المصادر.")}</div>
   <h2>النتائج المرتبة حسب درجة التوصية</h2>
   <table>
@@ -4183,6 +4194,122 @@ function switchMainTab(name) {
   if (name === "opportunities") loadOpportunities(false);
   if (name === "board") loadDashboardBoard();
   if (name === "insights") loadInsights();
+  if (name === "developments") loadDevelopments();
+}
+
+// ── تطورات السوق العقاري (وكيل الاكتشاف اليومي) ──────────────────────────
+const developmentsState = { data: null, loaded: false };
+
+const DEVELOPMENT_CATEGORY_ICONS = {
+  "سوق عقاري": "📊",
+  "مؤشرات رسمية": "🏛️",
+  "تنظيم وقانون": "⚖️",
+  "تمويل عقاري": "🏦",
+  "مشاريع وتطوير": "🏗️",
+};
+
+function developmentDateLabel(published) {
+  if (!published) return "";
+  const match = String(published).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : String(published).slice(0, 10);
+}
+
+async function loadDevelopments() {
+  if (developmentsState.loaded) return;
+  const root = $("developmentsRoot");
+  if (root) root.innerHTML = '<div class="empty">جاري تحميل تطورات السوق...</div>';
+  try {
+    developmentsState.data = await getJson("/api/developments");
+    developmentsState.loaded = true;
+    renderDevelopments();
+  } catch (err) {
+    console.error(err);
+    if (root) root.innerHTML = `<div class="empty">تعذر تحميل تطورات السوق: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderDevelopments() {
+  const data = developmentsState.data || {};
+  const items = data.developments || [];
+  const root = $("developmentsRoot");
+  if (!root) return;
+  const meta = $("developmentsMeta");
+  const stateEl = $("developmentsAgentState");
+  const portalsEl = $("developmentsPortals");
+  const sourcesEl = $("developmentsSources");
+
+  if (meta) {
+    const generated = data.generatedAt ? ` · آخر اكتشاف: ${String(data.generatedAt).slice(0, 16).replace("T", " ")}` : "";
+    meta.textContent = `${items.length} تطور${generated}`;
+  }
+
+  if (!items.length) {
+    root.innerHTML = '<div class="empty">لا توجد تطورات بعد — شغّل الوكيل اليومي من تبويب المصادر ليجمع وكيل الاكتشاف آخر أخبار السوق والمنصات المفيدة.</div>';
+  } else {
+    const byCategory = {};
+    for (const item of items) {
+      const cat = item.category || "سوق عقاري";
+      (byCategory[cat] ||= []).push(item);
+    }
+    root.innerHTML = Object.keys(byCategory).map((cat) => `
+      <div class="developments-category">
+        <h3 class="developments-category-title">${DEVELOPMENT_CATEGORY_ICONS[cat] || "📰"} ${escapeHtml(cat)} <span class="developments-category-count">${byCategory[cat].length}</span></h3>
+        <div class="developments-cards">
+          ${byCategory[cat].map((item) => `
+            <a class="development-card" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">
+              <div class="development-card-top">
+                <span class="development-source">${escapeHtml(item.source_name || item.source || "")}</span>
+                ${developmentDateLabel(item.published) ? `<time class="development-date">${developmentDateLabel(item.published)}</time>` : ""}
+              </div>
+              <h4>${escapeHtml(item.title)}</h4>
+              ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ""}
+              <span class="development-open">فتح المصدر ↗</span>
+            </a>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  if (stateEl) {
+    const note = data.note || "";
+    const status = data.status || "";
+    if (note) {
+      stateEl.className = `source-summary-bar ${status === "success" ? "tone-ok" : "tone-warn"}`;
+      stateEl.innerHTML = `🕵️ وكيل الاكتشاف: <strong>${escapeHtml(note)}</strong>`;
+    } else {
+      stateEl.innerHTML = "🕵️ وكيل الاكتشاف: لم يُشغَّل بعد — شغّل التحديث اليومي من تبويب المصادر والتشغيل.";
+    }
+  }
+
+  if (portalsEl) {
+    const portals = data.portals || [];
+    portalsEl.innerHTML = portals.length
+      ? `<div class="registry-table"><div class="registry-row registry-head"><span>المنصة</span><span>الدور</span><span>الحالة</span></div>${portals.map((p) => `
+        <div class="registry-row">
+          <span><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.name)}</a></span>
+          <span>${escapeHtml(p.role || "")}</span>
+          <span class="${p.status === "متاحة" ? "portals-ok" : "portals-no"}">${p.status === "متاحة" ? "● متاحة" : "○ غير متاحة"}</span>
+        </div>
+      `).join("")}</div>`
+      : '<div class="empty small">لا توجد بيانات منصات في هذه اللقطة.</div>';
+  }
+
+  if (sourcesEl) {
+    const sources = data.sources || [];
+    sourcesEl.innerHTML = sources.length
+      ? `<div class="source-grid">${sources.map((s) => `
+        <div class="source-card ${s.status === "success" ? "source-ok" : "source-muted"}">
+          <h4>${escapeHtml(s.name)}</h4>
+          <p class="source-meta">${escapeHtml(s.fetchMethod || "")} · ${escapeHtml(s.note || "")}</p>
+          <p class="source-meta">${escapeHtml(s.endpoint || "")}</p>
+        </div>
+      `).join("")}</div>`
+      : '<div class="empty small">لا توجد بيانات مصادر في هذه اللقطة.</div>';
+  }
+
+  const countEl = $("tabCountDevelopments");
+  if (countEl) countEl.textContent = items.length ? String(items.length) : "";
 }
 
 function bindMainTabs() {

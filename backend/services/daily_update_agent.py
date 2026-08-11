@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 import urllib.request
@@ -8,8 +9,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 from backend.config import load_local_env
 from backend.connectors.alforaij import load_listings
+from backend.services.developments_agent import discover_market_developments, save_developments_local
 from backend.services.official_source_agent import check_official_reference_sources
 from backend.services.opportunities import build_opportunities
 from backend.services.source_registry import source_registry
@@ -17,6 +21,7 @@ from backend.services.supabase_store import (
     fetch_latest_opportunities,
     is_configured,
     save_listings,
+    save_market_developments,
     save_market_listings,
     save_official_transactions,
     save_opportunities,
@@ -247,6 +252,24 @@ def run_daily_update_agent(
             trends_save,
             "ok" if trends_save.get("status") in ("saved", "empty", "not_configured") else "needs_table",
         )
+
+        # وكيل اكتشاف التطورات: أخبار ومؤشرات عقارية من مصادر كويتية + فحص منصات
+        # إضافية — يُحفظ في market_developments (Supabase) وملف محلي، ولا يُفشل
+        # الوكيل اليومي مهما تعطلت بعض المصادر (كل مصدر يُسجَّل حالته).
+        try:
+            discoveries = discover_market_developments()
+            local_save = save_developments_local(discoveries)
+            dev_save = save_market_developments(discoveries.get("developments", []))
+            step("discover_market_developments", {
+                "status": discoveries.get("status"),
+                "count": discoveries.get("count", 0),
+                "local": local_save.get("status"),
+                "database": dev_save.get("status"),
+                "note": discoveries.get("note", ""),
+            })
+        except Exception as exc:
+            logger.exception("discover_market_developments failed")
+            step("discover_market_developments", {"status": "failed", "error": str(exc)}, "ok")
 
         summary = supabase_data_summary(len(listings))
         notifications = build_update_notifications(

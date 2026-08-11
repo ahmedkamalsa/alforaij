@@ -147,6 +147,17 @@ def main() -> None:
     write_json("daily-agent-status.json", load_daily_agent_status() | {"staticSnapshot": True})
     write_json("official-reference-sources.json", official)
     write_json("clients.json", clients)
+    # تطورات السوق من وكيل الاكتشاف اليومي: الملف المحلي أولًا، وإلا القاعدة الحية.
+    from backend.services.developments_agent import load_developments_local
+    _developments = load_developments_local()
+    if not _developments.get("developments"):
+        _rows = guarded(
+            "developments",
+            lambda: supabase_store.fetch_market_developments(limit=100),
+            [],
+        )
+        _developments = {"generatedAt": "", "count": len(_rows), "developments": _rows}
+    write_json("developments.json", _developments | {"staticSnapshot": True})
     write_json("outreach-stats.json", outreach)
     write_json("health.json", health)
 

@@ -1,0 +1,185 @@
+{
+  "generatedAt": "2026-08-11T20:54:15",
+  "count": 5,
+  "status": "success",
+  "note": "جمع 5 تطورًا، 2/11 مصادر عقارية، 0/5 منصات مرشحة متاحة",
+  "developments": [
+    {
+      "url": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports/Real-estate-reports.html",
+      "title": "Real estate Reports",
+      "source": "kfh_reports",
+      "source_name": "بيت التمويل الكويتي - تقارير عقارية",
+      "category": "تمويل عقاري",
+      "published": "",
+      "summary": ""
+    },
+    {
+      "url": "https://www.kfh.com/en/reports/kuwait/RE-Reports/KFH-Local-Real-Estate-Report---Q1-2026/document/KFH%20Real%20Estate%20Report%202026-Q1-Final.pdf.pdf",
+      "title": "KFH-Local Real Estate Report - Q1 2026",
+      "source": "kfh_reports",
+      "source_name": "بيت التمويل الكويتي - تقارير عقارية",
+      "category": "تمويل عقاري",
+      "published": "",
+      "summary": ""
+    },
+    {
+      "url": "https://www.kfh.com/en/reports/kuwait/RE-Reports/KFH-Local-Real-Estate-Report-Q3-2025/document_en/KFH%20Real%20Estate%20Report%202025%20Q3-En.pdf.pdf",
+      "title": "KFH Local Real Estate Report-Q3-2025",
+      "source": "kfh_reports",
+      "source_name": "بيت التمويل الكويتي - تقارير عقارية",
+      "category": "تمويل عقاري",
+      "published": "",
+      "summary": ""
+    },
+    {
+      "url": "https://www.kfh.com/en/reports/kuwait/RE-Reports/KFH-Local-Real-Estate-Report---Q2-2025/document_en_en/KFH%20Real%20Estate%20Report%202025%20Q2-En.pdf.pdf",
+      "title": "KFH-Local Real Estate Report - Q2 2025",
+      "source": "kfh_reports",
+      "source_name": "بيت التمويل الكويتي - تقارير عقارية",
+      "category": "تمويل عقاري",
+      "published": "",
+      "summary": ""
+    },
+    {
+      "url": "https://www.moj.gov.kw/EN/pages/DeptProcedure.aspx?ItemID=865",
+      "title": "Selling the absolute ownership of the property or ...",
+      "source": "moj_deals",
+      "source_name": "وزارة العدل - التسجيل العقاري",
+      "category": "تنظيم وقانون",
+      "published": "",
+      "summary": ""
+    }
+  ],
+  "sources": [
+    {
+      "name": "وكالة الأنباء الكويتية",
+      "status": "failed",
+      "records": 0,
+      "note": "<urlopen error timed out>",
+      "fetchMethod": "HTML",
+      "endpoint": "https://www.kuna.net.kw/"
+    },
+    {
+      "name": "Kuwait Times",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
+      "fetchMethod": "HTML",
+      "endpoint": "https://kuwaittimes.com/"
+    },
+    {
+      "name": "TimesKuwait",
+      "status": "no_matches",
+      "records": 0,
+      "note": "10 عنوانًا إجمالًا، 0 عقاريًا",
+      "fetchMethod": "RSS",
+      "endpoint": "https://timeskuwait.com/feed"
+    },
+    {
+      "name": "Arab Times",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
+      "fetchMethod": "HTML",
+      "endpoint": "https://www.arabtimesonline.com/news/feed/"
+    },
+    {
+      "name": "القبس",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
+      "fetchMethod": "HTML",
+      "endpoint": "https://alqabas.com/"
+    },
+    {
+      "name": "الأنباء",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
+      "fetchMethod": "HTML",
+      "endpoint": "https://www.alanba.com.kw/rss/"
+    },
+    {
+      "name": "الجريدة",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
+      "fetchMethod": "HTML",
+      "endpoint": "https://www.aljarida.com/"
+    },
+    {
+      "name": "الراي",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
+      "fetchMethod": "HTML",
+      "endpoint": "https://www.alraimedia.com/"
+    },
+    {
+      "name": "بيت التمويل الكويتي - تقارير عقارية",
+      "status": "success",
+      "records": 4,
+      "note": "7 عنوانًا إجمالًا، 4 عقاريًا",
+      "fetchMethod": "HTML",
+      "endpoint": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports.html"
+    },
+    {
+      "name": "البنك المركزي الكويتي",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
+      "fetchMethod": "HTML",
+      "endpoint": "https://www.cbk.gov.kw/en"
+    },
+    {
+      "name": "وزارة العدل - التسجيل العقاري",
+      "status": "success",
+      "records": 1,
+      "note": "19 عنوانًا إجمالًا، 1 عقاريًا",
+      "fetchMethod": "HTML",
+      "endpoint": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx"
+    }
+  ],
+  "portals": [
+    {
+      "id": "propertyfinder_kw",
+      "name": "Property Finder Kuwait",
+      "url": "https://www.propertyfinder.kw/",
+      "role": "منصة عقارية كويتية",
+      "status": "غير متاحة",
+      "note": "<urlopen error timed out>"
+    },
+    {
+      "id": "aqarmap_kw",
+      "name": "Aqarmap Kuwait",
+      "url": "https://kuwait.aqarmap.com/",
+      "role": "بوابة بحث عقاري",
+      "status": "غير متاحة",
+      "note": "<urlopen error [Errno 11001] getaddrinfo failed>"
+    },
+    {
+      "id": "bayut_kw",
+      "name": "Bayut Kuwait",
+      "url": "https://www.bayut.kw/",
+      "role": "بوابة إعلانات عقارية",
+      "status": "غير متاحة",
+      "note": "<urlopen error [Errno 11001] getaddrinfo failed>"
+    },
+    {
+      "id": "realestate_kw_guides",
+      "name": "بوابة الكويت العقارية (e.gov.kw)",
+      "url": "https://e.gov.kw/sites/kgoArabic/Pages/Services/MOJ/RealEstate.aspx",
+      "role": "مرجع حكومي",
+      "status": "غير متاحة",
+      "note": "HTTP Error 403: Forbidden"
+    },
+    {
+      "id": "kuwait_finder",
+      "name": "Kuwait Finder (PACI)",
+      "url": "https://kuwaitfinder.paci.gov.kw/",
+      "role": "مصدر مكاني رسمي",
+      "status": "غير متاحة",
+      "note": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1028)>"
+    }
+  ]
+}

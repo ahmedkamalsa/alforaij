@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from backend.config import FRONTEND_DIR, HOST, PORT, AGENT_ROUTER_API_KEY
 from backend.connectors.alforaij import load_listings
-from backend.connectors.live_sources import search_external_sources
+from backend.connectors.live_sources import enrich_listings_from_details, search_external_sources
 from backend.services.deduplication import deduplicate_ranked
 from backend.services.matching import top_matches
 from backend.services.report_generator import build_report
@@ -675,6 +675,22 @@ class Handler(BaseHTTPRequestHandler):
             from backend.services.update_notifications import load_update_notifications
             json_response(self, load_update_notifications())
             return
+        if path == "/api/developments":
+            # تطورات السوق من وكيل الاكتشاف اليومي: الملف المحلي أولًا (سريع وبلا
+            # قاعدة)، وإلا أحدث ما حُفظ في market_developments (Supabase).
+            from backend.services.developments_agent import load_developments_local
+            from backend.services.supabase_store import fetch_market_developments
+            local = load_developments_local()
+            if local.get("developments"):
+                json_response(self, local)
+                return
+            try:
+                rows = fetch_market_developments(limit=100)
+                json_response(self, {"generatedAt": "", "count": len(rows), "developments": rows})
+            except Exception as exc:
+                logger.warning("Developments fetch failed: %s", exc)
+                json_response(self, {"generatedAt": "", "count": 0, "developments": [], "error": str(exc)})
+            return
         if path == "/api/daily-agent/status":
             from backend.services.daily_update_agent import load_daily_agent_status
             json_response(self, load_daily_agent_status())
@@ -904,6 +920,21 @@ class Handler(BaseHTTPRequestHandler):
                         # تحمل اسمًا مختلفًا للعرض) — حتى يعرض العميل صفًا واحدًا لكل مصدر.
                         progress_cb=lambda name, st: _progress_source_event(job_id, name, st),
                     )
+                    # وكيل إكمال التفاصيل: الإعلانات القادمة من صفحات القوائم كثيرًا ما تنقصها
+                    # السعر أو المساحة أو المنطقة — يقرأ صفحة التفاصيل لكل إعلان ناقص ويكمّلها
+                    # قبل فلتر الأسعار والمطابقة بالفلاتر (حتى لا يُسقط إعلان صالح بسبب بيانات ناقصة).
+                    _enrich = enrich_listings_from_details(external_listings)
+                    if _enrich.get("enriched"):
+                        _progress_push(job_id, "enrich", _enrich["note"])
+                        external_statuses.append({
+                            "name": "وكيل إكمال التفاصيل",
+                            "status": _enrich.get("status"),
+                            "records": _enrich.get("enriched", 0),
+                            "candidates": _enrich.get("read", 0),
+                            "note": _enrich.get("note", ""),
+                            "fetchMethod": "صفحات التفاصيل (بالموازاة)",
+                            "endpoint": "روابط إعلانات المصادر الخارجية",
+                        })
                     # فلتر الأسعار الواقعية: الأسعار النائبة/الوهمية من صفحات المصادر
                     # (9,999 / 5,000 د.ك بيع، 70 د.ك إيجار) لا تدخل نتائج البحث والتقييم.
                     from backend.services.opportunities import has_realistic_price

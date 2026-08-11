@@ -53,6 +53,7 @@ from backend.connectors.alforaij import load_listings
 from backend.connectors.live_sources import (
     broad_combo_requests,
     search_combo_sources,
+    enrich_listings_from_details,
     search_external_sources,
 )
 from backend.models import PropertyRequest
@@ -982,6 +983,18 @@ def build_opportunities(limit_per_tier: int = 30, include_external: bool = True,
             combo_listings, combo_statuses = search_combo_sources(broad_combo_requests(), ["Q8Aqar", "OpenSooq"])
             external_listings.extend(combo_listings)
             external_statuses.extend(combo_statuses)
+            # وكيل إكمال التفاصيل: يقرأ صفحة تفاصيل كل إعلان ناقص (سعر/مساحة/منطقة)
+            # حتى تُقيَّم الإعلانات ببيانات كاملة وتُحفظ في قاعدة المعرفة مكتملة.
+            _enrich = enrich_listings_from_details(external_listings, max_pages=15)
+            if _enrich.get("enriched"):
+                external_statuses.append({
+                    "name": "وكيل إكمال التفاصيل",
+                    "status": _enrich.get("status"),
+                    "records": _enrich.get("enriched", 0),
+                    "candidates": _enrich.get("read", 0),
+                    "note": _enrich.get("note", ""),
+                })
+                logger.info("harvest: %s", _enrich.get("note"))
             # إزالة التكرار بالكود: نفس الإعلان قد يظهر في المسح العام والمسح المركّب
             seen_codes = {listing.code for listing in listings}
             for listing in external_listings:

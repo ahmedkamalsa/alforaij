@@ -38,6 +38,7 @@
       <button class="main-tab" data-main-tab="opportunities" type="button">💎 أفضل الفرص <b class="main-tab-count" id="tabCountOpp"></b></button>
       <button class="main-tab" data-main-tab="board" type="button">📊 <span class="tab-full">لوحة السوق</span><span class="tab-short">السوق</span> <b class="main-tab-count" id="tabCountBoard"></b></button>
       <button class="main-tab" data-main-tab="insights" type="button">📈 <span class="tab-full">تحليلات السوق</span><span class="tab-short">التحليلات</span> <b class="main-tab-count" id="tabCountInsights"></b></button>
+      <button class="main-tab" data-main-tab="developments" type="button">📰 <span class="tab-full">التطورات</span><span class="tab-short">التطورات</span> <b class="main-tab-count" id="tabCountDevelopments"></b></button>
       <button class="main-tab" data-main-tab="sources" type="button">🔗 <span class="tab-full">المصادر والتشغيل</span><span class="tab-short">المصادر</span> <b class="main-tab-count" id="tabCountSources"></b></button>
     </nav>
 
@@ -503,6 +504,28 @@
           </div>
         </details>
         <div id="externalLinks" class="external-links"></div>
+      </section>
+
+      <section class="developments-panel" data-main-panel="developments">
+        <div class="section-title">
+          <div>
+            <h2>تطورات السوق العقاري الكويتي</h2>
+            <span>أحدث الأخبار والمؤشرات والمنصات المفيدة — يجمعها وكيل الاكتشاف يوميًا من مصادر متخصصة</span>
+          </div>
+          <span id="developmentsMeta" class="filter-summary"></span>
+        </div>
+        <div id="developmentsAgentState" class="source-summary-bar"></div>
+        <div id="developmentsRoot" class="developments-grid">
+          <div class="empty">جاري تحميل تطورات السوق...</div>
+        </div>
+        <details class="collapsible">
+          <summary>المنصات العقارية المرشحة (مواقع أخرى مفيدة للمجال)</summary>
+          <div id="developmentsPortals" class="registry-wrap"></div>
+        </details>
+        <details class="collapsible">
+          <summary>حالة مصادر الاكتشاف اليومي</summary>
+          <div id="developmentsSources" class="source-grid muted-grid"></div>
+        </details>
       </section>
 
     <section class="results-panel" data-main-panel="search">

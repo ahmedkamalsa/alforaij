@@ -525,6 +525,39 @@ def save_price_trends(rows: list[dict[str, Any]]) -> dict[str, Any]:
         return {"status": "failed", "count": 0, "error": "unexpected error"}
 
 
+# ─── market_developments (تطورات السوق من وكيل الاكتشاف) ────────────────
+
+
+def save_market_developments(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """حفظ تطورات السوق المكتشفة في جدول market_developments (upsert على url).
+
+    متسامح تمامًا كبقية الحفظ: غياب الجدول أو تعذر الكتابة يُسجَّل السبب ولا
+    يكسر التشغيل اليومي — التطورات تبقى متاحة محليًا عبر data/market_developments.json.
+    """
+    if not rows:
+        return {"status": "empty", "count": 0, "error": ""}
+    if not is_configured():
+        return {"status": "not_configured", "count": 0, "error": ""}
+    try:
+        for index in range(0, len(rows), 250):
+            _post("market_developments", rows[index:index + 250], upsert=True, conflict="url")
+        return {"status": "saved", "count": len(rows), "error": ""}
+    except RuntimeError as exc:
+        logger.warning("market_developments save failed: %s", exc)
+        return {"status": "failed", "count": 0, "error": str(exc)}
+    except Exception:
+        logger.exception("market_developments save failed")
+        return {"status": "failed", "count": 0, "error": "unexpected error"}
+
+
+def fetch_market_developments(limit: int = 100) -> list[dict[str, Any]]:
+    """أحدث تطورات السوق من market_developments (الأحدث أولًا)."""
+    if not is_configured():
+        return []
+    endpoint = f"{SUPABASE_URL}/rest/v1/market_developments?select=*&order=fetched_at.desc&limit={int(limit)}"
+    return _fetch_rows(endpoint)
+
+
 def price_trends_table_available() -> bool:
     """هل جدول price_trends موجود فعلًا؟ (فحص خفيف دون كشف الأخطاء)."""
     if not is_configured():
