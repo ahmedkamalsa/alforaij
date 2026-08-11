@@ -89,6 +89,33 @@ class AnalysisTests(unittest.TestCase):
         self.assertGreater(item["dataQuality"]["score"], 50)
         self.assertEqual(report["sourceStatus"][0]["trust"]["label"], "\u062f\u062e\u0644 \u0627\u0644\u062a\u0642\u064a\u064a\u0645")
 
+    def test_report_includes_price_gap_indicator_per_item(self) -> None:
+        """كل نتيجة تحمل مؤشر فجوة السعر (سعر المطلوب ÷ وسيط المنطقة) وشارة أرخص/أغلى."""
+        request = parse_request(
+            "مطلوب بيت في المطلاع مساحة 400 متر والميزانية 350 ألف"
+        )
+        # وسيط المقارنات هنا ≈ 360 ألف (AF-1 350k + AF-2 360k + AF-3 380k)
+        listings = [
+            listing("AF-1", 350000, 400),
+            listing("AF-2", 360000, 400),
+            listing("AF-3", 380000, 400),
+        ]
+        enriched = enrich_rankings(request, top_matches(request, listings), listings)
+
+        report = build_report(request, enriched, source_count=len(listings))
+        item = report["results"][0]
+
+        self.assertIn("priceGapPct", item)
+        self.assertIn("priceGapLabel", item)
+        if item["priceRatio"] is not None:
+            self.assertAlmostEqual(item["priceGapPct"], (item["priceRatio"] - 1) * 100, places=1)
+            if item["priceRatio"] <= 0.92:
+                self.assertEqual(item["priceGapLabel"], "أرخص من السوق")
+            elif item["priceRatio"] >= 1.08:
+                self.assertEqual(item["priceGapLabel"], "أغلى من السوق")
+            else:
+                self.assertEqual(item["priceGapLabel"], "قريب من السوق")
+
     def test_report_includes_same_area_external_similar_ads_only(self) -> None:
         request = parse_request("للبيع بيت في صباح الناصر المساحة 400 متر السعر 280 ألف")
         target = listing("AF-94", 280000, 400)

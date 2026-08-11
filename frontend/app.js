@@ -531,6 +531,8 @@ function staticAnalyzeReport(payload) {
       matchScore: Math.round(priceScore || score),
       marketMedian: median,
       priceRatio: median && price ? price / median : null,
+      priceGapPct: median && price ? Math.round((price / median - 1) * 1000) / 10 : null,
+      priceGapLabel: median && price ? (price / median <= 0.92 ? "أرخص من السوق" : price / median >= 1.08 ? "أغلى من السوق" : "قريب من السوق") : null,
       valuationLabel: row.opportunityLabel || (score >= 75 ? "فرصة قوية" : score >= 60 ? "مناسبة" : "تحتاج مراجعة"),
       valuationReason: row.opportunityReason || "تقييم من أحدث بيانات السوق المنشورة: مطابقة الفلاتر، السعر، وجود المقارنات، ومصدر الإعلان.",
       decisionLine: "يعتمد التقييم على أحدث بيانات السوق المتاحة من جميع المصادر، وتُحدَّث يوميًا تلقائيًا.",
@@ -1776,6 +1778,14 @@ function formatMoney(value) {
   return `${Number(value).toLocaleString("en-US")} د.ك`;
 }
 
+function gapText(item) {
+  const gap = item.priceGapPct;
+  if (gap === null || gap === undefined || Number.isNaN(Number(gap))) return "غير كافية";
+  const value = Number(gap);
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toLocaleString("en-US", { maximumFractionDigits: 1 })}%${value <= -8 ? " ⬅ أرخص" : value >= 8 ? " ⬅ أغلى" : " ≈ السوق"}`;
+}
+
 function analysisBadge(method) {
   if (method === "ai") return "تحليل ذكاء اصطناعي";
   if (method === "local") return "تحليل محلي احترافي";
@@ -1989,6 +1999,18 @@ function renderReport(report) {
       outsideBadge.textContent = labels[0] || "";
       outsideBadge.hidden = !labels.length;
     }
+    // شارة «أرخص/أغلى من السوق» + مؤشر فجوة السعر (السعر المطلوب ÷ وسيط المنطقة)
+    const gapBadge = node.querySelector(".price-gap-badge");
+    if (gapBadge) {
+      const gap = item.priceGapPct;
+      const label = item.priceGapLabel;
+      if (label && typeof gap === "number" && !Number.isNaN(gap)) {
+        gapBadge.textContent = `${label} ${gap >= 0 ? "+" : ""}${gap.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
+        gapBadge.className = `price-gap-badge ${gap <= -8 ? "gap-cheap" : gap >= 8 ? "gap-expensive" : "gap-fair"}`;
+        gapBadge.title = `فجوة السعر = السعر المطلوب ÷ وسيط المنطقة (${formatMoney(item.marketMedian)}). القيمة: ${gap >= 0 ? "+" : ""}${gap}%`;
+        gapBadge.hidden = false;
+      }
+    }
     node.querySelector(".verdict-label").textContent = item.valuationLabel || "بدون حكم";
     node.querySelector(".recommendation").textContent = `توصية ${Math.round(item.recommendationScore || 0)} / 100`;
     const isRental = !!item.rental;
@@ -2006,7 +2028,7 @@ function renderReport(report) {
       scoreItem("تاريخ الإعلان", dateText(item.publishedDate)),
       scoreItem("المشاهدات", viewsText(item)),
       scoreItem("وسيط المقارنات", formatMoney(item.marketMedian)),
-      scoreItem("نسبة السعر للوسيط", item.priceRatio ? `${Math.round(item.priceRatio * 100)}%` : "غير كافية"),
+      scoreItem("فجوة السعر (سعر ÷ وسيط المنطقة)", gapText(item)),
       scoreItem("مطابقة الطلب", `${Math.round(item.matchScore || 0)} / 100`),
     ].join("");
     const quality = item.dataQuality || {};

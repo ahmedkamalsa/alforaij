@@ -159,6 +159,17 @@ def _source_trust_for_listing(source_name: str) -> dict:
     }
 
 
+def _price_gap_label(price_ratio: float | None) -> str | None:
+    """شارة السعر مقابل وسيط المنطقة: أرخص / قريب / أغلى من السوق."""
+    if price_ratio is None:
+        return None
+    if price_ratio <= 0.92:
+        return "أرخص من السوق"
+    if price_ratio >= 1.08:
+        return "أغلى من السوق"
+    return "قريب من السوق"
+
+
 def _decision_line(item: RankedListing, quality: dict) -> str:
     listing = item.listing
     match = round(item.match_score or 0)
@@ -230,6 +241,8 @@ def ranked_to_dict(item: RankedListing) -> dict:
         "dealScore": item.deal_score,
         "marketMedian": item.market_median,
         "priceRatio": item.price_ratio,
+        "priceGapPct": round((item.price_ratio - 1) * 100, 1) if item.price_ratio is not None else None,
+        "priceGapLabel": _price_gap_label(item.price_ratio),
         "matchBreakdown": item.match_breakdown,
         "recommendationBreakdown": item.recommendation_breakdown,
         "numberSources": number_sources,
