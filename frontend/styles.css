@@ -1430,6 +1430,39 @@ button:hover {
   color: #fff;
 }
 
+/* قائمة الاقتراحات المخصصة (أسهم لوحة المفاتيح + تمييز العنصر النشط) */
+.typeahead {
+  position: fixed;
+  z-index: 400;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+  backdrop-filter: blur(14px);
+}
+
+.typeahead-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.typeahead-item.active,
+.typeahead-item:hover {
+  background: rgba(96, 117, 240, .18);
+  color: var(--blue);
+  outline: 1px solid rgba(96, 117, 240, .45);
+}
+
 .similar-external-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

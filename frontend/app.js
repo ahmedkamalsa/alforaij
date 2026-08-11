@@ -970,11 +970,118 @@ function setAreasFromString(value) {
   renderAreaChips();
 }
 
+// ---- قائمة اقتراحات مخصصة بحوّبات لوحة المفاتيح (أسهم + Enter + تمييز مرئي) ----
+// بديل أنيق عن الـ datalist الأصلي: تنقّل بأسهم الأعلى/الأسفل مع تمييز العنصر النشط،
+// Enter للاختيار، Escape للإغلاق، مع دعم كامل بالماوس.
+function attachTypeahead(inputId, optionsSource, onSelect) {
+  const input = $(inputId);
+  if (!input) return;
+  const box = document.createElement("div");
+  box.className = "typeahead";
+  box.setAttribute("role", "listbox");
+  box.hidden = true;
+  document.body.appendChild(box);
+  let items = [];
+  let active = -1;
+
+  const options = () => {
+    const dl = $(optionsSource);
+    return dl ? [...dl.options].map((o) => o.value).filter(Boolean) : [];
+  };
+
+  function position() {
+    const r = input.getBoundingClientRect();
+    box.style.top = `${r.bottom + 4}px`;
+    box.style.left = `${r.left}px`;
+    box.style.width = `${Math.max(r.width, 180)}px`;
+  }
+
+  function render() {
+    const q = normalizeArabic(input.value.trim());
+    items = q ? options().filter((o) => normalizeArabic(o).includes(q)) : options();
+    items = items.slice(0, 50);
+    if (!items.length) {
+      box.hidden = true;
+      return;
+    }
+    if (active < 0) active = 0;
+    if (active >= items.length) active = items.length - 1;
+    box.innerHTML = items
+      .map((it, i) => `<div class="typeahead-item${i === active ? " active" : ""}" role="option" aria-selected="${i === active}" data-i="${i}">${escapeHtml(it)}</div>`)
+      .join("");
+    position();
+    box.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  }
+
+  function close() {
+    box.hidden = true;
+    items = [];
+    active = -1;
+    input.removeAttribute("aria-expanded");
+  }
+
+  function move(dir) {
+    if (box.hidden) render();
+    if (!items.length) return;
+    active = (active + dir + items.length) % items.length;
+    [...box.children].forEach((el, i) => {
+      el.classList.toggle("active", i === active);
+      el.setAttribute("aria-selected", String(i === active));
+    });
+    box.children[active]?.scrollIntoView({ block: "nearest" });
+  }
+
+  function choose(i) {
+    const value = items[i];
+    if (value) onSelect(value, input);
+    close();
+  }
+
+  input.addEventListener("focus", () => { active = 0; render(); });
+  input.addEventListener("input", () => { active = 0; render(); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); move(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
+    else if (e.key === "Enter") {
+      if (!box.hidden && items.length) {
+        e.preventDefault();
+        e.typeaheadConsumed = true;
+        choose(active >= 0 ? active : 0);
+      }
+    }
+    else if (e.key === "Escape") { close(); }
+  });
+  box.addEventListener("mousedown", (e) => e.preventDefault());
+  box.addEventListener("click", (e) => {
+    const item = e.target.closest(".typeahead-item");
+    if (item) choose(Number(item.dataset.i));
+  });
+  box.addEventListener("mouseover", (e) => {
+    const item = e.target.closest(".typeahead-item");
+    if (item) {
+      active = Number(item.dataset.i);
+      [...box.children].forEach((el, i) => {
+        el.classList.toggle("active", i === active);
+        el.setAttribute("aria-selected", String(i === active));
+      });
+    }
+  });
+  input.addEventListener("blur", () => setTimeout(close, 160));
+  window.addEventListener("scroll", close, true);
+  window.addEventListener("resize", close);
+  return { close };
+}
+
 function initAreaChips() {
   const field = $("areasField");
   if (!field) return;
+  attachTypeahead("areasField", "advAreas", (value) => addAreaChip(value));
+  attachTypeahead("transactionField", "advTransactions", (value, input) => { input.value = value; input.dispatchEvent(new Event("change")); });
+  attachTypeahead("typeField", "advTypes", (value, input) => { input.value = value; input.dispatchEvent(new Event("change")); });
   field.addEventListener("change", () => addAreaChip(field.value));
   field.addEventListener("keydown", (e) => {
+    if (e.typeaheadConsumed) return;
     if (e.key === "Enter" || e.key === "," || e.key === "،") {
       e.preventDefault();
       addAreaChip(field.value);
