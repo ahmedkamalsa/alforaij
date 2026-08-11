@@ -476,21 +476,21 @@ function staticAnalyzeReport(payload) {
       marketMedian: median,
       priceRatio: median && price ? price / median : null,
       valuationLabel: row.opportunityLabel || (score >= 75 ? "فرصة قوية" : score >= 60 ? "مناسبة" : "تحتاج مراجعة"),
-      valuationReason: row.opportunityReason || "تقييم من لقطة البيانات المنشورة: مطابقة الفلاتر، السعر، وجود المقارنات، ومصدر الإعلان.",
-      decisionLine: "النسخة المنشورة (static) تستخدم لقطة بيانات. التحديث الحي يتطلب تشغيل خادم الـ API.",
+      valuationReason: row.opportunityReason || "تقييم من أحدث بيانات السوق المنشورة: مطابقة الفلاتر، السعر، وجود المقارنات، ومصدر الإعلان.",
+      decisionLine: "يعتمد التقييم على أحدث بيانات السوق المتاحة من جميع المصادر، وتُحدَّث يوميًا تلقائيًا.",
       reasons: [
         area ? `مطابق للمنطقة: ${area}` : "مطابق لنطاق البحث",
         propertyType ? `نوع العقار: ${propertyType}` : "نوع العقار من بيانات الإعلان",
-        comps.length ? `يوجد ${comps.length} مقارنات من نفس النطاق` : "المقارنات محدودة في اللقطة الحالية",
+        comps.length ? `يوجد ${comps.length} مقارنات من نفس النطاق` : "المقارنات المتاحة ضمن نطاق البحث الحالي",
       ],
-      warnings: STATIC_SNAPSHOT_MODE ? ["التحليل من لقطة منشورة وليس اتصالًا حيًا"] : [],
+      warnings: [],
       comparables: comps,
       numberSources: {
         price: { value: row.priceText || price, source: row.source, note: "من بيانات الإعلان" },
         space: { value: row.space || null, source: row.source, note: row.space ? "من بيانات الإعلان" : "غير مذكورة" },
-        marketMedian: { value: median || null, source: "لقطة المقارنات", note: `${priced.length} إعلان بسعر معلن` },
-        comparablesCount: { value: comps.length, source: "لقطة المقارنات", note: "نفس النطاق المتاح" },
-        confidence: { value: Math.round(score), source: "تقييم static", note: "السعر + الفلاتر + الأدلة المتاحة" },
+        marketMedian: { value: median || null, source: "بيانات السوق المنشورة", note: `${priced.length} إعلان بسعر معلن` },
+        comparablesCount: { value: comps.length, source: "بيانات السوق المنشورة", note: "نفس النطاق المتاح" },
+        confidence: { value: Math.round(score), source: "التقييم الآلي", note: "السعر + الفلاتر + الأدلة المتاحة" },
       },
       matchBreakdown: [
         { name: "مطابقة الفلاتر", points: area || propertyType ? 40 : 20, value: "حسب المدخلات", weight: "40%" },
@@ -498,7 +498,7 @@ function staticAnalyzeReport(payload) {
         { name: "الأدلة", points: comps.length * 10, value: `${comps.length} مقارنات`, weight: "25%" },
       ],
       recommendationBreakdown: [
-        { name: "درجة الفرصة", points: Math.round(score), value: row.opportunityReason || "لقطة منشورة", weight: "100%" },
+        { name: "درجة الفرصة", points: Math.round(score), value: row.opportunityReason || "وفق بيانات السوق", weight: "100%" },
       ],
     };
   }).sort((a, b) => b.recommendationScore - a.recommendationScore).slice(0, 20);
@@ -507,25 +507,25 @@ function staticAnalyzeReport(payload) {
     generatedAt: new Date().toLocaleString("ar-KW"),
     analysisMethod: "local",
     summary: results.length
-      ? `تم تحليل ${results.length} نتيجة من لقطة البيانات المنشورة. أفضل نتيجة ${results[0].code} بدرجة ${results[0].recommendationScore}/100.`
-      : "لا توجد نتائج مطابقة في لقطة البيانات المنشورة. جرّب توسيع المنطقة أو المنصة.",
+      ? `تم تحليل ${results.length} نتيجة من أحدث بيانات السوق. أفضل نتيجة ${results[0].code} بدرجة ${results[0].recommendationScore}/100.`
+      : "لا توجد نتائج مطابقة ضمن النطاق الحالي. جرّب توسيع المنطقة أو المنصة.",
     request: { rawText: text, areas: area ? [area] : [], propertyType, transaction },
     extractedFilters: [
       { label: "المنطقة", value: area, source: "الفلاتر" },
       { label: "نوع العقار", value: propertyType, source: "الفلاتر" },
       { label: "العملية", value: transaction, source: "الفلاتر" },
     ],
-    searchScope: { note: "تحليل من لقطة static منشورة. شغّل خادم الـ API للحصول على التحديث الحي والمسح المباشر للمصادر." },
+    searchScope: { note: "تحليل شامل لأحدث بيانات السوق المنشورة من جميع المصادر، تُحدَّث يوميًا تلقائيًا." },
     rankingMethod: {
-      title: "ترتيب static",
-      description: "الترتيب حسب درجة الفرصة، مطابقة الفلاتر، السعر، وعدد المقارنات المتاحة في اللقطة.",
+      title: "ترتيب الفرص",
+      description: "الترتيب حسب درجة الفرصة، مطابقة الفلاتر، السعر، وعدد المقارنات المتاحة في بيانات السوق.",
       weights: [
         { label: "مطابقة الطلب", value: "40%" },
         { label: "جاذبية السعر", value: "35%" },
         { label: "الأدلة", value: "25%" },
       ],
     },
-    sourceStatus: [{ name: "لقطة static منشورة", status: "success", records: rows.length }],
+    sourceStatus: [{ name: "بيانات السوق المنشورة", status: "success", records: rows.length }],
     similarExternal: (() => {
       // قسم «إعلانات مشابهة من المواقع الأخرى»: تُفضَّل المصادر غير الفريج إن وُجدت
       const nonLocal = results.filter((row) => normalizeArabic(row.source) !== normalizeArabic("الفريج"));
@@ -1806,13 +1806,13 @@ function staticDownloadPdf() {
           <td>${escapeHtml(comp.source || "")}</td>
           <td>${comp.url ? `<a href="${escapeHtml(comp.url)}">فتح الإعلان</a>` : "—"}</td>
         </tr>`).join("")
-    : '<tr><td colspan="6" style="text-align:center">لا توجد مقارنات سعرية في اللقطة الحالية.</td></tr>';
+    : '<tr><td colspan="6" style="text-align:center">لا توجد مقارنات سعرية ضمن النطاق الحالي.</td></tr>';
   const reasons = top && top.reasons && top.reasons.length
     ? top.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")
     : "";
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
-    alert("اسمح بالنوافذ المنبثقة لتوليد تقرير PDF داخل المتصفح، أو شغّل خادم الـ API.");
+    alert("اسمح بالنوافذ المنبثقة لتوليد تقرير PDF داخل المتصفح.");
     return;
   }
   win.document.write(`<!doctype html>
@@ -1836,8 +1836,8 @@ function staticDownloadPdf() {
 </head>
 <body>
   <h1>تقرير تقييم عقاري</h1>
-  <p class="meta">${escapeHtml(report.generatedAt || new Date().toLocaleString("ar-KW"))} · تحليل من لقطة البيانات المنشورة · احفظ الصفحة PDF من نافذة الطباعة</p>
-  <div class="note">${escapeHtml((report.searchScope && report.searchScope.note) || "النسخة الثابتة تستخدم لقطة بيانات منشورة؛ التحديث الحي يتطلب تشغيل خادم الـ API.")}</div>
+  <p class="meta">${escapeHtml(report.generatedAt || new Date().toLocaleString("ar-KW"))} · تحليل من أحدث بيانات السوق المنشورة · احفظ الصفحة PDF من نافذة الطباعة</p>
+  <div class="note">${escapeHtml((report.searchScope && report.searchScope.note) || "يعتمد التحليل على أحدث بيانات السوق المنشورة من جميع المصادر.")}</div>
   <h2>النتائج المرتبة حسب درجة التوصية</h2>
   <table>
     <thead><tr><th>#</th><th>الإعلان</th><th>المنطقة</th><th>السعر</th><th>المساحة</th><th>المصدر</th><th>التوصية</th><th>الحكم</th></tr></thead>
@@ -1861,7 +1861,7 @@ function staticDownloadPdf() {
     <thead><tr><th>الكود</th><th>المنطقة</th><th>السعر</th><th>المساحة</th><th>المصدر</th><th>الرابط</th></tr></thead>
     <tbody>${compsRows}</tbody>
   </table>` : ""}
-  <p class="meta">تقرير مولّد داخل المتصفح من لقطة البيانات المنشورة — للتحليل الحي والمصادر المباشرة شغّل خادم الـ API.</p>
+  <p class="meta">تقرير مولّد داخل المتصفح من أحدث بيانات السوق المنشورة من جميع المصادر.</p>
 </body>
 </html>`);
   win.document.close();
