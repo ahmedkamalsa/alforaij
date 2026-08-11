@@ -988,6 +988,71 @@ async function loadInsights() {
   }
 }
 
+// خريطة حرارية للمناطق: فجوة سعر كل منطقة (وسيط سعر المتر) مقابل وسيط محافظتها
+function computeAreaHeatmap(rows) {
+  const saleRows = (rows || []).filter((row) => String(row.transaction || "").includes("بيع") && Number(row.price) > 0 && Number(row.space) > 0);
+  const perM2ByArea = {};
+  const perM2ByGov = {};
+  for (const row of saleRows) {
+    const perM2 = Number(row.price) / Number(row.space);
+    (perM2ByArea[row.area] ||= []).push(perM2);
+    if (row.governorate) (perM2ByGov[row.governorate] ||= []).push(perM2);
+  }
+  const medianOf = (arr) => {
+    if (!arr || !arr.length) return null;
+    const sorted = arr.slice().sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  const govMedian = {};
+  for (const [gov, arr] of Object.entries(perM2ByGov)) govMedian[gov] = medianOf(arr);
+  const areas = [];
+  for (const [area, arr] of Object.entries(perM2ByArea)) {
+    const med = medianOf(arr);
+    const row = saleRows.find((r) => r.area === area);
+    const gov = row && row.governorate ? row.governorate : "";
+    const base = govMedian[gov];
+    if (med == null || !base) continue;
+    areas.push({
+      area,
+      governorate: gov,
+      count: arr.length,
+      perM2: med,
+      gapPct: Math.round(((med / base) - 1) * 1000) / 10,
+    });
+  }
+  return areas.sort((a, b) => a.gapPct - b.gapPct);
+}
+
+// لون متدرج من الأخضر (فرصة) عبر الكهرماني إلى الأحمر (مضخم) حسب فجوة ±30%
+function heatColor(gapPct) {
+  const t = Math.max(0, Math.min(1, (gapPct + 30) / 60)); // 0 عند -30% ... 1 عند +30%
+  const hue = Math.round(120 * (1 - t)); // 120 أخضر → 0 أحمر
+  return `hsl(${hue} 72% 42% / .85)`;
+}
+
+function renderBoardHeatmap(rows) {
+  const root = $("boardHeatmap");
+  if (!root) return;
+  const areas = computeAreaHeatmap(rows);
+  if (!areas.length) {
+    root.innerHTML = '<div class="empty">لا توجد بيانات سعر/مساحة كافية للرسم الحراري — تتراكم مع الحصاد اليومي.</div>';
+    return;
+  }
+  root.innerHTML = areas.map((a) => {
+    const color = heatColor(a.gapPct);
+    const cheap = a.gapPct <= -8, expensive = a.gapPct >= 8, fair = !cheap && !expensive;
+    const cls = cheap ? "heat-cheap" : expensive ? "heat-expensive" : "heat-fair";
+    const sign = a.gapPct > 0 ? "+" : "";
+    return `
+      <button type="button" class="heat-cell ${cls}" data-heat-area="${escapeHtml(a.area)}" data-heat-gov="${escapeHtml(a.governorate)}"
+        style="--heat:${color}" title="${escapeHtml(a.area)} — وسيط ${a.perM2.toLocaleString("en-US")} د.ك/م² مقابل وسيط ${escapeHtml(a.governorate || "" )}: ${sign}${a.gapPct}% (${a.count} إعلان بيع)">
+        <b>${escapeHtml(a.area)}</b>
+        <span>${sign}${a.gapPct.toLocaleString("en-US", { maximumFractionDigits: 1 })}%</span>
+      </button>`;
+  }).join("");
+}
+
 function renderBoard() {
   const rows = filteredBoardRows();
   updateBoardSummary(rows);
@@ -996,6 +1061,8 @@ function renderBoard() {
   renderCompanionAds(rows);
   renderBoardMarketMatches(rows);
   renderGovernorateTable(rows);
+  // الخريطة الحرارية تُبنى من كل السجلات بنطاق المنصات المختار (لا تتأثر بفلتر المنطقة)
+  renderBoardHeatmap(boardState.records);
 }
 
 async function loadDashboardBoard() {
@@ -3651,6 +3718,21 @@ function bind() {
       if (metricFilter) metricFilter.value = metric;
       boardState.activeMetric = metric;
       renderBoard();
+      return;
+    }
+    const heatCell = ev.target.closest?.("[data-heat-area]");
+    if (heatCell) {
+      const area = heatCell.dataset.heatArea || "";
+      const gov = heatCell.dataset.heatGov || "";
+      const areaFilter = $("boardAreaFilter");
+      const govFilter = $("boardGovernorateFilter");
+      if (areaFilter) areaFilter.value = area;
+      if (govFilter && gov) govFilter.value = gov;
+      boardState.activeMetric = "movement";
+      const metricFilter = $("boardMetricFilter");
+      if (metricFilter) metricFilter.value = "movement";
+      renderBoard();
+      runBoardAnalysis({ area, governorate: gov, metric: "movement" });
       return;
     }
     const toggle = ev.target.closest?.("[data-board-toggle-gov]");

@@ -2306,6 +2306,89 @@ button:hover {
   display: none;
 }
 
+/* خريطة حرارية للمناطق — فجوة السعر مقابل وسيط المحافظة */
+.heatmap-title {
+  margin-top: 18px;
+}
+
+.heatmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  margin-inline-end: 3px;
+  vertical-align: middle;
+}
+
+.legend-cheap {
+  background: hsl(120 72% 42% / .85);
+}
+
+.legend-neutral {
+  background: hsl(60 72% 42% / .85);
+}
+
+.legend-expensive {
+  background: hsl(0 72% 42% / .85);
+}
+
+.board-heatmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.heat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 10px;
+  color: #fff;
+  background: var(--heat);
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease;
+  min-height: 48px;
+}
+
+.heat-cell:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .25);
+}
+
+.heat-cell b {
+  font-size: 12px;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+
+.heat-cell span {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: .95;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+}
+
+.heat-cell.heat-cheap {
+  outline: 1px solid rgba(34, 197, 94, .55);
+}
+
+.heat-cell.heat-expensive {
+  outline: 1px solid rgba(248, 113, 113, .55);
+}
+
 /* محاكي صفقة الاستثمار */
 .deal-simulator {
   margin-top: 12px;
