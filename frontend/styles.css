@@ -2578,6 +2578,103 @@ button:hover {
   margin: 10px 0 4px;
 }
 
+.heat-cell-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.heat-watch-btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-radius: 9px;
+  border: 1px dashed rgba(255, 255, 255, .45);
+  background: rgba(2, 6, 16, .30);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.heat-watch-btn:hover {
+  background: rgba(2, 6, 16, .55);
+}
+
+.heat-watch-btn.watched {
+  background: rgba(245, 158, 11, .85);
+  border: 1px solid #fbbf24;
+}
+
+/* قائمة المناطق المراقبة */
+.watched-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 8px 0 6px;
+}
+
+.watched-area {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.watched-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--heat);
+  flex-shrink: 0;
+}
+
+.watched-area b {
+  font-size: 13px;
+}
+
+.watched-area small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.watched-area strong {
+  margin-inline-start: auto;
+  font-size: 14px;
+  color: var(--heat);
+}
+
+.watched-delta {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--amber);
+  font-weight: 800;
+}
+
+.watched-date {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.watched-area .watched-remove {
+  position: static;
+  min-height: 28px;
+  background: rgba(248, 113, 113, .15);
+  color: var(--red);
+  border-color: rgba(248, 113, 113, .5);
+}
+
+.watched-count {
+  color: var(--amber);
+  font-size: 12px;
+}
+
 .heat-cell {
   display: flex;
   flex-direction: column;

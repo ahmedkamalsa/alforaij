@@ -86,6 +86,49 @@ const boardMetricLabels = {
 };
 
 const recentAreasKey = "alforaij_recent_areas_v2";
+const watchedAreasKey = "alforaij_watched_areas_v1";
+
+// ── المناطق المراقبة (احجز منطقة لمراقبة تغيّر فجوتها مقابل وسيط المحافظة) ──
+function readWatchedAreas() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(watchedAreasKey) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((item) => item && item.area) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveWatchedAreas(list) {
+  try {
+    localStorage.setItem(watchedAreasKey, JSON.stringify(list));
+  } catch {
+    // التخزين ممتلئ/محظور — نتجاهل بصمت
+  }
+}
+
+function isWatchedArea(area) {
+  const clean = String(area || "").trim();
+  return readWatchedAreas().some((item) => normalizeArabic(item.area) === normalizeArabic(clean));
+}
+
+function toggleWatchedArea(area, governorate, gapPct) {
+  const clean = String(area || "").trim();
+  if (!clean) return;
+  let list = readWatchedAreas();
+  const existing = list.find((item) => normalizeArabic(item.area) === normalizeArabic(clean));
+  if (existing) {
+    list = list.filter((item) => normalizeArabic(item.area) !== normalizeArabic(clean));
+  } else {
+    list.unshift({
+      area: clean,
+      governorate: governorate || "",
+      savedAt: new Date().toISOString(),
+      gapAtBooking: gapPct ?? null,
+    });
+  }
+  saveWatchedAreas(list);
+  return !existing;
+}
 
 const $ = (id) => document.getElementById(id);
 const API_BASE = String(window.ALFORAIJ_API_BASE || localStorage.getItem("ALFORAIJ_API_BASE") || "").replace(/\/$/, "");
@@ -1078,12 +1121,16 @@ function heatmapCellsHtml(areas) {
     const cheap = a.gapPct <= -8, expensive = a.gapPct >= 8, fair = !cheap && !expensive;
     const cls = cheap ? "heat-cheap" : expensive ? "heat-expensive" : "heat-fair";
     const sign = a.gapPct > 0 ? "+" : "";
+    const watched = isWatchedArea(a.area);
     return `
-      <button type="button" class="heat-cell ${cls}" data-heat-area="${escapeHtml(a.area)}" data-heat-gov="${escapeHtml(a.governorate)}"
-        style="--heat:${color}" title="${escapeHtml(a.area)} — وسيط ${a.perM2.toLocaleString("en-US")} د.ك/م² مقابل وسيط ${escapeHtml(a.governorate || "" )}: ${sign}${a.gapPct}% (${a.count} إعلان بيع)">
-        <b>${escapeHtml(a.area)}</b>
-        <span>${sign}${a.gapPct.toLocaleString("en-US", { maximumFractionDigits: 1 })}%</span>
-      </button>`;
+      <div class="heat-cell-wrap">
+        <button type="button" class="heat-cell ${cls}" data-heat-area="${escapeHtml(a.area)}" data-heat-gov="${escapeHtml(a.governorate)}"
+          style="--heat:${color}" title="${escapeHtml(a.area)} — وسيط ${a.perM2.toLocaleString("en-US")} د.ك/م² مقابل وسيط ${escapeHtml(a.governorate || "" )}: ${sign}${a.gapPct}% (${a.count} إعلان بيع)">
+          <b>${escapeHtml(a.area)}</b>
+          <span>${sign}${a.gapPct.toLocaleString("en-US", { maximumFractionDigits: 1 })}%</span>
+        </button>
+        <button type="button" class="heat-watch-btn${watched ? " watched" : ""}" data-watch-area="${escapeHtml(a.area)}" data-watch-gov="${escapeHtml(a.governorate)}" data-watch-gap="${a.gapPct}" title="${watched ? "إلغاء مراقبة المنطقة" : "احجز هذه المنطقة لمراقبة تغيّر فجوتها"}">${watched ? "★ مراقَبة" : "☆ احجز"}</button>
+      </div>`;
   }).join("");
 }
 
@@ -1091,11 +1138,15 @@ function renderBoardHeatmap(rows) {
   const root = $("boardHeatmap");
   if (!root) return;
   const areas = computeAreaHeatmap(rows);
+  const countEl = $("watchedCount");
+  if (countEl) countEl.textContent = readWatchedAreas().length ? `(${readWatchedAreas().length})` : "";
   if (!areas.length) {
     root.innerHTML = '<div class="empty">لا توجد بيانات سعر/مساحة كافية للرسم الحراري — تتراكم مع الحصاد اليومي.</div>';
+    renderWatchedAreas($("watchedAreas"), []);
     return;
   }
   root.innerHTML = heatmapCellsHtml(areas);
+  renderWatchedAreas($("watchedAreas"), areas);
 }
 
 // خريطة حرارية تبويب التحليلات: تُبنى من /api/market-insights (مناطق بوسيط سعر المتر والمحافظة)
@@ -1139,6 +1190,45 @@ function renderInsightsHeatmap(data) {
     return;
   }
   root.innerHTML = heatmapCellsHtml(areas);
+  renderWatchedAreas($("watchedAreasInsights"), areas);
+}
+
+// قائمة «المناطق المراقبة»: تعرض فجوة كل منطقة محجوزة وتحدّث تلقائيًا عند تغيّر الحصاد
+function renderWatchedAreas(root, currentAreas) {
+  if (!root) return;
+  const watched = readWatchedAreas();
+  if (!watched.length) {
+    root.innerHTML = '<div class="empty compact-empty">لا مناطق محجوزة بعد — اضغط «☆ احجز» على أي خلية خريطة لمتابعة تغيّر فجوتها.</div>';
+    return;
+  }
+  const byArea = {};
+  for (const area of currentAreas || []) byArea[normalizeArabic(area.area)] = area;
+  root.innerHTML = watched.map((item) => {
+    const current = byArea[normalizeArabic(item.area)];
+    const gap = current ? current.gapPct : item.gapAtBooking;
+    const sign = gap != null && gap > 0 ? "+" : "";
+    const color = gap != null ? heatColor(gap) : "hsl(220 20% 45% / .7)";
+    const changed = current && item.gapAtBooking != null && Math.abs(current.gapPct - item.gapAtBooking) > 0.5;
+    const delta = changed
+      ? `تغيّرت من ${signOld(item.gapAtBooking)} إلى ${signOld(current.gapPct)}`
+      : "";
+    return `
+      <div class="watched-area" style="--heat:${color}">
+        <span class="watched-dot"></span>
+        <b>${escapeHtml(item.area)}</b>
+        <small>${escapeHtml(item.governorate || "غير محددة")}</small>
+        <strong>${gap != null ? `${sign}${gap.toLocaleString("en-US", { maximumFractionDigits: 1 })}%` : "—"}</strong>
+        ${changed ? `<span class="watched-delta">${escapeHtml(delta)}</span>` : ""}
+        <span class="watched-date">منذ ${dateText(item.savedAt ? item.savedAt.slice(0, 10) : "")}</span>
+        <button type="button" class="heat-watch-btn watched-remove" data-watch-area="${escapeHtml(item.area)}" data-watch-gov="${escapeHtml(item.governorate || "")}" title="إلغاء مراقبة ${escapeHtml(item.area)}">✕ إلغاء</button>
+      </div>`;
+  }).join("");
+}
+
+function signOld(value) {
+  if (value == null) return "—";
+  const v = Number(value);
+  return `${v > 0 ? "+" : ""}${v.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
 }
 
 function renderBoard() {
@@ -3878,6 +3968,18 @@ function bind() {
       if (metricFilter) metricFilter.value = metric;
       boardState.activeMetric = metric;
       renderBoard();
+      return;
+    }
+    const watchBtn = ev.target.closest?.("[data-watch-area]");
+    if (watchBtn) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const area = watchBtn.dataset.watchArea || "";
+      const gov = watchBtn.dataset.watchGov || "";
+      const gap = watchBtn.dataset.watchGap != null && watchBtn.dataset.watchGap !== "" ? Number(watchBtn.dataset.watchGap) : null;
+      toggleWatchedArea(area, gov, gap);
+      renderBoardHeatmap(boardState.records);
+      renderInsightsHeatmap(insightsState.data);
       return;
     }
     const heatCell = ev.target.closest?.("[data-heat-area]");

@@ -10,7 +10,7 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260811-insights-heatmap">
+  <link rel="stylesheet" href="styles.css?v=20260811-watchlist">
   <script src="config.js?v=20260811-trends"></script>
 </head>
 <body>
@@ -129,6 +129,12 @@
       </div>
       <div id="boardHeatmap" class="board-heatmap"></div>
 
+      <div class="section-title compact-title heatmap-title" id="watchedTitle">
+        <h3>المناطق المراقبة <span id="watchedCount" class="watched-count"></span></h3>
+        <span>المناطق التي حجزتها — تُحدَّث فجوتها تلقائيًا عند تغيّر بيانات الحصاد.</span>
+      </div>
+      <div id="watchedAreas" class="watched-areas"></div>
+
       <div class="board-layout">
         <section class="board-overview">
           <div class="section-title compact-title">
@@ -196,6 +202,7 @@
       <div id="insightsHeatmap" class="board-heatmap">
         <div class="empty">جاري تحميل الخريطة الحرارية...</div>
       </div>
+      <div id="watchedAreasInsights" class="watched-areas"></div>
       <div id="insightsRoot" class="insights-root">
         <div class="empty">جاري تحميل تحليلات السوق...</div>
       </div>
@@ -565,6 +572,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260811-insights-heatmap"></script>
+  <script src="app.js?v=20260811-watchlist"></script>
 </body>
 </html>
