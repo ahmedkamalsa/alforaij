@@ -387,6 +387,14 @@ class AnalysisTests(unittest.TestCase):
         r2 = parse_request("بيت شمال غرب الصليبيخات 400م")
         self.assertEqual(r2.areas, ["شمال غرب الصليبيخات"])
 
+    def test_official_indicators_sulaibikhat_mapping(self) -> None:
+        """خريطة الصليبيخات الإنجليزية موجودة ليُلتقط مؤشرها الرسمي."""
+        from backend.connectors.market_ads import _AR_TO_EN_REGION, _EN_TO_AR_REGION
+
+        self.assertEqual(_AR_TO_EN_REGION.get("الصليبيخات"), "sulaibikhat")
+        self.assertEqual(_EN_TO_AR_REGION.get("sulaibikhat"), "الصليبيخات")
+        self.assertEqual(_EN_TO_AR_REGION.get("north-west-sulaibikhat"), "شمال غرب الصليبيخات")
+
 
 if __name__ == "__main__":
     unittest.main()

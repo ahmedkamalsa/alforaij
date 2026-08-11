@@ -35,7 +35,10 @@ supabase/setup_all.sql
 3. `supabase/seed_source_registry.sql`
 … إلخ (كل ملفات `supabase/migrations/` بالترتيب، منها:
    - `007_outreach_clicks.sql` لتتبع نقرات التسويق
-   - `010_market_listings.sql` **لإعلانات السوق الخارجية المحصودة** — الوكيل اليومي يحفظ فيها كل إعلانات Mourjan/OpenSooq/Q8Aqar/… يوميًا (خطوة `persist_market_listings`) فتراكم قاعدة المعرفة مثل بيانات الفريج المحلية تمامًا)
+   - `010_market_listings.sql` **لإعلانات السوق الخارجية المحصودة** — الوكيل اليومي يحفظ فيها كل إعلانات Mourjan/OpenSooq/Q8Aqar/… يوميًا (خطوة `persist_market_listings`) فتراكم قاعدة المعرفة مثل بيانات الفريج المحلية تمامًا
+   - `011_official_indicators_sulaibikhat.sql` **لأسعار المتر الرسمية لصليبيخات** (600 د.ك/م² — مرجع 2025) حتى لا تبقى المنطقة بلا بيانات مرجعية في `official_market_indicators`)
+
+> ملاحظة: مؤشرات `official_market_indicators` **تُقرأ مباشرة من القاعدة** — إن لم يكن الترحيل `011` منشّذًا، تُعبَّأ الصفوف يدويًا أو عبر `_post` بنفس الحقول (region / reference_land_price_per_m2 / source_name / source_quarter / confidence / effective_from / effective_to / notes).
 
 أو بعد وضع مفاتيح البيئة يمكن مزامنة سجل المصادر بالكود:
 

@@ -48,6 +48,7 @@ _EN_TO_AR_REGION: dict[str, str] = {
     "jaber-al-ahmed": "جابر الأحمد",
     "saad-al-abdallah": "سعد العبدالله",
     "north-west-sulaibikhat": "شمال غرب الصليبيخات",
+    "sulaibikhat": "الصليبيخات",
     "abu-fatira": "أبو فطيرة",
     "aqeela": "العقيلة",
 }
