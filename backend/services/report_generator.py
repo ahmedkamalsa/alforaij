@@ -228,6 +228,7 @@ def ranked_to_dict(item: RankedListing) -> dict:
         "views": views,
         "viewsSource": views_source,
         "originalUrl": listing.original_url,
+        "phone": getattr(listing, "phone", "") or "",
         "rental": rental,
         "monthlyRent": listing.price if rental else None,
         "annualRent": number_sources.get("annualRent", {}).get("value") if rental else None,

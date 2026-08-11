@@ -125,10 +125,17 @@ class TestOutreachTracking(unittest.TestCase):
         self.assertEqual(len(stats["weekly"]), 12)
         by_week = {b["week"]: b for b in stats["weekly"]}
         w1, w2, w3 = self._week_start(d1), self._week_start(d2), self._week_start(d3)
-        self.assertEqual(by_week[w1]["total"], 3 if w1 == w2 else 2)
-        self.assertEqual(by_week[w1]["copies"], 1)
-        self.assertEqual(by_week[w1]["sends"], 2 if w1 == w2 else 1)
-        self.assertEqual(by_week[w3]["total"], 1)
+        # الأحداث: d1 نسخ+إرسال (2)، d2 إرسال (1)، d3 نسخ (1). التوقع يُحسب من
+        # الأسابيع الفعلية لأي تاريخ (قبل اليوم: d3 قد يقع في نفس أسبوع d1)،
+        # فلا يعتمد الاختبار على يوم التشغيل ولا يكسر عند حدود الأسبوع.
+        expected_w1_total = 2 + (1 if w2 == w1 else 0) + (1 if w3 == w1 else 0)
+        expected_w1_copies = 1 + (1 if w3 == w1 else 0)
+        expected_w1_sends = 1 + (1 if w2 == w1 else 0)
+        self.assertEqual(by_week[w1]["total"], expected_w1_total)
+        self.assertEqual(by_week[w1]["copies"], expected_w1_copies)
+        self.assertEqual(by_week[w1]["sends"], expected_w1_sends)
+        expected_w3_total = 1 + (2 if w1 == w3 else 0) + (1 if w2 == w3 else 0)
+        self.assertEqual(by_week[w3]["total"], expected_w3_total)
 
     def test_fetch_outreach_stats_computes_expected_response(self) -> None:
         from unittest import mock

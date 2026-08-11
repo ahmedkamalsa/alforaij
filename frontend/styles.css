@@ -3063,6 +3063,34 @@ summary {
   filter: brightness(.94);
 }
 
+/* زر «تواصل مع المعلن» عبر واتساب: يظهر عندما يحمل الإعلان رقم هاتف المعلن
+   (يُستخرج من صفحة تفاصيل الإعلان — Q8Aqar/Mourjan/4Sale…) */
+.wa-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid #128c7e;
+  border-radius: 8px;
+  background: #128c7e;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter .15s ease;
+}
+
+.wa-contact:hover {
+  filter: brightness(.94);
+}
+
+/* زر التواصل داخل بطاقات نتائج الشات (بجانب زر فتح الإعلان) */
+.result-body .wa-contact.chat-wa-contact {
+  margin-top: 12px;
+  margin-inline-start: 8px;
+}
+
 /* روابط الإرسال الشخصية للعملاء المطابقين (رسالة مخصصة لكل عميل) */
 .opp-client-send {
   display: flex;
@@ -4114,7 +4142,8 @@ summary {
   .opp-copy-btn,
   .wa-share,
   .wa-client,
-  .wa-open {
+  .wa-open,
+  .wa-contact {
     display: inline-flex;
     align-items: center;
     min-height: 44px;

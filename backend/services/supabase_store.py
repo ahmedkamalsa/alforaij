@@ -719,9 +719,12 @@ def fetch_market_analytics(limit: int = 5000) -> dict[str, Any]:
             "governorates": set(),
             "prices": [],
             "spaces": [],
+            "phones": 0,
             "lastFetched": "",
         })
         bucket["count"] += 1
+        if row.get("phone"):
+            bucket["phones"] += 1
         transaction = str(row.get("transaction") or "").strip()
         property_type = str(row.get("property_type") or "").strip()
         area = str(row.get("area") or "").strip()
@@ -767,6 +770,7 @@ def fetch_market_analytics(limit: int = 5000) -> dict[str, Any]:
             "governorates": sorted(bucket["governorates"]),
             "price": {"median": _median(bucket["prices"]), "min": min(bucket["prices"]) if bucket["prices"] else None, "max": max(bucket["prices"]) if bucket["prices"] else None},
             "space": {"median": _median(bucket["spaces"])},
+            "phones": bucket["phones"],
             "lastFetched": bucket["lastFetched"],
         })
     sources.sort(key=lambda item: item["count"], reverse=True)

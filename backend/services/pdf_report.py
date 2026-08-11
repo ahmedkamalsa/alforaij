@@ -622,6 +622,13 @@ def _detail_top_result(story: list, item: dict, styles: dict[str, ParagraphStyle
             "رابط الإعلان المباشر",
             f"{ar_link('اضغط هنا لفتح الإعلان الأصلي', url)}<br/>{ar(_display_url(url))}",
         ))
+    phone = item.get("phone") or ""
+    if phone:
+        phone_digits = re.sub(r"\D", "", phone)
+        summary_rows.append((
+            "هاتف المعلن (واتساب)",
+            f"{ar_link('اضغط هنا للتواصل عبر واتساب', f'https://wa.me/{phone_digits}')}<br/>{ar(phone)}",
+        ))
     story.append(_info_table(summary_rows, [40 * mm, 140 * mm]))
     story.append(Spacer(1, 6))
 

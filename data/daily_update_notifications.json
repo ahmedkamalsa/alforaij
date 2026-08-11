@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-11T21:36:46",
+  "generatedAt": "2026-08-12T01:08:29",
   "hasPrevious": true,
   "counts": {
-    "added": 20,
-    "removed": 25,
+    "added": 3,
+    "removed": 5,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -20,29 +20,16 @@
     "priceDrops": [],
     "added": [
       {
-        "code": "AF-176",
-        "area": "الرميثية",
-        "propertyType": "بيت",
-        "price": 650000.0,
-        "priceText": "650 ألف د.ك",
+        "code": "AF-105",
+        "area": "جليب الشيوخ - الحساوي",
+        "propertyType": "عمارة",
+        "price": 800000.0,
+        "priceText": "800 ألف د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
         "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/176",
-        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
-      },
-      {
-        "code": "AF-216",
-        "area": "السالمية",
-        "propertyType": "أرض",
-        "price": 530000.0,
-        "priceText": "530 ألف د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/216",
+        "url": "https://front.alforaij.com/Listing/Detail/105",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       },
       {
@@ -57,46 +44,59 @@
         "source": "الفريج",
         "url": "https://front.alforaij.com/Listing/Detail/76",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
+        "code": "OS-285431740",
+        "area": "",
+        "propertyType": "عقارات",
+        "price": 100000.0,
+        "priceText": "100,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/285431740",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       }
     ],
     "removed": [
       {
-        "code": "OS-285410620",
-        "area": "الأحمدي",
-        "propertyType": "شقة",
-        "price": 110000.0,
-        "priceText": "110,000 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285410620",
-        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
-      },
-      {
-        "code": "OS-285137798",
-        "area": "",
+        "code": "OS-285199468",
+        "area": "الفروانية",
         "propertyType": "بيت",
-        "price": 230.0,
-        "priceText": "230 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "إيجار ممتاز",
-        "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285137798",
-        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
-      },
-      {
-        "code": "4S-floor-21079428",
-        "area": "جابر الأحمد",
-        "propertyType": "أرض",
-        "price": 111000.0,
-        "priceText": "111,000 د.ك",
+        "price": 460000.0,
+        "priceText": "460,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "4Sale",
-        "url": "https://www.q84sale.com/en/listing/floor-21079428",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/285199468",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "AF-302",
+        "area": "صباح السالم",
+        "propertyType": "بيت",
+        "price": 270000.0,
+        "priceText": "270 ألف د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "الفريج",
+        "url": "https://front.alforaij.com/Listing/Detail/302",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "AF-218",
+        "area": "سلوى",
+        "propertyType": "بيت",
+        "price": 420000.0,
+        "priceText": "420 ألف د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "الفريج",
+        "url": "https://front.alforaij.com/Listing/Detail/218",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       }
     ]

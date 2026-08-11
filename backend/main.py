@@ -120,6 +120,7 @@ def _dashboard_record(listing) -> dict:
         "summary": listing.summary,
         "features": listing.features,
         "originalUrl": listing.original_url,
+        "phone": getattr(listing, "phone", "") or "",
     }
 
 
@@ -208,6 +209,7 @@ def _market_row_to_record(row: dict) -> dict:
         "summary": row.get("summary") or "",
         "features": row.get("features") or "",
         "originalUrl": row.get("original_url") or "",
+        "phone": row.get("phone") or "",
         "fetchedAt": str(row.get("fetched_at") or "")[:19],
         "harvested": True,
     }
@@ -351,6 +353,7 @@ def _record_from_opportunity(item: dict, area_map: dict[str, str]) -> dict:
         "opportunityComparablesCount": item.get("comparablesCount"),
         "opportunityEvidenceCount": item.get("evidenceCount"),
         "opportunityClientsCount": item.get("clientsCount"),
+        "phone": item.get("phone") or "",
     }
     _normalize_dashboard_place(record, area_map)
     return record

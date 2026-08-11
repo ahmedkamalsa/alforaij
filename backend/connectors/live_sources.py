@@ -1091,13 +1091,15 @@ def search_nabdaqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
 
 
 def _detail_fields(body: str) -> dict[str, Any]:
-    """استخراج السعر والمساحة والمنطقة والمحافظة من صفحة تفاصيل إعلان.
+    """استخراج السعر والمساحة والمنطقة والمحافظة والهاتف من صفحة تفاصيل إعلان.
 
     الوسوم الوصفية أولًا ثم JSON-LD ثم نص صريح — لكل حقل على حدة حتى يكتمل
-    الإعلان من صفحة التفاصيل عندما لا تحمل القائمة السابقة الحقل.
+    الإعلان من صفحة التفاصيل عندما لا تحمل القائمة السابقة الحقل. الهاتف يُستخرج
+    من روابط wa.me/tel ومن JSON المضمّن (4Sale) ومن نص الصفحة (Mourjan).
     """
     price, space = _detail_price_space(body)
     area, governorate = _detail_place(body)
+    phone = _detail_phone(body)
     fields: dict[str, Any] = {}
     if price is not None:
         fields["price"] = price
@@ -1107,7 +1109,79 @@ def _detail_fields(body: str) -> dict[str, Any]:
         fields["area"] = area
     if governorate:
         fields["governorate"] = governorate
+    if phone:
+        fields["phone"] = phone
     return fields
+
+
+# أرقام معروفة لدعم المواقع (ليست أرقام معلنين) — تُستبعد من الاستخراج دائمًا
+_SUPPORT_PHONES: set[str] = {
+    "9651844474",  # 4Sale الهاتف الساخن
+    "96522260016",  # OpenSooq الكويت
+    "9651844555",  # Mourjan/غيرها من الخطوط الساخنة العامة إن ظهرت
+}
+
+
+def _normalize_phone(raw: Any) -> str:
+    """تطبيع رقم كويتي إلى E.164 (+965xxxxxxxx) مع تجاهل أرقام الدعم."""
+    digits = re.sub(r"\D", "", str(raw or ""))
+    if not digits:
+        return ""
+    # أرقام الدعم المعروفة — ليست أرقام معلنين
+    if digits in _SUPPORT_PHONES:
+        return ""
+    if digits.startswith("00965"):
+        digits = digits[5:]
+    if digits.startswith("965") and len(digits) == 11:
+        return "+" + digits
+    if len(digits) == 8 and digits[0] in "569":
+        return "+965" + digits
+    return ""
+
+
+def _detail_phone(body: str) -> str:
+    """استخراج رقم تواصل المعلن من صفحة تفاصيل إعلان.
+
+    الترتيب (الأكثر صرامة أولًا):
+      1) روابط واتساب المباشرة wa.me/<رقم> (Q8Aqar يضعها صراحة في الصفحة),
+      2) روابط اتصال tel:+<رقم> (Mourjan),
+      3) JSON مضمّن بمفاتيح phone/contacts/mobile (4Sale يضع رقم البائع فيه),
+      4) نمط رقم كويتي محمول في النص الصريح للصفحة.
+    يعيد الرقم بصيغة E.164 أو سلسلة فارغة إذا لم يوجد رقم معلن.
+    """
+    # 1) wa.me — أوضح إشارة لرقم معلن
+    for match in re.finditer(r"wa\.me/(\+?[0-9\s-]{8,16})", body, re.I):
+        normalized = _normalize_phone(match.group(1))
+        if normalized:
+            return normalized
+    # 2) tel: — روابط اتصال مباشرة
+    for match in re.finditer(r"tel:([0-9+\s-]{8,16})", body, re.I):
+        normalized = _normalize_phone(match.group(1))
+        if normalized:
+            return normalized
+    # 3) JSON مضمّن: phone / contacts / mobile (4Sale …)
+    for key in ("phone", "contacts", "mobile", "mobile_number", "phone_number"):
+        for match in re.finditer(r'"' + key + r'"\s*:\s*("[^"]{6,24}"|\[[^\]]{6,160}\])', body, re.I):
+            raw = match.group(1)
+            values: list[str] = []
+            if raw.startswith("["):
+                values = re.findall(r'"([0-9+\s-]{6,24})"', raw)
+            else:
+                values = [raw.strip('"')]
+            for value in values:
+                normalized = _normalize_phone(value)
+                if normalized:
+                    return normalized
+    # 4) نمط محمول كويتي في النص الصريح بشرط سياق اتصال قريب (اتصل/جوال/واتساب/…)
+    #    — يمنع التقاط أرقام إعلانات مشابهة مذكورة في نفس الصفحة
+    text = clean_text(body)
+    for match in re.finditer(r"(?:\+?965[\s-]?)?[569]\d{7}", text):
+        window = text[max(0, match.start() - 90):match.end()]
+        if re.search(r"اتصل|جوال|هاتف|واتساب|للتواصل|تواصل|mobile|whatsapp|phone|call", window, re.I):
+            normalized = _normalize_phone(match.group(0))
+            if normalized:
+                return normalized
+    return ""
 
 
 def _detail_price_space(body: str) -> tuple[float | None, float | None]:
@@ -1270,10 +1344,16 @@ def enrich_listings_from_details(
             or not listing.space
             or not listing.area
             or not listing.governorate
+            or not listing.phone
         )
     ]
     if not incomplete:
         return {"status": "no_data", "read": 0, "enriched": 0, "fields": {}, "failed": 0, "note": "كل الإعلانات مكتملة — لا حاجة لقراءة تفاصيل."}
+    # أولوية المصادر التي تعرض هاتف المعلن في صفحة التفاصيل (Q8Aqar/Mourjan/4Sale…)
+    # حتى تُستنفد ميزانية القراءة اليومية على ما يعطي هاتفًا فعلًا، بينما يبقى
+    # OpenSooq (الرقم خلف زر كشف) آخر الخيارات إن وُسِّعت الميزانية مستقبلًا.
+    phone_sources = ("Q8Aqar", "Mourjan", "4Sale", "بوعقار", "Bu3qar", "السوق المباشر")
+    incomplete.sort(key=lambda listing: 0 if any(s in listing.source for s in phone_sources) else 1)
     targets = incomplete[:max_pages]
 
     def _fetch_one(listing: Listing) -> tuple[Listing, dict[str, Any]]:
@@ -1308,6 +1388,9 @@ def enrich_listings_from_details(
         if not listing.governorate and fields.get("governorate"):
             listing.governorate = str(fields["governorate"])
             changed.append("governorate")
+        if not listing.phone and fields.get("phone"):
+            listing.phone = str(fields["phone"])
+            changed.append("phone")
         if changed:
             enriched += 1
             for field in changed:
@@ -1324,7 +1407,7 @@ def enrich_listings_from_details(
     if enriched:
         parts.append(f"اكتمل {enriched} إعلان")
     if fields_filled:
-        labels = {"price": "سعر", "space": "مساحة", "area": "منطقة", "governorate": "محافظة"}
+        labels = {"price": "سعر", "space": "مساحة", "area": "منطقة", "governorate": "محافظة", "phone": "هاتف"}
         filled = ", ".join(f"{labels.get(k, k)}: {v}" for k, v in sorted(fields_filled.items()))
         parts.append(f"({filled})")
     if failed:

@@ -43,6 +43,7 @@ class Listing:
     source: str = "الفريج"
     listing_type: str = "غير محدد"  # مباشر | مكتب | غير محدد
     seller_info: str = ""  # معلومات إضافية عن البائع
+    phone: str = ""  # رقم تواصل المعلن (بصيغة E.164 +965xxxxxxxx) — يُستخرج من صفحة التفاصيل
     raw: dict[str, Any] = field(default_factory=dict)
 
 

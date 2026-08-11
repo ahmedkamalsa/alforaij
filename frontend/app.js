@@ -608,6 +608,7 @@ function staticAnalyzeReport(payload) {
       space: row.space,
       publishedDate: row.publishedDate,
       originalUrl: row.originalUrl,
+      phone: row.phone || "",
       summary: row.summary || row.features || "",
       features: row.features || "",
       recommendationScore: Math.round(score),
@@ -809,6 +810,7 @@ function renderCompanionAds(rows) {
       <div class="companion-actions">
         <button type="button" data-board-ad-code="${escapeHtml(item.code || "")}" data-board-ad-area="${escapeHtml(item.area || "")}" data-board-ad-type="${escapeHtml(item.propertyType || "")}">تحليل</button>
         ${item.originalUrl ? `<a href="${escapeHtml(item.originalUrl)}" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>` : ""}
+        ${item.phone ? `<a class="wa-contact" href="${escapeHtml(waLink(item.phone))}?text=${encodeURIComponent(`السلام عليكم، أستفسر عن الإعلان: ${item.code || ""} (${item.area || ""}) ${item.priceText || ""} — وجدته عبر منصة الفريج العقارية`)}" target="_blank" rel="noreferrer">تواصل واتساب</a>` : ""}
       </div>
     </article>
   `).join("");
@@ -2523,6 +2525,19 @@ function renderReport(report) {
     const link = node.querySelector(".open-link");
     link.href = item.originalUrl || "#";
     link.hidden = !item.originalUrl;
+    // زر «تواصل مع المعلن» عبر واتساب: يظهر عندما يحمل الإعلان رقم هاتف المعلن
+    // (يُستخرج من صفحة تفاصيل الإعلان — Q8Aqar/Mourjan/4Sale…) برسالة جاهزة مخصصة
+    if (item.phone) {
+      const contactLink = document.createElement("a");
+      contactLink.className = "wa-contact chat-wa-contact";
+      contactLink.href = `${waLink(item.phone)}?text=${encodeURIComponent(oppWhatsAppSummary(item))}`;
+      contactLink.target = "_blank";
+      contactLink.rel = "noreferrer";
+      contactLink.textContent = "تواصل مع المعلن";
+      contactLink.title = `واتساب المعلن: ${latinDigits(item.phone)}`;
+      contactLink.addEventListener("click", () => trackOutreach({ action: "contact", channel: "chat_result", opportunityCode: item.code || "" }));
+      link.after(contactLink);
+    }
     // زر «نسخ ملخص» في نتائج الشات: نفس الرسالة المولّدة بمصادر الأدلة + زر إرسال واتساب مباشر
     const copyBtn = document.createElement("button");
     copyBtn.type = "button";
@@ -2966,6 +2981,7 @@ function oppCard(item, index) {
       ${oppClientChips(item)}
       <div class="opp-actions">
         ${item.url ? `<a class="open-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>` : ""}
+        ${item.phone ? `<a class="wa-contact" href="${escapeHtml(waLink(item.phone))}?text=${encodeURIComponent(oppWhatsAppSummary(item))}" target="_blank" rel="noreferrer">تواصل مع المعلن (واتساب)</a>` : ""}
         <button class="opp-copy-btn" type="button">نسخ ملخص الفرصة</button>
         <a class="wa-share" href="${waShareLink(oppWhatsAppSummary(item))}" target="_blank" rel="noreferrer">إرسال واتساب</a>
       </div>
@@ -3733,10 +3749,10 @@ async function loadMarketAnalytics() {
         .map((s) => {
           const medianPrice = s.price && s.price.median != null ? s.price.median.toLocaleString("en") : "—";
           const medianSpace = s.space && s.space.median != null ? s.space.median.toLocaleString("en") : "—";
-          return `<tr><td>${escapeHtml(s.source)}</td><td>${s.count}</td><td>${(s.areas || []).length}</td><td>${medianPrice}</td><td>${medianSpace}</td></tr>`;
+          return `<tr><td>${escapeHtml(s.source)}</td><td>${s.count}</td><td>${(s.areas || []).length}</td><td>${medianPrice}</td><td>${medianSpace}</td><td>${s.phones || 0}</td></tr>`;
         })
         .join("");
-      detail.innerHTML = rows || '<tr><td colspan="5">لا توجد بيانات بعد.</td></tr>';
+      detail.innerHTML = rows || '<tr><td colspan="6">لا توجد بيانات بعد.</td></tr>';
     }
   } catch (err) {
     if (strip) strip.textContent = "حصاد السوق: غير متاح في هذا الوضع (يتطلب الباك إند الحي).";

@@ -139,12 +139,13 @@ class LiveSourceParsingTests(unittest.TestCase):
                 price_text="200,000 د.ك", space=320, listing_mode="خارجي مباشر",
                 summary="بيت في السالمية", features="", published_date="",
                 original_url="https://example.com/detail/2", source="TestSource",
+                phone="+96566242264",  # مكتمل مع هاتف → لا يُقرأ
             ),
         ]
         with patch("backend.connectors.live_sources.fetch_url", side_effect=fake_fetch_url):
             stats = enrich_listings_from_details(listings, max_pages=10)
         self.assertEqual(stats["enriched"], 1)
-        self.assertEqual(stats["read"], 1)  # الإعلان الثاني مكتمل — لا يُقرأ
+        self.assertEqual(stats["read"], 1)  # الإعلان الثاني مكتمل (مع هاتفه) — لا يُقرأ
         self.assertEqual(listings[0].price, 175000)
         self.assertEqual(listings[0].space, 320)
         self.assertEqual(listings[0].area, "الرميثية")
@@ -632,3 +633,129 @@ class LiveSourceParsingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PhoneExtractionTests(unittest.TestCase):
+    """استخراج رقم تواصل المعلن من صفحة التفاصيل (wa.me / tel: / JSON / نص بسياق)."""
+
+    def test_normalize_kw_mobile(self) -> None:
+        from backend.connectors.live_sources import _normalize_phone
+
+        self.assertEqual(_normalize_phone("96555655040"), "+96555655040")
+        self.assertEqual(_normalize_phone("+96597453404"), "+96597453404")
+        self.assertEqual(_normalize_phone("0096566242264"), "+96566242264")
+        self.assertEqual(_normalize_phone("66242264"), "+96566242264")
+        self.assertEqual(_normalize_phone("55655040"), "+96555655040")
+        # أرقام دعم المواقع تُستبعد
+        self.assertEqual(_normalize_phone("1844474"), "")
+        self.assertEqual(_normalize_phone("9651844474"), "")
+        self.assertEqual(_normalize_phone("96522260016"), "")
+        # أرقام غير كويتية/غير صالحة
+        self.assertEqual(_normalize_phone("+971501234567"), "")
+        self.assertEqual(_normalize_phone("12345"), "")
+
+    def test_detail_phone_from_wa_me_link(self) -> None:
+        from backend.connectors.live_sources import _detail_phone
+
+        body = '<a href="https://wa.me/96566242264?text=السلام عليكم - استفسار">واتساب</a>'
+        self.assertEqual(_detail_phone(body), "+96566242264")
+
+    def test_detail_phone_from_tel_link(self) -> None:
+        from backend.connectors.live_sources import _detail_phone
+
+        body = "<a href=tel:+96597453404 target=_blank>اتصل</a>"
+        self.assertEqual(_detail_phone(body), "+96597453404")
+
+    def test_detail_phone_from_embedded_json(self) -> None:
+        from backend.connectors.live_sources import _detail_phone
+
+        body = '{"title":"قسيمه للبيع","source":"4sale-website","phone":"96555655040","contacts":["96566898704"]}'
+        self.assertEqual(_detail_phone(body), "+96555655040")
+
+    def test_detail_phone_prefers_wa_me_over_json(self) -> None:
+        from backend.connectors.live_sources import _detail_phone
+
+        body = (
+            '{"phone":"96511111111"} '
+            '<a href="https://wa.me/96566242264">واتساب المعلن</a>'
+        )
+        self.assertEqual(_detail_phone(body), "+96566242264")
+
+    def test_detail_phone_ignores_support_line_and_foreign_numbers(self) -> None:
+        from backend.connectors.live_sources import _detail_phone
+
+        body = (
+            '<a href="tel:009651844474">الدعم الفني</a> '
+            '<div>للتواصل مع المعلن: 97453404</div>'
+        )
+        self.assertEqual(_detail_phone(body), "+96597453404")
+
+    def test_detail_phone_requires_contact_context_for_plain_text(self) -> None:
+        from backend.connectors.live_sources import _detail_phone
+
+        # رقم بلا سياق اتصال (مثل رقم إعلان مشابه) لا يُلتقط
+        body = "رقم القسيمة 66242264 ومساحتها 400 م²"
+        self.assertEqual(_detail_phone(body), "")
+        # مع سياق اتصال يُلتقط
+        body = "للتواصل مع المعلن جوال 66242264"
+        self.assertEqual(_detail_phone(body), "+96566242264")
+
+
+class EnrichPhoneTests(unittest.TestCase):
+    """وكيل إكمال التفاصيل يستخرج الهاتف ويكمّله من صفحة التفاصيل."""
+
+    def test_enrich_fills_phone_from_detail_page(self) -> None:
+        from unittest import mock
+        from backend.connectors import live_sources
+        from backend.connectors.live_sources import enrich_listings_from_details
+
+        listing = listing_from_text(
+            source="Mourjan",
+            code="MRJ-1",
+            url="https://www.mourjan.com/kw/kuwait/properties/for-sale/29771361/",
+            title="فيلا للبيع في السالمية",
+            description="فيلا دورين",
+            price=None,
+            transaction="للبيع",
+            fallback_type="بيت",
+        )
+        self.assertFalse(listing.phone)
+
+        def fake_fetch(url, extra_headers=None):
+            return '<a href="tel:+96597453404">اتصل</a>', 200, 10.0, None, 1
+
+        with mock.patch.object(live_sources, "fetch_url", side_effect=fake_fetch):
+            result = enrich_listings_from_details([listing], max_pages=2)
+
+        self.assertEqual(result["enriched"], 1)
+        self.assertIn("phone", result["fields"])
+        self.assertEqual(listing.phone, "+96597453404")
+        self.assertIn("enrichedFromDetails", listing.raw)
+
+    def test_enrich_saves_phone_when_only_phone_missing(self) -> None:
+        from unittest import mock
+        from backend.connectors import live_sources
+        from backend.connectors.live_sources import enrich_listings_from_details
+
+        listing = listing_from_text(
+            source="Q8Aqar",
+            code="Q8-1",
+            url="https://q8aqar.com/details/realestate/1858/",
+            title="بيت للبيع في بيان",
+            description="بيت قديم",
+            price=200000,
+            transaction="للبيع",
+            fallback_type="بيت",
+        )
+        # قائمة مكتملة (سعر/مساحة/منطقة/محافظة) لكن بلا هاتف → يبقى مرشحًا للقراءة
+        self.assertTrue(listing.original_url)
+        self.assertTrue(listing.price)
+
+        def fake_fetch(url, extra_headers=None):
+            return '<a href="https://wa.me/96566242264">واتساب</a>', 200, 10.0, None, 1
+
+        with mock.patch.object(live_sources, "fetch_url", side_effect=fake_fetch):
+            result = enrich_listings_from_details([listing], max_pages=2)
+
+        self.assertEqual(result["enriched"], 1)
+        self.assertEqual(listing.phone, "+96566242264")

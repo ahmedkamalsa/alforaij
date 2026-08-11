@@ -83,6 +83,7 @@ def _listing_row(listing: Any) -> dict[str, Any]:
         "features": listing.features,
         "published_date": listing.published_date or None,
         "original_url": listing.original_url,
+        "phone": getattr(listing, "phone", "") or None,
     }
 
 # مصداقية المصادر (ثابتة من السجل الرسمي للمصادر)
@@ -391,6 +392,7 @@ def _listing_opportunity(listing, valuation, clients: list[dict[str, Any]]) -> d
         "publishedDate": listing.published_date,
         "daysAgo": days_ago,
         "url": listing.original_url,
+        "phone": getattr(listing, "phone", "") or "",
         "summary": listing.summary,
         "dealScore": valuation.deal_score,
         "confidence": confidence,
@@ -991,9 +993,11 @@ def build_opportunities(limit_per_tier: int = 30, include_external: bool = True,
             _inventory, _inventory_status = scan_opensooq_inventory()
             external_listings.extend(_inventory)
             external_statuses.append(_inventory_status)
-            # وكيل إكمال التفاصيل: يقرأ صفحة تفاصيل كل إعلان ناقص (سعر/مساحة/منطقة)
-            # حتى تُقيَّم الإعلانات ببيانات كاملة وتُحفظ في قاعدة المعرفة مكتملة.
-            _enrich = enrich_listings_from_details(external_listings, max_pages=15)
+            # وكيل إكمال التفاصيل: يقرأ صفحة تفاصيل كل إعلان ناقص (سعر/مساحة/منطقة/هاتف)
+            # حتى تُقيَّم الإعلانات ببيانات كاملة وتُحفظ في قاعدة المعرفة مكتملة. سقف 40
+            # صفحة في الحصاد (وليس 15) لملء هواتف الإعلانات الجديدة أسرع — كل صفحة خفيفة
+            # (38-180KB) بسرعة 4 طلبات متوازية، والمصادر التي تعرض الهاتف لها الأولوية.
+            _enrich = enrich_listings_from_details(external_listings, max_pages=40)
             if _enrich.get("enriched"):
                 external_statuses.append({
                     "name": "وكيل إكمال التفاصيل",
