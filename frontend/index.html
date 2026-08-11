@@ -10,8 +10,8 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260811-livedb">
-  <script src="config.js?v=20260811-livedb"></script>
+  <link rel="stylesheet" href="styles.css?v=20260811-chips">
+  <script src="config.js?v=20260811-chips"></script>
 </head>
 <body>
   <header class="topbar">
@@ -213,7 +213,7 @@
         <div class="fields">
           <label>نوع العملية<input id="transactionField" type="text" list="advTransactions" placeholder="اكتب أو اختر: للبيع / للإيجار…" autocomplete="off"></label>
           <label>نوع العقار<input id="typeField" type="text" list="advTypes" placeholder="اكتب أو اختر: بيت / شقة / أرض…" autocomplete="off"></label>
-          <label class="wide">المناطق<input id="areasField" type="text" list="advAreas" placeholder="اكتب أو اختر: النهضة / السالمية / الصليبيخات…" autocomplete="off"></label>
+          <div class="wide"><label for="areasField">المناطق</label><span id="areasChips" class="chips-wrap"></span><input id="areasField" type="text" list="advAreas" placeholder="اكتب أو اختر منطقة ثم Enter أو فاصلة لإضافتها — يمكنك اختيار عدة مناطق…" autocomplete="off"></div>
           <datalist id="advTransactions"></datalist>
           <datalist id="advTypes"></datalist>
           <datalist id="advAreas"></datalist>
@@ -489,6 +489,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260811-livedb"></script>
+  <script src="app.js?v=20260811-chips"></script>
 </body>
 </html>

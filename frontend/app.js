@@ -302,7 +302,7 @@ function syncBoardToSearch(overrides = {}) {
   const chatInput = $("chatInput");
   if (transactionField) transactionField.value = transaction;
   if (typeField) typeField.value = filters.propertyType || "";
-  if (areasField) areasField.value = filters.area || "";
+  if (areasField) setAreasFromString(filters.area || "");
   if (chatInput) chatInput.value = boardTextFromFilters({ ...filters, transaction });
   if (filters.area) rememberRecentArea(filters.area);
 }
@@ -893,7 +893,7 @@ function collectAdvancedFilters() {
     transaction: $("transactionField")?.value.trim() || "",
     propertyType: $("typeField")?.value.trim() || "",
     governorate: $("boardGovernorateFilter")?.value.trim() || "",
-    areas: $("areasField")?.value.trim() || "",
+    areas: selectedAreas.join("، "),
     minArea: $("minAreaField")?.value || "",
     maxArea: $("maxAreaField")?.value || "",
     budget: $("budgetField")?.value || "",
@@ -933,6 +933,58 @@ const ADV_FALLBACK_AREAS = [
 
 // قوائم «اكتب أو اختر» في الخيارات المتقدمة: تُملأ من الباك إند (قوائم المحلل الرسمية)
 // مع سقوط آمن للقوائم الثابتة وبيانات اللوحة — تعمل في الوضع الحي والثابت على حد سواء.
+// ---- شرائح المناطق المتعددة: اختيار عدة مناطق من حقل «المناطق» كشرائح قابلة للإزالة ----
+let selectedAreas = [];
+
+function renderAreaChips() {
+  const wrap = $("areasChips");
+  if (!wrap) return;
+  wrap.innerHTML = selectedAreas
+    .map((area) => `<span class="area-chip" data-area="${escapeHtml(area)}">${escapeHtml(area)}<button type="button" class="area-chip-x" title="إزالة ${escapeHtml(area)}" aria-label="إزالة ${escapeHtml(area)}">×</button></span>`)
+    .join("");
+  wrap.querySelectorAll(".area-chip-x").forEach((btn) => {
+    btn.addEventListener("click", () => removeAreaChip(btn.closest(".area-chip")?.dataset.area || ""));
+  });
+}
+
+function addAreaChip(name) {
+  const area = String(name || "").trim();
+  if (!area) return;
+  if (!selectedAreas.some((a) => a === area)) selectedAreas.push(area);
+  const field = $("areasField");
+  if (field) field.value = "";
+  renderAreaChips();
+}
+
+function removeAreaChip(area) {
+  selectedAreas = selectedAreas.filter((a) => a !== area);
+  renderAreaChips();
+}
+
+function setAreasFromString(value) {
+  const list = String(value || "")
+    .split(/[،,|\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  selectedAreas = list;
+  renderAreaChips();
+}
+
+function initAreaChips() {
+  const field = $("areasField");
+  if (!field) return;
+  field.addEventListener("change", () => addAreaChip(field.value));
+  field.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === "," || e.key === "،") {
+      e.preventDefault();
+      addAreaChip(field.value);
+    }
+  });
+  field.addEventListener("blur", () => {
+    if (field.value.trim()) addAreaChip(field.value);
+  });
+}
+
 function populateAdvancedOptions() {
   const boardRows = (boardState.records || []).map((r) => r).filter(Boolean);
   const boardAreas = uniqueValues(boardRows.map((r) => r.area).filter(Boolean));
@@ -3330,6 +3382,7 @@ async function boot() {
   switchMainTab("search");
   bindOppEvents();
   populateAdvancedOptions();
+  initAreaChips();
   loadDashboardBoard();
   loadOpportunities();
   scheduleDailySixAM();

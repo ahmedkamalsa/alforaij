@@ -1113,6 +1113,20 @@ button:hover {
   grid-column: 1 / -1;
 }
 
+/* حقل «المناطق» متعدد الشرائح: التسمية فوق، ثم الشرائح، ثم حقل الكتابة */
+.fields .wide > label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: .85;
+  margin-bottom: 2px;
+}
+
+.fields .wide > input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .summary-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(130px, 1fr));
@@ -1372,6 +1386,48 @@ button:hover {
 .filter-chip b {
   color: var(--blue);
   font-size: 11px;
+}
+
+.chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 6px;
+}
+
+.area-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: rgba(96, 117, 240, .12);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.area-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.area-chip-x:hover {
+  background: rgba(255, 92, 92, .35);
+  color: #fff;
 }
 
 .similar-external-list {
