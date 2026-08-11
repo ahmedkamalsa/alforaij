@@ -56,7 +56,14 @@ def main() -> None:
             continue
         sql_path = migrations_dir / fname
         sql = sql_path.read_text(encoding="utf-8")
-        statements = [s.strip() for s in sql.split(";") if s.strip() and not s.strip().startswith("--")]
+        statements = [
+            "\n".join(
+                line for line in chunk.splitlines()
+                if line.strip() and not line.strip().startswith("--")
+            ).strip()
+            for chunk in sql.split(";")
+        ]
+        statements = [s for s in statements if s]
         if not statements:
             print(f"{fname}: no statements to apply")
             continue

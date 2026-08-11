@@ -13,7 +13,7 @@ import time
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +102,8 @@ SOURCE_MECHANISMS: dict[str, dict[str, str]] = {
         "endpoint": "https://q8aqar.com/… (لا REST عام — wp-json محجوب)",
     },
     "4Sale": {
-        "method": "فحص روابط HTML (لا API عام — api.4sale.com.kw غير متاح)",
-        "endpoint": "https://kuwait.4sale.com/real-estate?search_text=…",
+        "method": "فحص روابط HTML لأحدث العقارات (لا API عام — النطاق الحالي q84sale.com)",
+        "endpoint": "https://www.q84sale.com/en/latest/property/…",
     },
     "Waseet": {
         "method": "فحص روابط HTML وصفحات التفاصيل",
@@ -261,6 +261,8 @@ def parse_price(text: str, fallback: Any = None) -> float | None:
         r"([0-9]+(?:\.[0-9]+)?)\s*مليون",
         r"(?:السعر|سعر البيع|المطلوب|بياع|الثمن|الايجار|ايجار|الاجار)[:\s]*([0-9]+(?:\.[0-9]+)?)\s*(مليون|الف|ألف|دينار|د\.ك|دك)?",
         r"([0-9]+(?:\.[0-9]+)?)\s*(مليون|الف|ألف)\s*(?:دينار|د\.ك|دك)?",
+        # صيغة 4Sale والمواقع الإنجليزي: «850 KWD» / «1,300 KWD» — المبلغ بوحدة الدينار مباشرة
+        r"([0-9][0-9,]*(?:\.[0-9]+)?)\s*KWD",
     ]
     for pattern in patterns:
         match = re.search(pattern, normalized)
@@ -333,9 +335,11 @@ def transaction_from_request(request: PropertyRequest) -> str:
 
 def detect_transaction(text: str, fallback: str) -> str:
     normalized = normalize_text(text)
-    if "للايجار" in normalized or "للإيجار" in text:
+    # «ايجار»/«إيجار» بمختلف الصيغ (للايجار/الايجار/ايجار) — تُفحص قبل «بيع» لأن
+    # إعلانات الإيجار قد لا تحمل «للايجار» صراحةً (مثل «الايجار دور في عماير»)
+    if "ايجار" in normalized or "إيجار" in normalized or "ايجار" in text:
         return "للإيجار"
-    if "للبيع" in normalized or "بيع" in normalized:
+    if "للبيع" in normalized or "بيع" in normalized or "بيع" in text:
         return "للبيع"
     return fallback
 
@@ -1146,65 +1150,102 @@ def search_aqarat(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
     )
 
 
-def search_four_sale(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
-    """منصة 4Sale الكويتية، مع مصدر بديل (OpenSooq الكويت) عند تعذر الوصول.
+# 4Sale انتقلت إلى نطاق q84sale.com (النطاقات القديمة kuwait.4sale.com / 4sale.com.kw
+# محجوبة أو منتهية DNS). العقارات تُقرأ من صفحات /en/property/{1..n} (75 إعلانًا لكل
+# صفحة) مع فحص DNS سريع قبل الجلب حتى لا تُهدر عشرات الثواني على نطاق ميت.
+_FOUR_SALE_BASE = "https://www.q84sale.com"
+_FOUR_SALE_HOST = "www.q84sale.com"
+_FOUR_SALE_PAGES = 3  # صفحات 1..3 — نحو 225 إعلانًا يفلترها مسار المطابقة حسب منطقة الطلب
 
-    عند فشل الاتصال (خطأ عابر مثل DNS أو مهلة أو حظر) تُعاد المحاولة تلقائيًا
-    داخل fetch_url، ثم يُجرَّب المصدر البديل OpenSooq بنفس شروط الطلب حتى لا
-    يضيع هذا الموقع من التقييم، مع إفصاح شفاف في حالة المصدر عن السبب والبديل.
+
+def search_four_sale(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    """منصة 4Sale الكويتية (q84sale.com) بفحص روابط HTML، مع بديل OpenSooq عند التعذر.
+
+    احترافيًا: يُفحص DNS للنطاق أولًا — إن لم يُحل (حجب جغرافي/نطاق ميت) نفشل فورًا
+    نحو البديل بدل انتظار مهلات الجلب (كانت 31.8 ثانية على نطاق ميت). عند نجاح DNS
+    تُقرأ صفحات العقارات العامة (1..3) وتُفلتر لاحقًا حسب منطقة الطلب.
     """
-    area_query = " ".join(request.areas) if request.areas else ""
-    prop_word = request.property_type or "عقار"
-    search_q = f"{prop_word} {area_query}".strip()
-    url = f"https://kuwait.4sale.com/real-estate?search_text={urllib.parse.quote(search_q)}"
-    body, status, ms, error, attempts = fetch_url(url)
-    listings, candidates = _scan_link_listings(
-        request,
-        source="4Sale",
-        base_url="https://kuwait.4sale.com",
-        body=body,
-        href_pattern=r'<a\s+href="([^"]*(?:real-estate/|listing/|properties/)[^"]*)"[^>]*>(.*?)</a>',
-        code_prefix="4S",
-    )
+    started = time.perf_counter()
+    try:
+        socket.gethostbyname(_FOUR_SALE_HOST)
+    except Exception as dns_error:
+        return _four_sale_fallback(request, f"DNS: {dns_error}", round((time.perf_counter() - started) * 1000, 1), 0)
+
+    url = f"{_FOUR_SALE_BASE}/en/property/1"
+    listings: list[Listing] = []
+    candidates = 0
+    attempts = 0
+    error: str | None = None
+    ms = 0.0
+    for page in range(1, _FOUR_SALE_PAGES + 1):
+        page_url = f"{_FOUR_SALE_BASE}/en/property/{page}"
+        body, status, page_ms, page_error, page_attempts = fetch_url(page_url)
+        attempts += page_attempts
+        ms += page_ms
+        if page_error:
+            error = page_error
+            break
+        page_listings, page_candidates = _scan_link_listings(
+            request,
+            source="4Sale",
+            base_url=_FOUR_SALE_BASE,
+            body=body,
+            href_pattern=r'<a[^>]*href="(/en/listing/[^"]+)"[^>]*>(.*?)</a>',
+            code_prefix="4S",
+        )
+        candidates += page_candidates
+        listings.extend(page_listings)
+        if not page_candidates:
+            break  # آخر صفحة متاحة — لا مزيد من الصفحات
+
+    # إزالة التكرار عبر الصفحات (الإعلانات المثبّتة تظهر في أكثر من صفحة)
+    seen_codes: set[str] = set()
+    unique: list[Listing] = []
+    for listing in listings:
+        if listing.code in seen_codes:
+            continue
+        seen_codes.add(listing.code)
+        unique.append(listing)
+    listings = unique
+
     if error and not listings:
-        # تعذر الوصول إلى 4Sale: جرّب المصدر البديل OpenSooq الكويت بنفس شروط الطلب
-        fb_listings, fb_status = search_opensooq(request)
-        fb_name = fb_status.get("name", "OpenSooq")
-        for listing in fb_listings:
-            listing.raw["fallbackFor"] = "4Sale"
-        if fb_listings:
-            return fb_listings[:50], {
-                "name": "4Sale",
-                "status": "fallback",
-                "records": len(fb_listings),
-                "candidates": fb_status.get("candidates", 0),
-                "attempts": attempts,
-                "responseMs": fb_status.get("responseMs", ms),
-                "url": url,
-                "note": (
-                    f"تعذر الوصول إلى 4Sale ({error}) حتى بعد إعادة المحاولة — "
-                    f"استُخدم المصدر البديل {fb_name} بنفس شروط البحث وأسفر عن "
-                    f"{len(fb_listings)} نتيجة مطابقة (معلّمة في بيانات النتيجة)."
-                ),
-            }
-        # البديل فشل أيضًا: تقرير شفاف بفشل الموقعين
-        return [], {
+        return _four_sale_fallback(request, error, round(ms, 1), attempts)
+    return listings[:50], _link_search_result(
+        "4Sale", listings, candidates, round(ms, 1), url, error, body,
+        f"تم فحص {candidates} إعلانًا في 4Sale ({_FOUR_SALE_BASE}).", attempts,
+    )
+
+
+def _four_sale_fallback(request: PropertyRequest, reason: str, ms: float, attempts: int) -> tuple[list[Listing], dict[str, Any]]:
+    """مصدر بديل (OpenSooq) عند تعذر 4Sale، مع تقرير شفاف بالسبب والبديل."""
+    fb_listings, fb_status = search_opensooq(request)
+    fb_name = fb_status.get("name", "OpenSooq")
+    for listing in fb_listings:
+        listing.raw["fallbackFor"] = "4Sale"
+    if fb_listings:
+        return fb_listings[:50], {
             "name": "4Sale",
-            "status": "failed",
-            "records": 0,
-            "candidates": 0,
+            "status": "fallback",
+            "records": len(fb_listings),
+            "candidates": fb_status.get("candidates", 0),
             "attempts": attempts,
-            "responseMs": ms,
-            "url": url,
+            "responseMs": fb_status.get("responseMs", ms),
+            "url": f"{_FOUR_SALE_BASE}/en/latest/property/0",
             "note": (
-                f"تعذر الوصول إلى 4Sale ({error})، وجرّبنا المصدر البديل {fb_name} "
-                f"لكنه فشل أيضًا ({fb_status.get('note', '')})."
+                f"تعذر الوصول إلى 4Sale ({reason}) — استُخدم المصدر البديل {fb_name} "
+                f"بنفس شروط البحث وأسفر عن {len(fb_listings)} نتيجة مطابقة (معلّمة في بيانات النتيجة)."
             ),
         }
-    return listings[:50], _link_search_result(
-        "4Sale", listings, candidates, ms, url, error, body,
-        f"تم فحص {candidates} إعلانًا في 4Sale.", attempts,
-    )
+    return [], {
+        "name": "4Sale",
+        "status": "failed",
+        "records": 0,
+        "candidates": 0,
+        "attempts": attempts,
+        "responseMs": ms,
+        "url": f"{_FOUR_SALE_BASE}/en/latest/property/0",
+        "note": f"تعذر الوصول إلى 4Sale ({reason})، والمصدر البديل {fb_name} فشل أيضًا ({fb_status.get('note', '')}).",
+    }
 
 
 def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
@@ -1654,11 +1695,15 @@ def log_source_run(status: dict[str, Any]) -> None:
 def search_external_sources(
     request: PropertyRequest,
     selected_sources: list[str] | None = None,
+    progress_cb: Callable[[str, dict], None] | None = None,
 ) -> tuple[list[Listing], list[dict[str, Any]]]:
     """تشغيل كل المصادر بالتوازي لتقليل زمن الانتظار الإجمالي بدل التسلسل (حتى 84 ثانية سابقًا).
 
     يسجّل نتيجة كل مصدر (الحالة + السبب + المدة + عدد المحاولات) مرة واحدة لكل تشغيل
     عبر log_source_run مع منع تكرار الرسالة نفسها في الفحص الدوري.
+
+    progress_cb (اختياري): يُستدعى مرتين لكل مصدر — عند بدء تشغيله (status="running")
+    وعند انتهائه بالحالة النهائية — لبثّ تقدم حي إلى الواجهة أثناء البحث.
     """
     listings: list[Listing] = []
     statuses: list[dict[str, Any]] = []
@@ -1675,7 +1720,11 @@ def search_external_sources(
             }
         ]
     with ThreadPoolExecutor(max_workers=len(searchers)) as pool:
-        futures = {pool.submit(search, request): name for name, search in searchers}
+        futures: dict = {}
+        for name, search in searchers:
+            futures[pool.submit(search, request)] = name
+            if progress_cb:
+                progress_cb(name, {"name": name, "status": "running", "records": 0, "candidates": 0})
         for future, name in futures.items():
             try:
                 source_listings, status = future.result()
@@ -1694,4 +1743,6 @@ def search_external_sources(
             mech = source_mechanism(name)
             statuses.append({**status, "fetchMethod": mech["method"], "endpoint": mech["endpoint"]})
             log_source_run(status)
+            if progress_cb:
+                progress_cb(name, {**status, "fetchMethod": mech["method"], "endpoint": mech["endpoint"]})
     return listings, statuses

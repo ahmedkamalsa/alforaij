@@ -403,6 +403,7 @@ def fetch_latest_opportunities() -> dict[str, Any] | None:
     return {
         "generatedAt": row.get("generated_at") or "",
         "generatedDate": (row.get("generated_at") or "").replace("T", " ")[:16],
+        "totalListings": row.get("total_listings") or 0,
         "totalScored": row.get("total_scored") or 0,
         "tiers": tiers,
         "forecast": forecast,
@@ -422,6 +423,7 @@ def save_opportunities(snapshot: dict[str, Any]) -> None:
             {
                 "snapshot_date": str(snapshot.get("generatedAt") or snapshot.get("generatedDate") or ""),
                 "generated_at": snapshot.get("generatedAt") or "",
+                "total_listings": int(snapshot.get("totalListings") or 0),
                 "total_scored": int(snapshot.get("totalScored") or 0),
                 "tiers": snapshot.get("tiers") or {},
                 "forecast": snapshot.get("forecast") or [],

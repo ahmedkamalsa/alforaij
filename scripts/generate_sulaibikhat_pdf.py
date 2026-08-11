@@ -81,8 +81,17 @@ def main() -> None:
     title = "تقرير تقييم بيت — الصليبيخات (300م)"
     pdf_bytes = build_pdf(report, title=title, client_recommendations=recs)
     out_path = os.path.join(out_dir, "تقرير-بيت-الصليبيخات.pdf")
-    with open(out_path, "wb") as f:
-        f.write(pdf_bytes)
+    try:
+        with open(out_path, "wb") as f:
+            f.write(pdf_bytes)
+    except PermissionError:
+        # الملف مفتوح في عارض PDF عند المستخدم — احفظ بجانبه باسم بديل بلا كسر التشغيل
+        import time
+        alt = os.path.join(out_dir, f"تقرير-بيت-الصليبيخات-جديد.pdf")
+        with open(alt, "wb") as f:
+            f.write(pdf_bytes)
+        out_path = alt
+        print("ملف التقرير مقفول (مفتوح في عارض) — حُفظ الاسم البديل بدلًا منه", flush=True)
     print(f"PDF saved: {out_path} ({len(pdf_bytes)} bytes)", flush=True)
     print(f"Results in report: {len(results)}", flush=True)
     print(f"Summary: {(report.get('summary') or '')[:120]}", flush=True)

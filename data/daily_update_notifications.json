@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-11T00:52:34",
+  "generatedAt": "2026-08-11T12:47:09",
   "hasPrevious": true,
   "counts": {
-    "added": 11,
-    "removed": 10,
+    "added": 15,
+    "removed": 12,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -13,25 +13,53 @@
     "note": "لا يوجد مصدر صفقات رسمي مضبوط لهذا التشغيل."
   },
   "officialIndicators": {
-    "storedCount": 51,
+    "storedCount": 53,
     "status": "ok"
   },
   "top": {
     "priceDrops": [],
     "added": [
       {
-        "code": "AD-278",
-        "area": "بيان",
-        "propertyType": "بيت",
-        "price": 270000.0,
-        "priceText": "270,000 د.ك",
+        "code": "AF-115",
+        "area": "الفروانية",
+        "propertyType": "عمارة",
+        "price": 1550000.0,
+        "priceText": "1,550 ألف د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "السوق المباشر (alforaij)",
-        "url": "https://front.alforaij.com/Listing/Detail/278",
+        "source": "الفريج",
+        "url": "https://front.alforaij.com/Listing/Detail/115",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       },
+      {
+        "code": "AF-168",
+        "area": "حولي",
+        "propertyType": "عمارة",
+        "price": 1600000.0,
+        "priceText": "1,600 ألف د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "الفريج",
+        "url": "https://front.alforaij.com/Listing/Detail/168",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
+        "code": "AD-214637",
+        "area": "حولي",
+        "propertyType": "بيت",
+        "price": 520000.0,
+        "priceText": "520,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "السوق المباشر (بوشملان)",
+        "url": "https://www.boshamlan.com//sale/houses/hawally-governorate/salam/214637",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      }
+    ],
+    "removed": [
       {
         "code": "MJ-29779168",
         "area": "الجابرية",
@@ -43,60 +71,32 @@
         "valuationLabel": "لقطة ممتازة",
         "source": "Mourjan",
         "url": "https://www.mourjan.com/kw/kuwait/villas-and-houses/for-sale/29779168/",
-        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       },
       {
-        "code": "MJ-29978238",
-        "area": "السالمية",
-        "propertyType": "عمارة",
-        "price": 2300000.0,
-        "priceText": "2,300,000 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "Mourjan",
-        "url": "https://www.mourjan.com/kw/kuwait/buildings/for-sale/29978238/",
-        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
-      }
-    ],
-    "removed": [
-      {
-        "code": "OS-285301696",
-        "area": "المطلاع",
+        "code": "OS-285308050",
+        "area": "",
         "propertyType": "بيت",
-        "price": 310000.0,
-        "priceText": "310,000 د.ك",
+        "price": 230.0,
+        "priceText": "230 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
+        "valuationLabel": "إيجار ممتاز",
         "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285301696",
+        "url": "https://kw.opensooq.com/search/285308050",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       },
       {
-        "code": "OS-285300706",
-        "area": "الأحمدي",
-        "propertyType": "شقة",
-        "price": 37000.0,
-        "priceText": "37,000 د.ك",
+        "code": "OS-285107210",
+        "area": "",
+        "propertyType": "بيت",
+        "price": 230.0,
+        "priceText": "230 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
+        "valuationLabel": "إيجار ممتاز",
         "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285300706",
-        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
-      },
-      {
-        "code": "MJ-30025059",
-        "area": "السالمية",
-        "propertyType": "شقة",
-        "price": 12000.0,
-        "priceText": "12,000 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "Mourjan",
-        "url": "https://www.mourjan.com/kw/kuwait/villas-and-houses/for-sale/30025059/",
+        "url": "https://kw.opensooq.com/search/285107210",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       }
     ]

@@ -10,8 +10,8 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260809-evidence-suite">
-  <script src="config.js?v=20260809-evidence-suite"></script>
+  <link rel="stylesheet" href="styles.css?v=20260811-final">
+  <script src="config.js?v=20260811-final"></script>
 </head>
 <body>
   <header class="topbar">
@@ -21,6 +21,7 @@
         <h1>منصة الفريج للفرص والتقييم العقاري</h1>
         <p class="hero-copy">بحث موحد في بيانات الفريج والمصادر الخارجية، تقييم موثق بمصدر كل رقم، وفرص مكسب تربط العرض بالطلب والعملاء المحتملين.</p>
         <div class="hero-actions">
+          <button class="hero-link theme-toggle" id="themeToggle" type="button" aria-label="تبديل الوضع الفاتح/الداكن" title="الوضع الداكن/الفاتح">🌙 الوضع الفاتح</button>
           <a class="hero-link" href="https://ahmedkamalsa.github.io/alforaijboard/" target="_blank" rel="noreferrer">فتح لوحة الفريج الأساسية</a>
         </div>
       </div>
@@ -65,6 +66,7 @@
         <label>قائمة جاهزة حسب الرقم
           <select id="boardMetricFilter">
             <option value="movement">حركة الدلال</option>
+            <option value="opportunities">فرص محسوبة</option>
             <option value="saleOffers">عروض للبيع</option>
             <option value="buyRequests">طلبات شراء</option>
             <option value="rentOffers">عروض الإيجار</option>
@@ -484,6 +486,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260809-final-platform"></script>
+  <script src="app.js?v=20260811-final"></script>
 </body>
 </html>

@@ -129,7 +129,7 @@ SOURCE_REGISTRY: list[dict[str, Any]] = [
         "id": "four_sale",
         "name": "4Sale",
         "category": "مصادر توسعة",
-        "connection": "بحث حي من صفحة البحث العامة",
+        "connection": "فحص روابط HTML لأحدث العقارات (q84sale.com — النطاق القديم غير متاح DNS)",
         "role": "يدخل في البحث والتقييم عند ظهور إعلان يثبت نفس الطلب",
         "trustLevel": "متوسط",
         "scoringPolicy": "تدخل بنفس قواعد الفلترة والدليل.",

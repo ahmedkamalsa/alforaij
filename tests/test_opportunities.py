@@ -515,6 +515,35 @@ class TestOpportunities(unittest.TestCase):
         self.assertEqual(clients[0]["price"], "300,000")
         self.assertIn("55559950", clients[0]["phones"])
 
+    def test_has_realistic_price_shared_filter(self) -> None:
+        """الدالة المشتركة ترفض الأسعار الوهمية وتمرّر الرسمي/الطلبات/بلا سعر."""
+        from backend.models import Listing
+        from backend.services.opportunities import has_realistic_price, MIN_SALE_PRICE, MIN_RENT_PRICE
+
+        def make(price, tx="للبيع", mode="") -> Listing:
+            return Listing(
+                code="X", transaction=tx, governorate="", area="", property_type="بيت",
+                detail_class="", price=price, price_text="", space=None,
+                listing_mode=mode, summary="", features="", published_date="",
+                original_url="", source="test",
+            )
+
+        # أسعار وهمية من OpenSooq — مرفوضة
+        self.assertFalse(has_realistic_price(make(9_999)))
+        self.assertFalse(has_realistic_price(make(5_000)))
+        self.assertFalse(has_realistic_price(make(17_000)))
+        self.assertFalse(has_realistic_price(make(70, "للإيجار")))
+        # حدود واقعية مقبولة
+        self.assertTrue(has_realistic_price(make(MIN_SALE_PRICE)))
+        self.assertTrue(has_realistic_price(make(MIN_RENT_PRICE, "للإيجار")))
+        self.assertTrue(has_realistic_price(make(350_000)))
+        # بلا سعر (طلبات شراء/إيجار) — يمرّ لخدمة العملاء
+        self.assertTrue(has_realistic_price(make(None)))
+        # المؤشرات الرسمية (سعر المتر المرجعي) — يمرّ للبحث والتقييم
+        self.assertTrue(has_realistic_price(make(600, "", "رسمي")))
+        # طلب «مطلوب» — يمرّ
+        self.assertTrue(has_realistic_price(make(300_000, "مطلوب للشراء")))
+
 
 if __name__ == "__main__":
     unittest.main()

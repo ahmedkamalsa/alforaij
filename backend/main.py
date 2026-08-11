@@ -4,6 +4,7 @@ import json
 import logging
 import mimetypes
 import re
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -38,6 +39,68 @@ _OPPORTUNITIES_CACHE: dict | None = None
 _OPPORTUNITIES_PREVIOUS: dict | None = None  # اللقطة السابقة للمقارنة (تنبيهات واتساب)
 _OPPORTUNITIES_CACHE_AT = 0.0
 _OPPORTUNITIES_TTL_SECONDS = 300
+
+# ---- بثّ تقدم البحث الحي: يُملأ أثناء تشغيل /api/analyze ويُقرأ من الواجهة بالاقتراع ----
+_ANALYZE_PROGRESS: dict[str, dict] = {}
+_ANALYZE_PROGRESS_LOCK = _threading.Lock()
+_ANALYZE_PROGRESS_TTL = 900  # ثوانٍ — تُنظَّف الوظائف القديمة تلقائيًا
+
+_PROGRESS_SOURCE_LABELS = {
+    "running": "جارٍ البحث",
+    "success": "نجح",
+    "fallback": "عبر بديل",
+    "failed": "فشل",
+    "no_results": "لا نتائج",
+    "no_data": "لا بيانات",
+    "page_reachable": "الصفحة متاحة",
+}
+
+
+def _progress_source_label(status: dict) -> str:
+    return _PROGRESS_SOURCE_LABELS.get(str(status.get("status") or ""), str(status.get("status") or ""))
+
+
+def _progress_push(job_id: str, stage: str, message: str, **data) -> None:
+    """تسجيل حدث تقدم لوظيفة تحليل حية (يُهمَل إن لم يكن هناك jobId)."""
+    if not job_id:
+        return
+    now = time.time()
+    with _ANALYZE_PROGRESS_LOCK:
+        for old in [
+            k for k, v in _ANALYZE_PROGRESS.items()
+            if now - v.get("startedAt", 0) > _ANALYZE_PROGRESS_TTL
+        ]:
+            _ANALYZE_PROGRESS.pop(old, None)
+        job = _ANALYZE_PROGRESS.get(job_id)
+        if job is None:
+            job = {"jobId": job_id, "startedAt": now, "done": False, "stage": "", "events": []}
+            _ANALYZE_PROGRESS[job_id] = job
+        job["stage"] = stage
+        job["events"].append({"t": now, "stage": stage, "message": message, **data})
+        job["events"] = job["events"][-200:]
+        if stage == "done":
+            job["done"] = True
+            job["finishedAt"] = now
+
+
+def _progress_source_event(job_id: str, name: str, st: dict) -> None:
+    """حدث مصدر فردي: يبثّ الحالة ويُحدّث عدّاد الإنجاز الكلي (منتهي/إجمالي)."""
+    if not job_id:
+        return
+    _progress_push(
+        job_id, "source", f"{name} — {_progress_source_label(st)} ({st.get('records', 0)} إعلان)",
+        name=name, status=st.get("status"), records=st.get("records") or 0,
+    )
+    with _ANALYZE_PROGRESS_LOCK:
+        job = _ANALYZE_PROGRESS.get(job_id)
+        if job is None:
+            return
+        if st.get("status") == "running":
+            job["totalSources"] = int(job.get("totalSources", 0)) + 1
+        else:
+            job["doneSources"] = int(job.get("doneSources", 0)) + 1
+            # إجمالي الإعلانات المُجمّعة حتى اللحظة من المصادر المنتهية
+            job["collectedRecords"] = int(job.get("collectedRecords", 0)) + int(st.get("records") or 0)
 
 
 def _dashboard_record(listing) -> dict:
@@ -273,6 +336,7 @@ def _dashboard_summary(listings, selected_platforms: set[str] | None = None, inc
         "opportunities": {
             "count": len(opportunity_items),
             "displayedCount": min(len(opportunity_items), 60),
+            "totalListings": opportunity_snapshot.get("totalListings") or 0,
             "totalScored": opportunity_snapshot.get("totalScored") or len(opportunity_items),
             "generatedAt": opportunity_snapshot.get("generatedAt") or opportunity_snapshot.get("generatedDate"),
             "items": opportunity_items[:60],
@@ -440,6 +504,17 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/sources":
             json_response(self, {"sources": source_registry()})
+            return
+        if path == "/api/analyze/progress":
+            # تقدم البحث الحي: الواجهة تقترع كل ~0.7 ثانية أثناء تشغيل POST /api/analyze
+            params = parse_qs(urlparse(self.path).query)
+            job_id = (params.get("job") or [""])[0]
+            with _ANALYZE_PROGRESS_LOCK:
+                job = _ANALYZE_PROGRESS.get(job_id)
+            if job is None:
+                json_response(self, {"error": "unknown job"}, status=404)
+                return
+            json_response(self, job)
             return
         if path == "/api/market-analytics":
             # تحليلات الحصاد المتراكم: كل موقع على حدة (عدد/مناطق/أسعار) من market_listings
@@ -649,6 +724,8 @@ class Handler(BaseHTTPRequestHandler):
             json_response(self, {"request": parse_request(text).__dict__})
             return
         if path == "/api/analyze":
+            job_id = str(payload.get("jobId") or "")
+            _progress_push(job_id, "parse", "تحليل الطلب وفهم النية والمنطقة والنوع")
             try:
                 request = parse_request(text)
                 if payload.get("mode") in {"search", "valuation", "search_and_value"}:
@@ -669,10 +746,27 @@ class Handler(BaseHTTPRequestHandler):
                 use_external = source_mode in {"all", "source", "custom"} and bool(payload.get("includeExternal", True))
                 listings = load_listings() if use_local else []
                 local_count = len(listings)
+                _progress_push(job_id, "local", f"تحميل {local_count} إعلانًا محليًا من قاعدة الفريج")
                 external_statuses = []
                 if use_external:
                     selected_sources = selected_sources_payload or ([selected_source] if source_mode == "source" and selected_source else None)
-                    external_listings, external_statuses = search_external_sources(request, selected_sources=selected_sources)
+                    _progress_push(job_id, "external", "بدء فحص المصادر الخارجية بالتوازي")
+                    external_listings, external_statuses = search_external_sources(
+                        request,
+                        selected_sources=selected_sources,
+                        # name موحّد من مفتاح السجل في بدء وانتهاء كل مصدر (بعض الحالات النهائية
+                        # تحمل اسمًا مختلفًا للعرض) — حتى يعرض العميل صفًا واحدًا لكل مصدر.
+                        progress_cb=lambda name, st: _progress_source_event(job_id, name, st),
+                    )
+                    # فلتر الأسعار الواقعية: الأسعار النائبة/الوهمية من صفحات المصادر
+                    # (9,999 / 5,000 د.ك بيع، 70 د.ك إيجار) لا تدخل نتائج البحث والتقييم.
+                    from backend.services.opportunities import has_realistic_price
+                    _before = len(external_listings)
+                    external_listings = [item for item in external_listings if has_realistic_price(item)]
+                    _dropped = _before - len(external_listings)
+                    if _dropped:
+                        logger.info("analyze: استبعاد %d إعلانًا خارجيًا بأسعار غير واقعية", _dropped)
+                    _progress_push(job_id, "score", f"تم جمع {len(external_listings)} إعلانًا خارجيًا — مرشح الآن للأسعار والمطابقة")
                     listings.extend(external_listings)
                 if request.governorates and not request.areas:
                     allowed_governorates = set(request.governorates)
@@ -684,8 +778,10 @@ class Handler(BaseHTTPRequestHandler):
                 ranked = top_matches(request, listings, limit=100)
                 enriched = enrich_rankings(request, ranked, listings)
                 deduped = deduplicate_ranked(enriched)[:50]
-                
+                _progress_push(job_id, "score", f"تقييم المطابقة والترتيب: {len(deduped)} نتيجة نهائية")
+
                 # Fetch AI professional analysis
+                _progress_push(job_id, "report", "بناء التقرير والتحليل الاحترافي (قد يستغرق ثوانٍ)")
                 ai_insights = generate_professional_analysis(request, deduped, external_statuses)
                 
                 report = build_report(
@@ -751,6 +847,7 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as ve:
                     logger.warning("Could not save valuation request: %s", ve)
 
+                _progress_push(job_id, "done", f"اكتمل التقرير — {len(deduped)} نتيجة", results=len(deduped))
                 json_response(self, report)
             except Exception as exc:
                 logger.exception("Analysis failed")

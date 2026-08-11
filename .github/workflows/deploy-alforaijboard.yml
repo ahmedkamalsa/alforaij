@@ -1,0 +1,60 @@
+name: Deploy alforaijboard Pages
+
+# ينشر الواجهة الثابتة (frontend + static-data) إلى فرع gh-pages في مستودع
+# ahmedkamalsa/alforaijboard — الصفحة الحية على:
+#   https://ahmedkamalsa.github.io/alforaijboard/
+# يتطلب سريًا واحدًا: ALFORAIJBOARD_TOKEN (PAT بنطاق repo للمستودع الهدف).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "data/**"
+      - "frontend/**"
+      - "scripts/export_static_frontend_data.py"
+      - ".github/workflows/deploy-alforaijboard.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-alforaijboard
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure API base (static mode)
+        run: |
+          cat > frontend/config.js <<'EOF'
+          window.ALFORAIJ_API_BASE = "";
+          EOF
+
+      - name: Generate static data snapshot
+        run: python scripts/export_static_frontend_data.py
+
+      - name: Push frontend to alforaijboard gh-pages
+        env:
+          TOKEN: ${{ secrets.ALFORAIJBOARD_TOKEN }}
+        run: |
+          set -e
+          if [ -z "$TOKEN" ]; then
+            echo "::error::ALFORAIJBOARD_TOKEN secret is missing. Add a PAT with 'repo' scope for ahmedkamalsa/alforaijboard."
+            exit 1
+          fi
+          rm -rf /tmp/board-deploy
+          mkdir -p /tmp/board-deploy
+          cp -r frontend/. /tmp/board-deploy/
+          cd /tmp/board-deploy
+          git init -q
+          git checkout -q -B gh-pages
+          git add -A
+          git -c user.email="actions@github.com" -c user.name="GitHub Actions" \
+            commit -q -m "Deploy alforaijboard $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/ahmedkamalsa/alforaijboard.git" gh-pages
+          echo "Pushed to https://github.com/ahmedkamalsa/alforaijboard/tree/gh-pages"

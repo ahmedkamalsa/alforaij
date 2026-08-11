@@ -43,6 +43,22 @@ _FONT_NAME = "Tahoma"
 _FONT_BOLD = "Tahoma-Bold"
 _STYLE_CACHE: dict[str, ParagraphStyle] | None = None
 
+# شعار الشركة: يُستخدم في الشريط العلوي لكل صفحة + غلاف الصفحة الأولى.
+# المسار من مجلد المشروع (الموصل للواجهة) — بلا الاعتماد على مجلد العمل الحالي.
+_LOGO_PATH = Path(__file__).resolve().parents[2] / "frontend" / "assets" / "alforaij_logo.png"
+# الشعار الرمزي المربع (شعار الموقع الفعلي) — أنيق داخل الإطار المربع للشريط العلوي بلا تشويه.
+_SYMBOL_PATH = Path(__file__).resolve().parents[2] / "frontend" / "assets" / "alforaij-official-symbol.png"
+
+
+def _image_size(path: Path) -> tuple[int, int] | None:
+    """أبعاد الصورة (عرض، ارتفاع) عبر ImageReader — بلا الاعتماد على PIL."""
+    try:
+        from reportlab.lib.utils import ImageReader
+        width, height = ImageReader(str(path)).getSize()
+        return max(1, width), max(1, height)
+    except Exception:
+        return None
+
 
 def _register_fonts() -> None:
     """تسجيل خط يدعم العربية. يحاول Tahoma (ويندوز) ثم DejaVu (لينكس)، ويسقط لخط مدمج عند الفشل."""
@@ -208,6 +224,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "cell": ParagraphStyle("cell", fontName=_FONT_NAME, fontSize=8.5, leading=12, textColor=colors.HexColor("#232a33"), alignment=TA_RIGHT),
             "cell_head": ParagraphStyle("cell_head", fontName=_FONT_BOLD, fontSize=8.5, leading=12, textColor=colors.white, alignment=TA_CENTER),
             "monogram": ParagraphStyle("monogram", fontName=_FONT_BOLD, fontSize=24, leading=28, textColor=GOLD, alignment=TA_CENTER),
+            "company": ParagraphStyle("company", fontName=_FONT_BOLD, fontSize=15, leading=20, textColor=NAVY, alignment=TA_CENTER, spaceBefore=4),
+            "company_en": ParagraphStyle("company_en", fontName=_FONT_NAME, fontSize=8.5, leading=12, textColor=GRAY, alignment=TA_CENTER),
             "box_title": ParagraphStyle("box_title", fontName=_FONT_BOLD, fontSize=9.5, leading=13, textColor=NAVY, alignment=TA_RIGHT),
         }
     return _STYLE_CACHE
@@ -225,15 +243,61 @@ def _draw_header(canvas_obj: Any, doc: Any) -> None:
     canvas_obj.rect(0, h - band_h, w, band_h, stroke=0, fill=1)
     canvas_obj.setFillColor(GOLD)
     canvas_obj.rect(0, h - band_h, w, 2.2, stroke=0, fill=1)
-    # شعار: مربع دائري الزوايا بحرف "ف"
+    # شعار الشركة: الشعار الرمزي المربع داخل الإطار الأبيض المربع (أنيق بلا تشويه)،
+    # وإن غاب فالشعار الأفقي يُرسم بنسبته الطبيعية داخل إطار عريض، وإلا مربع «ف» كسقوط آمن.
     logo_size = 17 * mm
     logo_x = w - 16 * mm - logo_size
     logo_y = h - band_h / 2 - logo_size / 2
-    canvas_obj.setFillColor(NAVY_LIGHT)
-    canvas_obj.roundRect(logo_x, logo_y, logo_size, logo_size, 4, stroke=0, fill=1)
-    canvas_obj.setFillColor(GOLD)
-    canvas_obj.setFont(_FONT_BOLD, 20)
-    canvas_obj.drawCentredString(logo_x + logo_size / 2, logo_y + logo_size / 2 - 7.5, _shape("ف"))
+    frame_pad = 2 * mm
+
+    def _fallback_symbol() -> None:
+        canvas_obj.setFillColor(NAVY_LIGHT)
+        canvas_obj.roundRect(logo_x, logo_y, logo_size, logo_size, 4, stroke=0, fill=1)
+        canvas_obj.setFillColor(GOLD)
+        canvas_obj.setFont(_FONT_BOLD, 20)
+        canvas_obj.drawCentredString(logo_x + logo_size / 2, logo_y + logo_size / 2 - 7.5, _shape("ف"))
+
+    if _SYMBOL_PATH.exists():
+        try:
+            canvas_obj.setFillColor(colors.white)
+            canvas_obj.roundRect(logo_x - 1 * mm, logo_y - 1 * mm, logo_size + 2 * mm, logo_size + 2 * mm, 3, stroke=0, fill=1)
+            canvas_obj.drawImage(
+                str(_SYMBOL_PATH),
+                logo_x + frame_pad,
+                logo_y + frame_pad,
+                width=logo_size - 2 * frame_pad,
+                height=logo_size - 2 * frame_pad,
+                preserveAspectRatio=True,
+                anchor="c",
+                mask="auto",
+            )
+        except Exception:
+            _fallback_symbol()
+    elif _LOGO_PATH.exists():
+        # الشعار الأفقي العريض: إطار أبيض عريض بنسبة الصورة الفعلية (لا مربع يضغطه)
+        try:
+            size = _image_size(_LOGO_PATH)
+            ratio = (size[0] / size[1]) if size else 6.0
+            logo_w = 30 * mm
+            logo_h = min(logo_w / ratio, 9 * mm)
+            wide_x = w - 16 * mm - logo_w
+            wide_y = h - band_h / 2 - logo_h / 2
+            canvas_obj.setFillColor(colors.white)
+            canvas_obj.roundRect(wide_x - 1 * mm, wide_y - 1 * mm, logo_w + 2 * mm, logo_h + 2 * mm, 3, stroke=0, fill=1)
+            canvas_obj.drawImage(
+                str(_LOGO_PATH),
+                wide_x + frame_pad,
+                wide_y + frame_pad,
+                width=logo_w - 2 * frame_pad,
+                height=logo_h - 2 * frame_pad,
+                preserveAspectRatio=True,
+                anchor="c",
+                mask="auto",
+            )
+        except Exception:
+            _fallback_symbol()
+    else:
+        _fallback_symbol()
     # العناوين يمين الشعار
     canvas_obj.setFillColor(colors.white)
     canvas_obj.setFont(_FONT_BOLD, 16)
@@ -353,6 +417,24 @@ def build_pdf(report: dict | None, *, title: str | None = None, client_recommend
     doc._report_title = title
 
     story: list = []
+
+    # ---- غلاف الشركة (الصفحة الأولى فقط): شعار + اسم الشركة ----
+    if _LOGO_PATH.exists():
+        try:
+            from reportlab.platypus import Image as FlowImage
+
+            logo_w = 52 * mm
+            logo_h = 22 * mm
+            letterhead = FlowImage(str(_LOGO_PATH), width=logo_w, height=logo_h, hAlign="CENTER")
+            letterhead.preserveAspectRatio = True
+            story.append(Spacer(1, 2))
+            story.append(letterhead)
+        except Exception:
+            pass
+    story.append(Paragraph(ar("شركة عبدالعزيز سعود الفريج العقارية"), styles["company"]))
+    story.append(Paragraph(ar("ABDUL AZIZ SAUD AL-FURAIJ REAL ESTATE COMPANY — KUWAIT"), styles["company_en"]))
+    story.append(Spacer(1, 2))
+    story.append(HRFlowable(width="100%", thickness=1.2, color=GOLD, spaceBefore=2, spaceAfter=8))
 
     # ---- طلب العميل ----
     _heading(story, "طلب العميل")

@@ -23,6 +23,32 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# حدود الأسعار الواقعية — تُستخدم في الفرص والبحث/التقييم معًا لمنع تسلل
+# الأسعار النائبة/الوهمية من صفحات المصادر (9,999 / 5,000 د.ك بيع، 70 د.ك إيجار).
+# مبني على أدنى سوق محلي فعلي (41,000 د.ك بيع / 250 د.ك إيجار) بهامش أمان.
+MIN_SALE_PRICE = 20_000
+MIN_RENT_PRICE = 120
+
+
+def has_realistic_price(listing: Any) -> bool:
+    """هل سعر الإعلان واقعي؟
+
+    يمرّر: الإعلانات بلا سعر (طلبات شراء/إيجار تُستخدم للعملاء)، المؤشرات
+    الرسمية (سعر المتر المرجعي)، وطلبات «مطلوب». يرفض الأسعار الوهمية النائبة
+    من صفحات المصادر فقط (أقل من الحد الواقعي حسب نوع العملية).
+    """
+    if not listing.price:
+        return True
+    raw = getattr(listing, "raw", None) or {}
+    if getattr(listing, "listing_mode", "") == "رسمي" or raw.get("official"):
+        return True
+    tx = str(listing.transaction or "")
+    if tx.startswith("مطلوب"):
+        return True
+    floor = MIN_RENT_PRICE if tx.startswith("للإيجار") else MIN_SALE_PRICE
+    return listing.price >= floor
+
+
 from backend.connectors.alforaij import load_listings
 from backend.connectors.live_sources import (
     broad_combo_requests,
@@ -421,18 +447,16 @@ def _score_listings(listings, clients: list[dict[str, Any]]) -> tuple[list[dict[
     for listing in listings:
         if not listing.price:
             continue
-        if getattr(listing, "listing_type", "") == "رسمي" or (getattr(listing, "raw", {}) or {}).get("official"):
+        # المؤشرات الرسمية لا تدخل الفرص (سعر المتر المرجعي ليس عرضًا)
+        if getattr(listing, "listing_mode", "") == "رسمي":
             continue
         tx = str(listing.transaction or "")
         if tx.startswith("مطلوب"):
             skipped_demand += 1
             continue
         # أسعار وهمية/نائبة من صفحات المصادر (9,999 / 5,000 د.ك بيع، 70 د.ك إيجار) تمرّ
-        # بالحدود المنخفضة السابقة وتتصدر «أفضل الفرص» كأنها صفقات حقيقية. الحد الواقعي
-        # مبني على أدنى أسعار السوق المحلي الفعلي (41,000 د.ك بيع / 250 د.ك إيجار) بهامش أمان.
-        min_sale = 20_000
-        min_rent = 120
-        if listing.price < (min_rent if tx.startswith("للإيجار") else min_sale):
+        # بالحدود المنخفضة السابقة وتتصدر «أفضل الفرص» كأنها صفقات حقيقية.
+        if not has_realistic_price(listing):
             skipped_unreal += 1
             continue
         comps = comparable_pool(listing, listings)

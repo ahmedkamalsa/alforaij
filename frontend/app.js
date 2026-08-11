@@ -1,3 +1,63 @@
+/* ===== دخول متدرج لبطاقات النتائج والفرص عند التمرير =====
+   يضيف .reveal-card للبطاقات ويراقب ظهورها (IntersectionObserver)، ويعيد
+   المراقبة عند إعادة رسم القوائم (MutationObserver). يُعطّل تلقائيًا عند
+   تفضيل تقليل الحركة أو غياب IntersectionObserver — البطاقات تبقى ظاهرة.
+   البطاقات الظاهرة وقت التحميل تُعلَّم فورًا بلا انتظار تمرير. */
+function initCardReveal() {
+  if (!("IntersectionObserver" in window)) return;
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("in-view");
+        observer.unobserve(entry.target);
+      }
+    }
+  }, { rootMargin: "0px 0px -40px 0px", threshold: 0.05 });
+
+  const watch = () => {
+    document.querySelectorAll(".result-card:not(.reveal-card)").forEach((card) => {
+      card.classList.add("reveal-card");
+      observer.observe(card);
+    });
+  };
+  watch();
+  const mo = new MutationObserver(watch);
+  mo.observe(document.body, { childList: true, subtree: true });
+}
+
+/* ===== تبديل الوضع الفاتح/الداكن ===== */
+const THEME_KEY = "alforaij_theme";
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  root.setAttribute("data-theme", theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme === "light" ? "#eef2f9" : "#0F172A");
+  const btn = document.getElementById("themeToggle");
+  if (btn) {
+    const isLight = theme === "light";
+    btn.textContent = isLight ? "🌙 الوضع الداكن" : "☀️ الوضع الفاتح";
+    btn.setAttribute("aria-label", isLight ? "التبديل إلى الوضع الداكن" : "التبديل إلى الوضع الفاتح");
+  }
+}
+
+function initTheme() {
+  let theme = localStorage.getItem(THEME_KEY);
+  if (!theme) {
+    theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  }
+  applyTheme(theme);
+  const btn = document.getElementById("themeToggle");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme(next);
+    });
+  }
+}
+
 const state = {
   mode: "search_and_value",
   report: null,
@@ -509,6 +569,7 @@ function clearChat() {
   if (!win) return;
   win.innerHTML = "";
   state.chatMessages = [];
+  resetSearchTabProgress();
   setTabCount("tabCountSearch", 0);
 }
 
@@ -819,6 +880,146 @@ function buildTextFromFilters(filters) {
   return parts.join(" ").trim();
 }
 
+// ---- بثّ تقدم البحث الحي: فقاعة تعرض المراحل والمصادر لحظيًا بدل «جاري البحث» الثابتة ----
+const PROGRESS_STAGE_LABELS = {
+  parse: "تحليل الطلب وفهم النية",
+  local: "تحميل الإعلانات المحلية",
+  external: "فحص المصادر الخارجية",
+  score: "تقييم المطابقة والترتيب",
+  report: "بناء التقرير والتحليل الاحترافي",
+  done: "اكتمل التقرير",
+};
+const PROGRESS_SOURCE_LABELS = {
+  running: "جارٍ البحث",
+  success: "نجح",
+  fallback: "عبر بديل",
+  failed: "فشل",
+  no_results: "لا نتائج",
+  no_data: "لا بيانات",
+  page_reachable: "الصفحة متاحة",
+};
+
+// هل يوجد بحث جارٍ الآن؟ — يعرض نسبة الإنجاز في زر تبويب «البحث والتقييم»
+let liveSearchActive = false;
+
+function updateSearchTabProgress(total, done, isDone) {
+  const el = $("tabCountSearch");
+  if (!el) return;
+  if (isDone) {
+    // انتهى البحث — يزول التمييز الحي ويُترك العدّاد لعدد النتائج النهائية (renderReport)
+    el.classList.remove("live");
+    el.title = "";
+    return;
+  }
+  if (!liveSearchActive || total <= 0) return;
+  const pct = Math.min(100, Math.round((done / total) * 100));
+  el.textContent = pct + "%";
+  el.title = `جاري البحث: ${done}/${total} مصدر · ${pct}%`;
+  el.classList.add("live");
+}
+
+function finishSearchTabProgress() {
+  liveSearchActive = false;
+  const el = $("tabCountSearch");
+  if (!el) return;
+  el.classList.remove("live");
+  el.title = "";
+}
+
+function resetSearchTabProgress() {
+  finishSearchTabProgress();
+  const el = $("tabCountSearch");
+  if (el) el.textContent = "";
+}
+
+function progressBubbleHtml(jobId) {
+  return `<div class="bubble assistant live-progress" data-job="${escapeHtml(jobId)}">
+    <div class="lp-head"><span class="lp-spinner" aria-hidden="true"></span> <strong class="lp-stage">جاري البحث والتقييم...</strong> <span class="lp-elapsed" title="الوقت المنقضي">0ث</span></div>
+    <div class="lp-bar-wrap" hidden><div class="lp-bar"><div class="lp-bar-fill"></div></div><span class="lp-bar-label"></span></div>
+    <div class="lp-detail">تحضير الطلب...</div>
+    <div class="lp-sources"></div>
+    <div class="meta">(${new Date().toLocaleTimeString()})</div>
+  </div>`;
+}
+
+// يحدّث فقاعة التقدم الحية من استجابة /api/analyze/progress
+function renderLiveProgress(bubbleEl, data, startedAt) {
+  const total = Number(data.totalSources || 0);
+  const done = Number(data.doneSources || 0);
+  // حتى لو انتقل المستخدم لقسم آخر، زر التبويب يعرض النسبة أثناء التشغيل
+  updateSearchTabProgress(total, done, Boolean(data.done));
+  if (!bubbleEl || !bubbleEl.isConnected) return false;
+  const stageKey = data.stage || "";
+  const stageEl = bubbleEl.querySelector(".lp-stage");
+  if (stageEl && stageEl.textContent.indexOf("اكتمل") === -1) {
+    stageEl.textContent = (PROGRESS_STAGE_LABELS[stageKey] || stageKey || "جاري البحث والتقييم") + "...";
+  }
+  const elapsedEl = bubbleEl.querySelector(".lp-elapsed");
+  if (elapsedEl) elapsedEl.textContent = Math.max(1, Math.round((Date.now() - startedAt) / 1000)) + "ث";
+  const events = data.events || [];
+  const detailEl = bubbleEl.querySelector(".lp-detail");
+  if (detailEl) {
+    const last = [...events].reverse().find((e) => e.stage !== "source");
+    if (last && last.message) detailEl.textContent = last.message;
+  }
+  // شريط الإنجاز الكلي: المصادر المنتهية / إجمالي المصادر
+  const barWrap = bubbleEl.querySelector(".lp-bar-wrap");
+  if (barWrap) {
+    if (total > 0) {
+      barWrap.hidden = false;
+      const pct = Math.min(100, Math.round((done / total) * 100));
+      const fill = barWrap.querySelector(".lp-bar-fill");
+      if (fill) fill.style.width = pct + "%";
+      const label = barWrap.querySelector(".lp-bar-label");
+      const collected = Number(data.collectedRecords || 0);
+      if (label) label.textContent = `${done}/${total} مصدر · ${pct}%` + (collected > 0 ? ` · ${collected} إعلان` : "");
+    } else {
+      barWrap.hidden = true;
+    }
+  }
+  const listEl = bubbleEl.querySelector(".lp-sources");
+  if (listEl) {
+    // أحدث حدث فقط لكل مصدر (بدل تراكم صفوف «جارٍ البحث» + النهائي للمصدر نفسه)
+    const latestPerSource = new Map();
+    for (const e of events) {
+      if (e.stage === "source" && e.name) latestPerSource.set(e.name, e);
+    }
+    const rows = [...latestPerSource.values()].map((e) => {
+      const status = e.status || "";
+      const label = PROGRESS_SOURCE_LABELS[status] || status || "";
+      const cls = status === "success" || status === "fallback" ? "ok" : status === "running" ? "run" : status === "failed" ? "bad" : "mid";
+      return `<div class="lp-row ${cls}"><span class="lp-dot"></span><span class="lp-name">${escapeHtml(e.name)}</span><span class="lp-count">${label}${Number(e.records) ? " · " + e.records + " إعلان" : ""}</span></div>`;
+    });
+    if (rows) listEl.innerHTML = rows;
+  }
+  return true;
+}
+
+// اقتراع دوري خفيف أثناء تشغيل البحث؛ يتوقف عند اكتمال الوظيفة أو انتهاء الطلب
+function startProgressPolling(jobId, bubbleEl, isFinished) {
+  if (STATIC_SNAPSHOT_MODE) return null;
+  const startedAt = Date.now();
+  const timer = setInterval(async () => {
+    if (isFinished() || !bubbleEl.isConnected) {
+      clearInterval(timer);
+      return;
+    }
+    try {
+      const res = await fetch(apiUrl("/api/analyze/progress?job=" + encodeURIComponent(jobId)), { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!renderLiveProgress(bubbleEl, data, startedAt)) {
+        clearInterval(timer);
+        return;
+      }
+      if (data.done) clearInterval(timer);
+    } catch (err) {
+      // أخطاء اقتراع عابرة (فقدان اتصال) تُتجاهل — النتيجة النهائية تأتي من الطلب نفسه
+    }
+  }, 700);
+  return timer;
+}
+
 async function sendChat() {
   if (state.chatSubmitting) return;
   const input = $("chatInput");
@@ -844,15 +1045,25 @@ async function sendChat() {
   const includeExternal = platformScope.includeExternal;
   const includeLocal = platformScope.includeLocal;
   const scope = platformScope.label;
+  const jobId = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
 
   addChatMessage('user', `<div class="bubble user">${escapeHtml(text)}<div class="meta">نطاق: ${escapeHtml(scope)} | مصادر خارجية: ${includeExternal ? 'نعم' : 'لا'}</div></div>`);
   input.value = "";
-  addChatMessage('assistant', `<div class="bubble assistant">جاري البحث والتقييم... <div class="meta">(${new Date().toLocaleTimeString()})</div></div>`);
+  liveSearchActive = true;
+  const win = $("chatWindow");
+  if (win) {
+    addChatMessage('assistant', progressBubbleHtml(jobId));
+    const bubbleEl = win.querySelector('.chat-message.assistant:last-child .live-progress');
+    startProgressPolling(jobId, bubbleEl, () => !state.chatSubmitting);
+  } else {
+    addChatMessage('assistant', `<div class="bubble assistant">جاري البحث والتقييم... <div class="meta">(${new Date().toLocaleTimeString()})</div></div>`);
+  }
 
   try {
-    const payload = { text, mode: state.mode, includeExternal, includeLocal, sourceMode, selectedSource, selectedSources, filters };
+    const payload = { text, mode: state.mode, includeExternal, includeLocal, sourceMode, selectedSource, selectedSources, filters, jobId };
     const report = await postJson('/api/analyze', payload);
     state.report = report;
+    finishSearchTabProgress();  // عدّاد التبويب يعود لعدد النتائج النهائية (setTabCount في renderReport)
 
     // استبدال آخر فقاعة مساعد بالملخص
     const win = $("chatWindow");
@@ -881,6 +1092,7 @@ async function sendChat() {
     state.chatSubmitting = false;
   } catch (err) {
     state.chatSubmitting = false;
+    resetSearchTabProgress();
     console.error(err);
     addChatMessage('assistant', `<div class="bubble assistant error">تعذر الحصول على النتائج: ${escapeHtml(err.message)}</div>`);
   }
@@ -2509,7 +2721,12 @@ function renderOppTier() {
 
 function renderOppMeta() {
   const updated = $("oppUpdated");
-  if (updated && oppState.data) updated.textContent = `آخر تحديث: ${oppState.data.generatedDate || ""} — ${oppState.data.totalScored} فرصة مُسجَّلة`;
+  if (updated && oppState.data) {
+    const total = Number(oppState.data.totalListings || oppState.data.totalScored || 0);
+    const scored = Number(oppState.data.totalScored || 0);
+    const noOpp = Math.max(0, total - scored);
+    updated.textContent = `آخر تحديث: ${oppState.data.generatedDate || ""} — ${scored} فرصة من أصل ${total} إعلان (${noOpp} بدون فرصة)`;
+  }
   const note = $("oppOfficialNote");
   if (note && oppState.data) {
     const rental = oppState.data.rentalNote ? ` ${oppState.data.rentalNote}` : "";
@@ -2997,23 +3214,23 @@ function setTabCount(id, count) {
 }
 
 function updateOppTabCount() {
-  // عدّاد تبويب «أفضل الفرص» = إجمالي الفرص المتاحة (مدمجة من كل الفئات الزمنية بلا تكرار)
-  // ثابت بغض النظر عن التبويب الفرعي المفتوح — يعكس حجم المحتوى قبل الدخول.
+  // عدّاد تبويب «أفضل الفرص» = عدد الفرص من إجمالي الإعلانات المفحوصة
+  // «208/415» تعني 208 فرصة مقيّمة من أصل 415 إعلانًا — مع تلميح يوضح «بدون فرصة».
   if (!oppState.data) {
     setTabCount("tabCountOpp", 0);
     return;
   }
-  const seen = new Set();
-  let count = 0;
-  const tierItems = oppState.data.tiers || {};
-  for (const key of ["daily", "weekly", "monthly", "yearly"]) {
-    for (const item of (tierItems[key]?.items) || []) {
-      if (item.code && seen.has(item.code)) continue;
-      if (item.code) seen.add(item.code);
-      count += 1;
-    }
+  const el = $("tabCountOpp");
+  if (!el) return;
+  const scored = Number(oppState.data.totalScored || 0);
+  if (scored <= 0) {
+    el.textContent = "";
+    return;
   }
-  setTabCount("tabCountOpp", count);
+  const total = Number(oppState.data.totalListings || scored);
+  const noOpp = Math.max(0, total - scored);
+  el.textContent = `${scored}/${total}`;
+  el.title = `${scored} فرصة من أصل ${total} إعلان (${noOpp} بدون فرصة)`;
 }
 
 // ── التبويبات الرئيسية: يعرض قسمًا واحدًا في كل مرة بدل تكديس كل الأقسام تحت بعض ──
@@ -3035,6 +3252,8 @@ function bindMainTabs() {
 }
 
 async function boot() {
+  initTheme();
+  initCardReveal();
   bind();
   bindMainTabs();
   switchMainTab("search");

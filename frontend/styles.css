@@ -21,6 +21,163 @@
   --cover-image: url("assets/kuwait_glass_cover.webp");
 }
 
+/* ========== الوضع الفاتح (زجاجي فاتح) ==========
+   طبقة تجاوز إضافية — الوضع الداكن الافتراضي لا يتأثر */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef2f9;
+  --surface: rgba(255, 255, 255, .60);
+  --panel: rgba(255, 255, 255, .55);
+  --ink: #152238;
+  --muted: #4b5d79;
+  --line: rgba(21, 34, 56, .14);
+  --navy: #e2eaf8;
+  --blue: #2563eb;
+  --blue-soft: rgba(37, 99, 235, .12);
+  --green: #059669;
+  --green-soft: rgba(5, 150, 105, .12);
+  --amber: #d97706;
+  --amber-soft: rgba(217, 119, 6, .12);
+  --red: #dc2626;
+  --shadow: 0 10px 30px rgba(30, 41, 59, .14);
+  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, .78) 0%, rgba(255, 255, 255, .50) 55%, rgba(255, 255, 255, .66) 100%);
+  --glass-border: rgba(30, 58, 138, .20);
+}
+
+[data-theme="light"] body::before {
+  background:
+    radial-gradient(1100px 520px at 12% -8%, rgba(37, 99, 235, .16), transparent 60%),
+    radial-gradient(900px 480px at 92% 4%, rgba(91, 140, 255, .14), transparent 58%),
+    radial-gradient(1000px 600px at 55% 108%, rgba(217, 119, 6, .10), transparent 60%),
+    linear-gradient(180deg, #eef2f9 0%, #f6f9fd 55%, #e7edf7 100%);
+}
+
+[data-theme="light"] body::after {
+  background-image:
+    linear-gradient(rgba(21, 34, 56, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(21, 34, 56, .045) 1px, transparent 1px);
+}
+
+/* الشريط العلوي — زجاج فاتح مع صورة الغلاف */
+[data-theme="light"] .topbar {
+  background:
+    linear-gradient(90deg, rgba(226, 234, 248, .92) 0%, rgba(226, 234, 248, .84) 46%, rgba(226, 234, 248, .55) 100%),
+    var(--navy);
+  color: var(--ink);
+  border-bottom-color: var(--glass-border);
+  box-shadow: 0 18px 50px rgba(30, 41, 59, .18);
+}
+
+[data-theme="light"] .topbar::before {
+  opacity: .55;
+  mix-blend-mode: multiply;
+}
+
+[data-theme="light"] .topbar h1,
+[data-theme="light"] .eyebrow,
+[data-theme="light"] .hero-copy {
+  color: var(--ink);
+}
+
+[data-theme="light"] .logo-showcase {
+  border-color: rgba(30, 58, 138, .25);
+  background: linear-gradient(145deg, rgba(255, 255, 255, .85), rgba(255, 255, 255, .55)), rgba(226, 234, 248, .5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 24px 58px rgba(30, 41, 59, .18);
+}
+
+[data-theme="light"] .status {
+  border-color: rgba(30, 58, 138, .25);
+  background: rgba(255, 255, 255, .75);
+  color: var(--ink);
+}
+
+/* التبويبات الرئيسية */
+[data-theme="light"] .main-tabs {
+  background: rgba(255, 255, 255, .62);
+  border-bottom-color: var(--glass-border);
+}
+
+[data-theme="light"] .main-tab {
+  background: rgba(255, 255, 255, .55);
+  color: var(--ink);
+}
+
+[data-theme="light"] .main-tab:hover {
+  background: rgba(37, 99, 235, .10);
+}
+
+[data-theme="light"] .main-tab.active {
+  background: linear-gradient(120deg, #2563eb, #1d4ed8);
+  border-color: rgba(30, 58, 138, .35);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, .3);
+}
+
+[data-theme="light"] .main-tab.active .main-tab-count {
+  background: rgba(255, 255, 255, .9);
+  color: #152238;
+}
+
+/* المدخلات والقوائم */
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background: rgba(255, 255, 255, .72);
+  border-color: var(--glass-border);
+  color: var(--ink);
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #7a8ba3;
+}
+
+[data-theme="light"] select option {
+  background: #ffffff;
+  color: #152238;
+}
+
+/* رؤوس الجداول — أزرق ثابت مقروء على الفاتح */
+[data-theme="light"] .governorate-table th,
+[data-theme="light"] .minitable th {
+  background: linear-gradient(120deg, #2563eb, #1d4ed8);
+  color: #fff;
+}
+
+/* فقاعات الشات */
+[data-theme="light"] .chat-message.user .bubble {
+  background: rgba(37, 99, 235, .14);
+  border-color: rgba(37, 99, 235, .35);
+  color: #1e40af;
+}
+
+[data-theme="light"] .chat-message.assistant .bubble {
+  background: rgba(255, 255, 255, .78);
+  border-color: var(--glass-border);
+  color: var(--ink);
+}
+
+/* حشوات بيضاء شفافة صغيرة — تتحول لظل أزرق خفيف */
+[data-theme="light"] .calc-details {
+  background: rgba(255, 255, 255, .7);
+}
+
+/* زر التبديل في الشريط العلوي */
+.theme-toggle {
+  cursor: pointer;
+  background: transparent;
+  font: inherit;
+}
+
+[data-theme="light"] .hero-link {
+  color: var(--ink);
+  border-color: rgba(30, 58, 138, .3);
+}
+
+[data-theme="light"] .theme-toggle:hover {
+  background: rgba(37, 99, 235, .10);
+}
+
 /* خلفية داكنة متدرجة مع توهجات ملونة خفيفة خلف الألواح الزجاجية */
 body::before {
   content: "";
@@ -56,11 +213,21 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: Arial, Tahoma, "Segoe UI", sans-serif;
+  /* خطوط نظام حديثة: Segoe UI للاتينية/الأرقام مع Tahoma/Arial للعربية */
+  font-family: "Segoe UI", Tahoma, Arial, system-ui, -apple-system, sans-serif;
   font-size: 17px;
   line-height: 1.55;
   letter-spacing: 0;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* تمييز واضح للتركيز بلوحة المفاتيح (إتاحة واحترافية) دون تغيير مظهر النقر العادي */
+:focus-visible {
+  outline: 2px solid var(--accent, #4d9fff);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 button,
@@ -264,6 +431,13 @@ textarea {
 .main-tab.active .main-tab-count {
   background: rgba(255, 255, 255, .85);
   color: #0b1220;
+}
+
+/* نسبة الإنجاز الحية أثناء البحث — تظهر في زر التبويب حتى خارج القسم */
+.main-tab-count.live {
+  background: linear-gradient(90deg, #7fbbff, #46d39a);
+  color: #fff;
+  animation: lp-pulse 1.2s ease-in-out infinite;
 }
 
 .main-tab-count:empty {
@@ -3332,4 +3506,75 @@ summary {
     break-inside: avoid;
     margin-bottom: 12px;
   }
+}
+
+/* ========== دخول متدرج خفيف لبطاقات النتائج والفرص عند التمرير ==========
+   يُضاف .reveal-card عبر JS (IntersectionObserver) — بلا JS تبقى البطاقات
+   ظاهرة دائمًا، ويُعطّل بالكامل عند تفضيل تقليل الحركة. */
+.reveal-card {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity .5s ease, transform .5s ease;
+}
+
+.reveal-card.in-view {
+  opacity: 1;
+  transform: none;
+}
+
+/* تدرّج بسيط بين أول البطاقات المتجاورة */
+.reveal-card:nth-child(2) { transition-delay: .04s; }
+.reveal-card:nth-child(3) { transition-delay: .08s; }
+.reveal-card:nth-child(4) { transition-delay: .12s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-card {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+
+.lp-bar-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.lp-bar-wrap[hidden] { display: none; }
+.lp-bar { flex: 1 1 auto; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.lp-bar-fill { height: 100%; width: 0%; border-radius: 3px; background: linear-gradient(90deg, #7fbbff, #46d39a); transition: width .4s ease; }
+.lp-bar-label { font-size: 11px; opacity: .8; white-space: nowrap; }
+[data-theme="light"] .lp-bar { background: rgba(10, 40, 80, .12); }
+@media (prefers-reduced-motion: reduce) {
+  .lp-bar-fill { transition: none; }
+}
+/* ---- بثّ تقدم البحث الحي: فقاعة المراحل والمصادر لحظيًا ---- */
+.live-progress { min-width: 240px; }
+.lp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.lp-stage { font-size: 13px; }
+.lp-elapsed { margin-inline-start: auto; font-size: 11px; opacity: .75; white-space: nowrap; direction: ltr; }
+.lp-spinner {
+  width: 14px; height: 14px; flex: 0 0 auto;
+  border: 2px solid rgba(127, 187, 255, .35);
+  border-top-color: #7fbbff;
+  border-radius: 50%;
+  animation: lp-spin .7s linear infinite;
+}
+@keyframes lp-spin { to { transform: rotate(360deg); } }
+.lp-detail { font-size: 12px; opacity: .85; margin-bottom: 6px; }
+.lp-sources { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.lp-row {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; padding: 3px 8px; border-radius: 8px;
+  background: rgba(255, 255, 255, .05);
+}
+.lp-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; }
+.lp-row.run .lp-dot { background: #f5c542; animation: lp-pulse 1s ease-in-out infinite; }
+.lp-row.ok .lp-dot { background: #46d39a; }
+.lp-row.bad .lp-dot { background: #ff6b6b; }
+.lp-row.mid .lp-dot { background: #9aa7b8; }
+.lp-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-count { font-size: 11px; opacity: .8; white-space: nowrap; }
+@keyframes lp-pulse { 50% { opacity: .4; } }
+[data-theme="light"] .lp-row { background: rgba(10, 40, 80, .06); }
+@media (prefers-reduced-motion: reduce) {
+  .lp-spinner { animation: none; }
+  .lp-row.run .lp-dot { animation: none; }
 }
