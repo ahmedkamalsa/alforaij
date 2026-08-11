@@ -906,6 +906,8 @@ function renderInsights() {
   if (!root) return;
   const data = insightsState.data;
   const meta = $("insightsMeta");
+  // الخريطة الحرارية في أعلى التبويب — نفس الخلايا القابلة للنقر (تعمل حتى قبل بقية التحليلات)
+  renderInsightsHeatmap(data);
   if (!data || !data.tableOk) {
     if (meta) meta.textContent = "";
     root.innerHTML = `<div class="empty">لا توجد بيانات تحليلات بعد — شغّل الوكيل اليومي لتراكم حصاد المواقع في market_listings.</div>`;
@@ -1070,15 +1072,8 @@ function heatColor(gapPct) {
   return `hsl(${hue} 72% 42% / .85)`;
 }
 
-function renderBoardHeatmap(rows) {
-  const root = $("boardHeatmap");
-  if (!root) return;
-  const areas = computeAreaHeatmap(rows);
-  if (!areas.length) {
-    root.innerHTML = '<div class="empty">لا توجد بيانات سعر/مساحة كافية للرسم الحراري — تتراكم مع الحصاد اليومي.</div>';
-    return;
-  }
-  root.innerHTML = areas.map((a) => {
+function heatmapCellsHtml(areas) {
+  return areas.map((a) => {
     const color = heatColor(a.gapPct);
     const cheap = a.gapPct <= -8, expensive = a.gapPct >= 8, fair = !cheap && !expensive;
     const cls = cheap ? "heat-cheap" : expensive ? "heat-expensive" : "heat-fair";
@@ -1090,6 +1085,60 @@ function renderBoardHeatmap(rows) {
         <span>${sign}${a.gapPct.toLocaleString("en-US", { maximumFractionDigits: 1 })}%</span>
       </button>`;
   }).join("");
+}
+
+function renderBoardHeatmap(rows) {
+  const root = $("boardHeatmap");
+  if (!root) return;
+  const areas = computeAreaHeatmap(rows);
+  if (!areas.length) {
+    root.innerHTML = '<div class="empty">لا توجد بيانات سعر/مساحة كافية للرسم الحراري — تتراكم مع الحصاد اليومي.</div>';
+    return;
+  }
+  root.innerHTML = heatmapCellsHtml(areas);
+}
+
+// خريطة حرارية تبويب التحليلات: تُبنى من /api/market-insights (مناطق بوسيط سعر المتر والمحافظة)
+function computeInsightsHeatmap(data) {
+  const areas = (data && data.areas) || [];
+  const govBucket = {};
+  for (const a of areas) {
+    if (a.medianSalePerM2 == null || !a.governorate) continue;
+    (govBucket[a.governorate] ||= []).push(Number(a.medianSalePerM2));
+  }
+  const medianOf = (arr) => {
+    if (!arr || !arr.length) return null;
+    const sorted = arr.slice().sort((x, y) => x - y);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  const govMedian = {};
+  for (const [gov, arr] of Object.entries(govBucket)) govMedian[gov] = medianOf(arr);
+  const out = [];
+  for (const a of areas) {
+    const med = a.medianSalePerM2 == null ? null : Number(a.medianSalePerM2);
+    const base = govMedian[a.governorate];
+    if (med == null || !base || !a.governorate) continue;
+    out.push({
+      area: a.area,
+      governorate: a.governorate,
+      count: Number(a.saleCount) || 0,
+      perM2: med,
+      gapPct: Math.round(((med / base) - 1) * 1000) / 10,
+    });
+  }
+  return out.sort((x, y) => x.gapPct - y.gapPct);
+}
+
+function renderInsightsHeatmap(data) {
+  const root = $("insightsHeatmap");
+  if (!root) return;
+  const areas = computeInsightsHeatmap(data);
+  if (!areas.length) {
+    root.innerHTML = '<div class="empty">لا توجد بيانات سعر/مساحة كافية للرسم الحراري — تتراكم مع الحصاد اليومي.</div>';
+    return;
+  }
+  root.innerHTML = heatmapCellsHtml(areas);
 }
 
 function renderBoard() {
