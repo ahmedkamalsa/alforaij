@@ -153,6 +153,8 @@ with sync_playwright() as p:
         "overflow": page_overflow(page),
         "insightCards": page.locator(".insight-card").count(),
         "govChips": page.locator(".insights-govs .filter-chip").count(),
+        # بدون بيانات (CI بلا Supabase) تعرض الواجهة الحالة الفارغة بدل «جاري التحميل»
+        "panelLoaded": page.evaluate("!document.querySelector('#insightsRoot').innerText.includes('جاري التحميل')"),
         "offenders": offenders(page),
         "touch": touch_audit(page),
     }
@@ -181,7 +183,7 @@ failed = (
     or any(sub[t]["overflow"] or sub[t]["offenders"] or sub[t]["contentLen"] == 0 or sub[t]["touch"] for t in sub)
     or results["search"]["resultCards"] == 0
     or results["opportunities"]["cards"] == 0
-    or results["insights"]["insightCards"] == 0
+    or not results["insights"]["panelLoaded"]
     or errors
 )
 sys.exit(1 if failed else 0)
