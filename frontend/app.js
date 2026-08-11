@@ -3350,10 +3350,11 @@ async function loadOpportunityTab(tier) {
       ]);
       oppState.history = historyRes;
       oppState.outreach = outreachRes;
-      // اللقطة بلا اتجاهات؟ الموقع المرفوع يقرأ الجدول حيًا مباشرة (جدول عام عبر RLS)
-      oppState.priceTrends = (priceTrendsRes && priceTrendsRes.rows && priceTrendsRes.rows.length)
-        ? priceTrendsRes
-        : (await fetchLivePriceTrends()) || priceTrendsRes;
+      // اللقطة بلا اتجاهات؟ الموقع المرفوع فقط (وضع ثابت بلا باك إند) يقرأ الجدول
+      // حيًا مباشرة عبر REST — وفي الوضع الحي يعمل /api/price-trends فعلًا فلا نحتاج أي سقوط.
+      oppState.priceTrends = (STATIC_SNAPSHOT_MODE && (!priceTrendsRes || !priceTrendsRes.rows || !priceTrendsRes.rows.length))
+        ? (await fetchLivePriceTrends()) || priceTrendsRes
+        : priceTrendsRes;
       renderHistoryTab(root);
     } else if (tier === "matching") {
       oppState.matching = await getJson("/api/market-matching");
