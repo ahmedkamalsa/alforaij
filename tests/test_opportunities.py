@@ -86,7 +86,8 @@ class TestOpportunities(unittest.TestCase):
             source="OpenSooq",
         )
         with mock.patch("backend.services.opportunities.search_external_sources", return_value=([rental], [{"name": "OpenSooq", "status": "success", "records": 1}])), \
-             mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
+             mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])), \
+             mock.patch("backend.services.opportunities.scan_opensooq_inventory", return_value=([], {"name": "OpenSooq (جرد كامل)", "status": "no_results", "records": 0})):
             snapshot = opportunities.build_opportunities(include_external=True)
         items = [
             item
@@ -215,7 +216,8 @@ class TestOpportunities(unittest.TestCase):
             )
         ]
         with mock.patch("backend.services.opportunities.search_external_sources", return_value=(external, [{"name": "OpenSooq", "status": "success", "records": 1}])), \
-             mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
+             mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])), \
+             mock.patch("backend.services.opportunities.scan_opensooq_inventory", return_value=([], {"name": "OpenSooq (جرد كامل)", "status": "no_results", "records": 0})):
             snapshot = opportunities.build_opportunities(include_external=True)
         # الفحص عبر كل الفئات (إعلان حديث قد يتفوق عليه محليون أعلى درجة في فئة معينة)
         codes = [
@@ -252,7 +254,7 @@ class TestOpportunities(unittest.TestCase):
         with mock.patch(
             "backend.services.opportunities.search_external_sources",
             return_value=([external], [{"name": "Mourjan", "status": "success", "records": 1}]),
-        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
+        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])), mock.patch("backend.services.opportunities.scan_opensooq_inventory", return_value=([], {"name": "OpenSooq (جرد كامل)", "status": "no_results", "records": 0})):
             snapshot = opportunities.build_opportunities(include_external=True)
         daily_items = snapshot["tiers"]["daily"]["items"]
         daily_codes = [item["code"] for item in daily_items]
@@ -284,7 +286,7 @@ class TestOpportunities(unittest.TestCase):
         with mock.patch(
             "backend.services.opportunities.search_external_sources",
             return_value=(external, [{"name": "OpenSooq", "status": "success", "records": 3}]),
-        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
+        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])), mock.patch("backend.services.opportunities.scan_opensooq_inventory", return_value=([], {"name": "OpenSooq (جرد كامل)", "status": "no_results", "records": 0})):
             snapshot = opportunities.build_opportunities(include_external=True)
         codes = [item["code"] for tier in snapshot["tiers"].values() for item in tier["items"]]
         self.assertIn("OS-GOOD", codes)
@@ -324,7 +326,7 @@ class TestOpportunities(unittest.TestCase):
                 {"name": "Q8Aqar", "status": "success", "records": 0},
                 {"name": "OpenSooq", "status": "success", "records": 1},
             ]),
-        ):
+        ), mock.patch("backend.services.opportunities.scan_opensooq_inventory", return_value=([], {"name": "OpenSooq (جرد كامل)", "status": "no_results", "records": 0})):
             snapshot = opportunities.build_opportunities(include_external=True)
         daily_codes = [item["code"] for item in snapshot["tiers"]["daily"]["items"]]
         self.assertIn("OS-777", daily_codes, "إعلان المسح المركّب يجب أن يدخل الفئة اليومية")

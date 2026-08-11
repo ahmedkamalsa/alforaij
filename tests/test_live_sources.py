@@ -571,6 +571,64 @@ class LiveSourceParsingTests(unittest.TestCase):
 
         self.assertEqual([status["name"] for status in statuses], ["B"])
 
+    def test_encode_url_handles_arabic_paths(self) -> None:
+        from backend.connectors.live_sources import _encode_url
+
+        encoded = _encode_url("https://kw.opensooq.com/ar/عقارات-للبيع/عقارات")
+        self.assertNotIn("ع", encoded)
+        self.assertTrue(encoded.startswith("https://kw.opensooq.com/ar/"))
+        self.assertIn("%D9%82%D8%A7", encoded)  # مقطع مرمّز من «عقارات»
+        # لا ترميز مزدوج: الترميزات الموجودة تبقى كما هي
+        already = _encode_url("https://x.test/a%20b?q=%D8%B4")
+        self.assertEqual(already, "https://x.test/a%20b?q=%D8%B4")
+        # ASCII يمر كما هو
+        self.assertEqual(_encode_url("https://kw.opensooq.com/en/property/property-for-sale"),
+                         "https://kw.opensooq.com/en/property/property-for-sale")
+
+    def test_scan_opensooq_inventory_walks_pages_and_dedupes(self) -> None:
+        from unittest import mock
+        from backend.connectors import live_sources
+
+        def fake_body(url: str) -> str:
+            prefix = 2 if "rent" in url else 1  # كودان مختلفان لكل قسم حتى لا يُخصم الثاني
+            items = []
+            for i in range(1, 3):
+                items.append(
+                    "{\"title\": \"شقة للبيع في السالمية\", \"post_url\": \"/en/property/apartment-%d-%d\", "
+                    "\"id\": %d, \"cat1_code\": \"RealEstateForSale\", \"price_amount\": 90000}"
+                    % (prefix, i, prefix * 100 + i)
+                )
+            return (
+                "<html><script id=\"__NEXT_DATA__\" type=\"application/json\">"
+                "{\"props\":{\"pageProps\":{\"items\":["
+                + ",".join(items)
+                + "]}}}"
+                "</script></html>"
+            )
+
+        calls: list[str] = []
+
+        def fake_fetch(url, extra_headers=None):
+            calls.append(url)
+            if "?page=" in url:
+                return "", 0, 0.0, "net down", 1  # الصفحات 2+ تفشل → القسم ينتهي
+            return fake_body(url), 200, 10.0, None, 1
+
+        with mock.patch.object(live_sources, "fetch_url", side_effect=fake_fetch):
+            listings, status = live_sources.scan_opensooq_inventory(max_pages=3, max_total=100)
+
+        self.assertEqual(status["status"], "success")
+        self.assertEqual(len(listings), 4)  # صفحتا القسمين (كل واحدة عنصران فريدان)
+        codes = {listing.code for listing in listings}
+        self.assertEqual(len(codes), len(listings))
+        # القسم الأول بيع والثاني إيجار
+        transactions = {listing.transaction for listing in listings}
+        self.assertEqual(transactions, {"للبيع", "للإيجار"})
+        self.assertIn("جرد", status["note"])
+        # أول صفحة من كل قسم تُجلب دون ?page= لتوافق كاش البحث الحي
+        self.assertTrue(any("property-for-sale" in url for url in calls))
+        self.assertTrue(any("property-for-rent" in url for url in calls))
+
 
 if __name__ == "__main__":
     unittest.main()

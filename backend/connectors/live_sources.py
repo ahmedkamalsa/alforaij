@@ -90,8 +90,8 @@ KNOWN_AREAS = list(dict.fromkeys(list(AREA_SLUGS.keys()) + REQUEST_KNOWN_AREAS +
 # كدليل في قاعدة المعرفة (market_listings.original_url).
 SOURCE_MECHANISMS: dict[str, dict[str, str]] = {
     "OpenSooq": {
-        "method": "حمولة JSON مضمّنة (بيانات التطبيق __NEXT_DATA__) من صفحة البحث",
-        "endpoint": "https://kw.opensooq.com/en/find?term=…",
+        "method": "حمولة JSON مضمّنة (__NEXT_DATA__) من صفحات البيع والإيجار — مسح جرد كامل بترقيم الصفحات + بحث حي بالعبارة",
+        "endpoint": "https://kw.opensooq.com/en/property/property-for-sale?page=… (و property-for-rent)",
     },
     "Mourjan": {
         "method": "بيانات منظمة JSON-LD + فحص روابط الصفحة",
@@ -148,12 +148,32 @@ def source_mechanism(name: str) -> dict[str, str]:
     })
 
 
+def _encode_url(url: str) -> str:
+    """ترميز الأحرف غير ASCII في الرابط قبل الطلب (urllib يتطلب ASCII).
+
+    الروابط العربية (مثل صفحات OpenSooq بقسم عقارات-للبيع) تفشل بدونه بخطأ
+    `'ascii' codec can't encode` — نرمّز المسار والاستعلام مع إبقاء البنية
+    والترميزات الموجودة كما هي (لا ترميز مزدوج).
+    """
+    try:
+        url.encode("ascii")
+        return url
+    except UnicodeEncodeError:
+        pass
+    parts = urllib.parse.urlsplit(url)
+    path = urllib.parse.quote(parts.path, safe="/%:@")
+    query = urllib.parse.quote(parts.query, safe="=&%")
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, query, parts.fragment))
+
+
 def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[str, int, float, str | None, int]:
     """جلب رابط مع إعادة محاولة ودعم gzip وكاش قصير ووكيل متصفح حديث.
 
     يعيد (body, status, ms, error, attempts): آخر عنصر هو عدد المحاولات الفعلية
-    التي جرت (يشمل الناجحة — يُسجَّل في حالة المصدر للسجل الدوري).
+    التي جرت (يشمل الناجحة — يُسجَّل في حالة المصدر للسجل الدوري). الروابط غير
+    ASCII تُرمَّز تلقائيًا (انظر _encode_url) قبل الطلب.
     """
+    request_url = _encode_url(url)
     # مفتاح التخزين يتضمن الرؤوس حتى لا تتصادم طلبات مختلفة لنفس الرابط
     cache_key = (url, tuple(sorted((extra_headers or {}).items())))
     # Cache hit (يمنع إعادة جلب نفس الصفحة في نفس الجلسة)
@@ -181,7 +201,7 @@ def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[st
     # بينما الخطأ الحقيقي (HTTP 403/404...) لا يتحسن بإعادة المحاولة المطولة.
     for attempt in range(MAX_ATTEMPTS + TRANSIENT_EXTRA_ATTEMPTS):
         attempts_made += 1
-        request = urllib.request.Request(url, headers=headers)
+        request = urllib.request.Request(request_url, headers=headers)
         # مهلة متناقصة مع كل إعادة محاولة حتى لا يطول انتظار المصدر المتعثر كثيرًا
         attempt_timeout = max(3, TIMEOUT - (3 * attempt))
         try:
@@ -215,9 +235,10 @@ def fetch_url(url: str, extra_headers: dict[str, str] | None = None) -> tuple[st
 
 def _is_transient_error(exc: BaseException) -> bool:
     """هل الخطأ عابر (يستحق إعادة محاولة إضافية) أم حقيقي (لا يتحسن بالإعادة)؟"""
-    # استجابة فعلية من الخادم (403/404...) — لا نعيد محاولة طويلة عليها
+    # استجابة فعلية من الخادم — بعضها عابر يُعاد (410/429/503: حماية WAF أو
+    # تحميل مؤقت من المواقع يظهر ويختفي) والباقي حقيقي لا يتحسن بالإعادة.
     if isinstance(exc, urllib.error.HTTPError):
-        return False
+        return exc.code in (410, 429, 503)
     # DNS (getaddrinfo)، مهلة، قطع/رفض اتصال، خطأ مقبس/نظام
     if isinstance(exc, (socket.gaierror, socket.timeout, TimeoutError, ConnectionError, OSError)):
         return True
@@ -227,6 +248,15 @@ def _is_transient_error(exc: BaseException) -> bool:
     if isinstance(exc, (http.client.RemoteDisconnected, http.client.HTTPException, ssl.SSLError)):
         return True
     return False
+
+
+def _is_transient_block(error: str | None) -> bool:
+    """هل الفشل حجب مؤقت من WAF (410/429/503) يستحق انتظارًا متباعدًا؟
+
+    fetch_url يعيد status=0 عند الفشل، لذا نفحص نص الخطأ (مثل «HTTP Error 410: Gone»).
+    """
+    text = error or ""
+    return any(code in text for code in ("410", "429", "503"))
 
 
 # تحويل الأرقام العربية الهندية (٠-٩) وفواصلها إلى الإنجليزية (0-9) عند دخول النص
@@ -508,6 +538,30 @@ def opensooq_transaction_from_item(item: dict[str, Any], fallback: str) -> str:
     return fallback
 
 
+def _opensooq_items(body: str) -> list[dict[str, Any]]:
+    """إعلانات السوق المفتوح من حمولة __NEXT_DATA__ المضمّنة في صفحة قائمة.
+
+    تعيد عناصر العقارات فقط (cat1 RealEstate) — مستخدمة في البحث الحي والجرد
+    الكامل معًا حتى لا يتكرر منطق الاستخراج.
+    """
+    match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', body, re.S)
+    if not match:
+        return []
+    try:
+        next_data = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return []
+    items: list[dict[str, Any]] = []
+    for item in walk_dicts(next_data):
+        if "title" not in item or "post_url" not in item:
+            continue
+        cat1 = str(item.get("cat1_code", ""))
+        if cat1 and "RealEstate" not in cat1:
+            continue
+        items.append(item)
+    return items
+
+
 def search_opensooq(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
     if request.raw_text.strip():
         url = f"https://kw.opensooq.com/en/find?{urllib.parse.urlencode({'term': request.raw_text})}"
@@ -518,41 +572,30 @@ def search_opensooq(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
     listings: list[Listing] = []
     candidates = 0
     if body:
-        next_match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', body, re.S)
-        if next_match:
-            try:
-                next_data = json.loads(next_match.group(1))
-            except json.JSONDecodeError:
-                next_data = {}
-            seen_ids: set[str] = set()
-            for item in walk_dicts(next_data):
-                if "title" not in item or "post_url" not in item:
-                    continue
-                cat1 = str(item.get("cat1_code", ""))
-                if cat1 and "RealEstate" not in cat1:
-                    continue
-                candidates += 1
-                code = "OS-" + str(item.get("id") or item.get("post_url", "").rstrip("/").split("/")[-1])
-                if code in seen_ids:
-                    continue
-                seen_ids.add(code)
-                description = " ".join(
-                    str(item.get(key, ""))
-                    for key in ("masked_description", "description", "nhood_label", "nhood_reporting", "city_label")
-                    if item.get(key)
-                )
-                listing = listing_from_text(
-                    source="OpenSooq",
-                    code=code,
-                    url=urllib.parse.urljoin("https://kw.opensooq.com", str(item.get("post_url", ""))),
-                    title=str(item.get("title", "")),
-                    description=description,
-                    price=item.get("price_amount") or item.get("price"),
-                    transaction=opensooq_transaction_from_item(item, transaction_from_request(request)),
-                    fallback_type=opensooq_type_from_item(item, request.property_type),
-                )
-                if request_matches_listing(request, listing):
-                    listings.append(listing)
+        seen_ids: set[str] = set()
+        for item in _opensooq_items(body):
+            candidates += 1
+            code = "OS-" + str(item.get("id") or item.get("post_url", "").rstrip("/").split("/")[-1])
+            if code in seen_ids:
+                continue
+            seen_ids.add(code)
+            description = " ".join(
+                str(item.get(key, ""))
+                for key in ("masked_description", "description", "nhood_label", "nhood_reporting", "city_label")
+                if item.get(key)
+            )
+            listing = listing_from_text(
+                source="OpenSooq",
+                code=code,
+                url=urllib.parse.urljoin("https://kw.opensooq.com", str(item.get("post_url", ""))),
+                title=str(item.get("title", "")),
+                description=description,
+                price=item.get("price_amount") or item.get("price"),
+                transaction=opensooq_transaction_from_item(item, transaction_from_request(request)),
+                fallback_type=opensooq_type_from_item(item, request.property_type),
+            )
+            if request_matches_listing(request, listing):
+                listings.append(listing)
         # Also parse JSON-LD
         for raw_json in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S):
             try:
@@ -591,6 +634,107 @@ def search_opensooq(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
         "responseMs": ms,
         "url": url,
         "note": error or "تم البحث بعبارة الطلب واستخراج النتائج القابلة للقراءة من بيانات الصفحة.",
+    }
+
+
+def scan_opensooq_inventory(
+    *,
+    max_pages: int = 6,
+    max_total: int = 500,
+    block_retries: int = 3,
+    block_delay: float = 20.0,
+) -> tuple[list[Listing], dict[str, Any]]:
+    """مسح جرد كامل للسوق المفتوح: كل صفحات أقسام البيع والإيجار.
+
+    صفحة OpenSooq الواحدة تعرض نحو 30 إعلانًا من كل أنواع العقارات (شقق/بيوت/
+    فلل/أراضٍ/عمارات/تجاري) عبر قسمي property-for-sale و property-for-rent مع
+    ترقيم صفحات. البحث الحي كان يقتطع الصفحة الأولى فقط (نحو 60 إعلانًا من
+    القسمين)، فتُفقد بقية الجرد. هذا المسح يمشي صفحات القسمين حتى نهايتهما
+    (أو سقف max_pages) ويزيل التكرار بالكود، فيتراكم جرد السوق المفتوح كاملًا
+    في قاعدة المعرفة (market_listings) مثل بيانات الفريج المحلية تمامًا.
+    """
+    sections = [("property-for-sale", "للبيع"), ("property-for-rent", "للإيجار")]
+    listings: list[Listing] = []
+    seen_codes: set[str] = set()
+    candidates = 0
+    pages_read = 0
+    max_ms = 0.0
+    detail_notes: list[str] = []
+    for section, transaction in sections:
+        for page in range(1, max_pages + 1):
+            # المسار الصحيح يحمل مقطع property/: /en/property/property-for-sale
+            # (بدونه يعيد الموقع 410 Gone لأنه مسار غير موجود)
+            url = f"https://kw.opensooq.com/en/property/{section}" + (f"?page={page}" if page > 1 else "")
+            body, status, ms, error, attempts = fetch_url(url)
+            max_ms = max(max_ms, ms)
+            if not body or error:
+                # حماية WAF عند OpenSooq (410/429...) تأتي وتذهب بنوافذ قصيرة —
+                # نعيد محاولة الصفحة بانتظار متباعد (block_delay) قبل الاستسلام،
+                # حتى يمر الحصاد في النافذة المسموحة غالبًا بدل إسقاط الجرد كاملًا.
+                blocked = _is_transient_block(error) or (status in (410, 429, 503))
+                note = (error or f"HTTP {status}")[:90]
+                if blocked and page == 1:
+                    waited = 0
+                    for retry in range(block_retries):
+                        time.sleep(block_delay)
+                        waited += block_delay
+                        body, status, ms, error, attempts = fetch_url(url)
+                        max_ms = max(max_ms, ms)
+                        if body and not error:
+                            note = f"نجح بعد {int(waited)}ث انتظار"
+                            break
+                    else:
+                        note = (error or f"HTTP {status}")[:90]
+                if not body or error:
+                    if len(detail_notes) < 2:
+                        detail_notes.append(f"{section} p{page}: {note}")
+                    break
+            items = _opensooq_items(body)
+            candidates += len(items)
+            pages_read += 1
+            new_on_page = 0
+            for item in items:
+                code = "OS-" + str(item.get("id") or item.get("post_url", "").rstrip("/").split("/")[-1])
+                if code in seen_codes:
+                    continue
+                seen_codes.add(code)
+                description = " ".join(
+                    str(item.get(key, ""))
+                    for key in ("masked_description", "description", "nhood_label", "nhood_reporting", "city_label")
+                    if item.get(key)
+                )
+                listing = listing_from_text(
+                    source="OpenSooq",
+                    code=code,
+                    url=urllib.parse.urljoin("https://kw.opensooq.com", str(item.get("post_url", ""))),
+                    title=str(item.get("title", "")),
+                    description=description,
+                    price=item.get("price_amount") or item.get("price"),
+                    transaction=transaction,
+                    fallback_type=opensooq_type_from_item(item, ""),
+                )
+                listings.append(listing)
+                new_on_page += 1
+                if len(listings) >= max_total:
+                    break
+            if new_on_page == 0 or len(listings) >= max_total:
+                break
+            # مسافة قصيرة بين الصفحات — نزور الموقع برفق ولا نستفز حماية WAF
+            time.sleep(0.8)
+        if len(listings) >= max_total:
+            break
+    status = "success" if listings else ("no_results" if pages_read else "failed")
+    note_parts = [f"مسح {pages_read} صفحة", f"جرد {len(listings)} إعلانًا"]
+    note_parts.extend(detail_notes)
+    return listings, {
+        "name": "OpenSooq (جرد كامل)",
+        "status": status,
+        "records": len(listings),
+        "candidates": candidates,
+        "attempts": 0,
+        "responseMs": round(max_ms, 1),
+        "url": "https://kw.opensooq.com/en/property/property-for-sale (+ ترقيم الصفحات)",
+        "note": "، ".join(note_parts),
     }
 
 

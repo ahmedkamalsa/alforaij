@@ -52,8 +52,9 @@ def has_realistic_price(listing: Any) -> bool:
 from backend.connectors.alforaij import load_listings
 from backend.connectors.live_sources import (
     broad_combo_requests,
-    search_combo_sources,
     enrich_listings_from_details,
+    scan_opensooq_inventory,
+    search_combo_sources,
     search_external_sources,
 )
 from backend.models import PropertyRequest
@@ -983,6 +984,13 @@ def build_opportunities(limit_per_tier: int = 30, include_external: bool = True,
             combo_listings, combo_statuses = search_combo_sources(broad_combo_requests(), ["Q8Aqar", "OpenSooq"])
             external_listings.extend(combo_listings)
             external_statuses.extend(combo_statuses)
+            # جرد السوق المفتوح الكامل: صفحة القائمة الواحدة تُظهر نحو 30 إعلانًا من
+            # كل الأنواع، والبحث الحي يقتطع الصفحة الأولى فقط — هذا المسح يمشي صفحات
+            # قسمي البيع والإيجار كاملًا حتى يتراكم جرد OpenSooq في قاعدة المعرفة
+            # (market_listings) مثل بيانات الفريج المحلية، وكل نوع يظهر في اللوحة.
+            _inventory, _inventory_status = scan_opensooq_inventory()
+            external_listings.extend(_inventory)
+            external_statuses.append(_inventory_status)
             # وكيل إكمال التفاصيل: يقرأ صفحة تفاصيل كل إعلان ناقص (سعر/مساحة/منطقة)
             # حتى تُقيَّم الإعلانات ببيانات كاملة وتُحفظ في قاعدة المعرفة مكتملة.
             _enrich = enrich_listings_from_details(external_listings, max_pages=15)
