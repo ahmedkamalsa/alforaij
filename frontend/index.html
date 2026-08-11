@@ -10,7 +10,7 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260811-pricegap">
+  <link rel="stylesheet" href="styles.css?v=20260811-simulator">
   <script src="config.js?v=20260811-trends"></script>
 </head>
 <body>
@@ -221,6 +221,29 @@
       <div class="actions compact-actions">
         <button id="openEvidenceQuick" type="button">المصادر والأدلة</button>
       </div>
+
+      <details class="deal-simulator" id="dealSimulator">
+        <summary>🧮 محاكي صفقة الاستثمار</summary>
+        <div class="sim-fields">
+          <label>سعر الشراء (د.ك)
+            <input id="simBuyPrice" type="number" min="0" step="1000" inputmode="decimal" placeholder="مثال: 280000" autocomplete="off">
+          </label>
+          <label>تكلفة الترميم (د.ك)
+            <input id="simRenovCost" type="number" min="0" step="500" inputmode="decimal" placeholder="مثال: 15000" autocomplete="off">
+          </label>
+          <label>الإيجار المتوقع شهريًا (د.ك)
+            <input id="simRent" type="number" min="0" step="50" inputmode="decimal" placeholder="مثال: 800" autocomplete="off">
+          </label>
+          <button id="simPrefill" type="button" class="sim-prefill" title="تعبئة سعر الشراء من أفضل نتيجة بيع في التقرير الحالي والإيجار المتوقع من وسيط إيجارات منطقتها إن وُجد">تعبئة من أفضل نتيجة</button>
+        </div>
+        <div class="sim-results">
+          <div class="sim-result"><span>العائد السنوي</span><strong id="simYield">—</strong></div>
+          <div class="sim-result"><span>فترة الاسترداد</span><strong id="simPayback">—</strong></div>
+          <div class="sim-result"><span>رأس المال الكلي</span><strong id="simCapital">—</strong></div>
+          <div class="sim-result"><span>الدخل السنوي</span><strong id="simIncome">—</strong></div>
+        </div>
+        <p class="sim-note" id="simNote">أدخل سعر الشراء وتكلفة الترميم والإيجار المتوقع شهريًا — يُحسب العائد السنوي وفترة الاسترداد فورًا.</p>
+      </details>
 
       <details class="advanced-fields">
         <summary>خيارات متقدمة</summary>
@@ -504,6 +527,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260811-pricegap"></script>
+  <script src="app.js?v=20260811-simulator"></script>
 </body>
 </html>

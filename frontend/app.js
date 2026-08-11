@@ -3764,6 +3764,97 @@ function bindMainTabs() {
   });
 }
 
+// ── محاكي صفقة الاستثمار: سعر الشراء + الترميم + الإيجار المتوقع ← العائد وفترة الاسترداد ──
+function simNumbers() {
+  const buy = Number($("simBuyPrice")?.value || 0);
+  const renov = Number($("simRenovCost")?.value || 0);
+  const rent = Number($("simRent")?.value || 0);
+  const capital = buy + renov;
+  const annual = rent * 12;
+  return { buy, renov, rent, capital, annual };
+}
+
+function updateSimulator() {
+  const { capital, annual } = simNumbers();
+  const yieldEl = $("simYield");
+  const paybackEl = $("simPayback");
+  const capitalEl = $("simCapital");
+  const incomeEl = $("simIncome");
+  const noteEl = $("simNote");
+  if (!yieldEl || !paybackEl) return;
+  if (capital <= 0 || annual <= 0) {
+    yieldEl.textContent = "—";
+    paybackEl.textContent = "—";
+    capitalEl.textContent = capital > 0 ? formatMoney(capital) : "—";
+    incomeEl.textContent = annual > 0 ? formatMoney(annual) : "—";
+    if (noteEl) noteEl.textContent = "أدخل سعر الشراء وتكلفة الترميم والإيجار المتوقع شهريًا — يُحسب العائد السنوي وفترة الاسترداد فورًا.";
+    return;
+  }
+  const pct = (annual / capital) * 100;
+  const years = capital / annual;
+  const yearsInt = Math.floor(years);
+  const months = Math.round((years - yearsInt) * 12);
+  const paybackText = yearsInt >= 1
+    ? `${yearsInt} سنة و ${months} شهر`
+    : `${months} شهر`;
+  yieldEl.textContent = `${pct.toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+  yieldEl.className = `sim-value ${pct >= 6 ? "yield-high" : pct >= 4 ? "yield-mid" : "yield-low"}`;
+  paybackEl.textContent = paybackText;
+  capitalEl.textContent = formatMoney(capital);
+  incomeEl.textContent = formatMoney(annual);
+  if (noteEl) {
+    const advice = pct >= 6
+      ? "عائد جيد يغطي التمويل والرسوم عادةً — فرصة استثمارية قوية."
+      : pct >= 4
+        ? "عائد مقبول ضمن متوسط السوق الكويتي."
+        : "عائد منخفض — راجع سعر الشراء أو الإيجار المتوقع قبل الإقرار.";
+    noteEl.textContent = `${advice} الحساب: (${formatMoney(annual)} ÷ ${formatMoney(capital)}) × 100 = ${pct.toLocaleString("en-US", { maximumFractionDigits: 2 })}%.`;
+  }
+}
+
+function prefillSimulator() {
+  const report = state.report;
+  if (!report || !(report.results || []).length) {
+    const noteEl = $("simNote");
+    if (noteEl) noteEl.textContent = "لا توجد نتائج بعد — شغّل بحثًا أولًا ثم عُد لتفعيل «تعبئة من أفضل نتيجة».";
+    return;
+  }
+  // أفضل نتيجة بيع (لأن المحاكي يستثمر في شراء): السعر = سعر الشراء
+  const saleTop = (report.results || []).find((item) => !item.rental && item.price);
+  const buyField = $("simBuyPrice");
+  if (saleTop && buyField) buyField.value = Math.round(Number(saleTop.price));
+  // الإيجار المتوقع: وسيط إيجارات نفس منطقة أفضل نتيجة إن وُجدت نتائج إيجار لها
+  const topArea = (saleTop || report.results[0] || {}).area;
+  const rents = (report.results || [])
+    .filter((item) => item.rental && item.price && (!topArea || normalizeArabic(item.area) === normalizeArabic(topArea)))
+    .map((item) => Number(item.price));
+  const rentField = $("simRent");
+  let rentMedian = null;
+  if (rents.length) {
+    const sorted = rents.slice().sort((a, b) => a - b);
+    rentMedian = sorted[Math.floor(sorted.length / 2)];
+    rentField.value = Math.round(rentMedian);
+  }
+  updateSimulator();
+  // تُكتب رسالة التعبئة بعد الحساب حتى لا تُستبدل بنص النصيحة
+  const noteEl = $("simNote");
+  if (noteEl) {
+    const current = noteEl.textContent;
+    noteEl.textContent = saleTop
+      ? `عبّأت من أفضل نتيجة بيع (${saleTop.code}): سعر الشراء ${formatMoney(saleTop.price)}${rentMedian ? ` والإيجار من وسيط إيجارات المنطقة (${formatMoney(rentMedian)}/شهر)` : " — عدّل الإيجار المتوقع يدويًا"}. ${current}`
+      : "لا توجد نتيجة بيع بسعر — أدخل الأرقام يدويًا.";
+  }
+}
+
+function initDealSimulator() {
+  for (const id of ["simBuyPrice", "simRenovCost", "simRent"]) {
+    const el = $(id);
+    if (el) el.addEventListener("input", updateSimulator);
+  }
+  const prefill = $("simPrefill");
+  if (prefill) prefill.addEventListener("click", prefillSimulator);
+}
+
 async function boot() {
   initTheme();
   initCardReveal();
@@ -3773,6 +3864,7 @@ async function boot() {
   bindOppEvents();
   populateAdvancedOptions();
   initAreaChips();
+  initDealSimulator();
   loadDashboardBoard();
   loadOpportunities();
   scheduleDailySixAM();

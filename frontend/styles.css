@@ -2306,6 +2306,103 @@ button:hover {
   display: none;
 }
 
+/* محاكي صفقة الاستثمار */
+.deal-simulator {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .03);
+  padding: 12px 14px;
+}
+
+.deal-simulator summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--blue);
+}
+
+.sim-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.sim-fields label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sim-fields input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.sim-prefill {
+  align-self: end;
+  padding: 9px 12px;
+  border: 1px solid #b7cdf4;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sim-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.sim-result {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.sim-result span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sim-result strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 17px;
+}
+
+.sim-value.yield-high {
+  color: #22c55e;
+}
+
+.sim-value.yield-mid {
+  color: var(--blue);
+}
+
+.sim-value.yield-low {
+  color: var(--red);
+}
+
+.sim-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 /* شارة فجوة السعر: السعر المطلوب مقابل وسيط المنطقة */
 .price-gap-badge {
   display: inline-block;
