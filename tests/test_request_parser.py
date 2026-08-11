@@ -44,5 +44,15 @@ class RequestParserTests(unittest.TestCase):
         self.assertEqual(request.areas, ["\u0628\u0646\u064a\u062f \u0627\u0644\u0642\u0627\u0631"])
 
 
+    def test_square_al_khair_mall_detects_sabah_al_ahmad(self) -> None:
+        request = parse_request(
+            "شاليه للبيع قريب من "
+            "مول سكوير الخير"
+        )
+
+        self.assertEqual(request.transaction, "للبيع")
+        self.assertIn("صباح الأحمد", request.areas)
+
+
 if __name__ == "__main__":
     unittest.main()

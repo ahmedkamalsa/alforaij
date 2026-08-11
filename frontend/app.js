@@ -37,7 +37,9 @@ function applyTheme(theme) {
   const btn = document.getElementById("themeToggle");
   if (btn) {
     const isLight = theme === "light";
-    btn.textContent = isLight ? "🌙 الوضع الداكن" : "☀️ الوضع الفاتح";
+    const moon = '<svg class="hero-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg> ';
+    const sun = '<svg class="hero-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg> ';
+    btn.innerHTML = (isLight ? moon : sun) + (isLight ? "الوضع الداكن" : "الوضع الفاتح");
     btn.setAttribute("aria-label", isLight ? "التبديل إلى الوضع الداكن" : "التبديل إلى الوضع الفاتح");
   }
 }
@@ -1923,7 +1925,7 @@ function renderSources(report) {
     // شفافية آلية الجلب: كيف جُلبت البيانات فعلًا (JSON مضمّن / بيانات منظمة / فحص HTML / تغذية رسمية)
     // ونقطة النهاية الحقيقية — فلا يظهر رقم بلا مصدر قابل للتتبع
     const mechLine = source.fetchMethod
-      ? `<span class="source-mech" dir="auto">🔎 آلية الجلب: ${escapeHtml(source.fetchMethod)}${source.endpoint ? ` · <code dir="ltr">${escapeHtml(source.endpoint)}</code>` : ""}</span>`
+      ? `<span class="source-mech" dir="auto">${DEV_SVG('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>')} آلية الجلب: ${escapeHtml(source.fetchMethod)}${source.endpoint ? ` · <code dir="ltr">${escapeHtml(source.endpoint)}</code>` : ""}</span>`
       : "";
     const item = document.createElement("div");
     item.className = `source-card ${source.status}`;
@@ -3516,15 +3518,20 @@ function renderDeltaTab(root) {
             <div class="verdict"><strong class="recommendation">${escapeHtml(d.priceText || oppMoney(d.price))}</strong></div>
           </div>
           ${d.oldPriceText || d.oldPrice ? `<p class="delta-price">قبل: ${escapeHtml(d.oldPriceText || oppMoney(d.oldPrice))} ← بعد: ${escapeHtml(d.priceText || oppMoney(d.price))}</p>` : ""}
-          <p class="delta-guidance">💡 ${escapeHtml(d.guidance || "")}</p>
+          <p class="delta-guidance">${DEV_SVG('<path d="M12 16v-4"/><path d="M12 8h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>')} ${escapeHtml(d.guidance || "")}</p>
           ${d.clients && d.clients.length ? `<div class="opp-clients"><strong>عملاء مطابقون (${d.clients.length}):</strong> ${d.clients.map((c) => `<span>${escapeHtml(c.area || "")} ${escapeHtml(c.type || "")} — تطابق ${c.matchScore}/100</span>`).join(" · ")}</div>` : ""}
           ${d.url ? `<a class="open-link" href="${escapeHtml(d.url)}" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>` : ""}
         </div>
       </article>`).join("")}` : "";
+  const DELTA_ICONS = {
+    "🆕": DEV_SVG('<path d="M5 12h14"/><path d="M13 5l7 7-7 7"/>'),
+    "🗑️": DEV_SVG('<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/>'),
+    "📉": DEV_SVG('<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>'),
+  };
   root.innerHTML = stats
-    + section("🆕 فرص جديدة دخلت السوق", data.added || [], "delta-new")
-    + section("🗑️ فرص اختفت من السوق", data.removed || [], "delta-removed")
-    + section("📉 انخفاض الأسعار", data.priceDrops || [], "delta-drop");
+    + section(DELTA_ICONS["🆕"] + " فرص جديدة دخلت السوق", data.added || [], "delta-new")
+    + section(DELTA_ICONS["🗑️"] + " فرص اختفت من السوق", data.removed || [], "delta-removed")
+    + section(DELTA_ICONS["📉"] + " انخفاض الأسعار", data.priceDrops || [], "delta-drop");
 }
 
 function renderOppTier() {
@@ -4197,15 +4204,29 @@ function switchMainTab(name) {
   if (name === "developments") loadDevelopments();
 }
 
+// زر «اسأل المساعد» العائم: يقفز للبحث/الشات ويُركز الحقل فورًا من أي قسم
+const chatFab = document.getElementById("chatFab");
+if (chatFab) {
+  chatFab.addEventListener("click", () => {
+    switchMainTab("search");
+    const input = document.getElementById("chatInput");
+    if (input) input.focus();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+}
+
 // ── تطورات السوق العقاري (وكيل الاكتشاف اليومي) ──────────────────────────
 const developmentsState = { data: null, loaded: false };
 
+// أيقونات SVG خطية بأسلوب موحد مع باقي الواجهة (بدل الإيموجي)
+const DEV_SVG = (paths) =>
+  `<svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 const DEVELOPMENT_CATEGORY_ICONS = {
-  "سوق عقاري": "📊",
-  "مؤشرات رسمية": "🏛️",
-  "تنظيم وقانون": "⚖️",
-  "تمويل عقاري": "🏦",
-  "مشاريع وتطوير": "🏗️",
+  "سوق عقاري": DEV_SVG('<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>'),
+  "مؤشرات رسمية": DEV_SVG('<path d="M3 21h18"/><path d="M5 21V7"/><path d="M9 21V3"/><path d="M13 21v-9"/><path d="M17 21v-5"/>'),
+  "تنظيم وقانون": DEV_SVG('<path d="M12 3v18"/><path d="M5 7.5 12 3l7 4.5"/><path d="M7 21h10"/><path d="M8 7.5 12 10l4-2.5"/><path d="M5 7.5v6"/><path d="M19 7.5v6"/>'),
+  "تمويل عقاري": DEV_SVG('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>'),
+  "مشاريع وتطوير": DEV_SVG('<path d="M2 20h20"/><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/>'),
 };
 
 function developmentDateLabel(published) {
@@ -4253,7 +4274,7 @@ function renderDevelopments() {
     }
     root.innerHTML = Object.keys(byCategory).map((cat) => `
       <div class="developments-category">
-        <h3 class="developments-category-title">${DEVELOPMENT_CATEGORY_ICONS[cat] || "📰"} ${escapeHtml(cat)} <span class="developments-category-count">${byCategory[cat].length}</span></h3>
+        <h3 class="developments-category-title">${DEVELOPMENT_CATEGORY_ICONS[cat] || DEV_SVG('<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/>')} ${escapeHtml(cat)} <span class="developments-category-count">${byCategory[cat].length}</span></h3>
         <div class="developments-cards">
           ${byCategory[cat].map((item) => `
             <a class="development-card" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">
@@ -4276,9 +4297,9 @@ function renderDevelopments() {
     const status = data.status || "";
     if (note) {
       stateEl.className = `source-summary-bar ${status === "success" ? "tone-ok" : "tone-warn"}`;
-      stateEl.innerHTML = `🕵️ وكيل الاكتشاف: <strong>${escapeHtml(note)}</strong>`;
+      stateEl.innerHTML = `${DEV_SVG('<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.9.7 3.7 1.9 5.1L12 22l6.1-6.9A8 8 0 0 0 20 10a8 8 0 0 0-8-8Z"/>')} وكيل الاكتشاف: <strong>${escapeHtml(note)}</strong>`;
     } else {
-      stateEl.innerHTML = "🕵️ وكيل الاكتشاف: لم يُشغَّل بعد — شغّل التحديث اليومي من تبويب المصادر والتشغيل.";
+      stateEl.innerHTML = `${DEV_SVG('<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.9.7 3.7 1.9 5.1L12 22l6.1-6.9A8 8 0 0 0 20 10a8 8 0 0 0-8-8Z"/>')} وكيل الاكتشاف: لم يُشغَّل بعد — شغّل التحديث اليومي من تبويب المصادر والتشغيل.`;
     }
   }
 

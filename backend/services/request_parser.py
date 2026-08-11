@@ -86,7 +86,7 @@ AREA_ALIASES: dict[str, list[str]] = {
     "العدان": ["عدان", "addan", "adan"],
     "المنقف": ["منقف", "mangaf", "al-mangaf"],
     "الفحيحيل": ["فحيحيل", "fahaheel", "faheel"],
-    "صباح الأحمد": ["صباح الاحمد", "صباح احمد", "sabah al ahmed", "sabah al-ahmad"],
+    "صباح الأحمد": ["صباح الاحمد", "صباح احمد", "صباح الاحمد البحرية", "صباح الاحمد البحريه", "sabah al ahmed", "sabah al-ahmad", "سكوير الخير", "مول سكوير الخير", "سكوير الخير مول"],
     "جابر الأحمد": ["جابر الاحمد", "جابر احمد", "jaber al ahmed", "jaber al-ahmed"],
     "سعد العبدالله": ["سعد عبدالله", "saad al abdallah", "saad al-abdallah"],
     "شمال غرب الصليبيخات": ["شمال غرب صليبيخات", "north west sulaibikhat", "nwsk"],

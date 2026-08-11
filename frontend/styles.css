@@ -4457,3 +4457,70 @@ summary {
     padding: 12px 12px 24px;
   }
 }
+
+/* ── أيقونات الواجهة الاحترافية (SVG بدل الإيموجي) ─────────────────────── */
+.tab-ic {
+  width: 17px;
+  height: 17px;
+  vertical-align: -3px;
+  margin-inline-end: 6px;
+  flex: none;
+}
+
+.hero-ic {
+  width: 15px;
+  height: 15px;
+  vertical-align: -2px;
+  margin-inline-end: 6px;
+  flex: none;
+}
+
+/* ── زر «اسأل المساعد» العائم: شات فوري من أي قسم ──────────────────────── */
+.chat-fab {
+  position: fixed;
+  inset-inline-start: 22px;
+  bottom: 22px;
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 19px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 999px;
+  background: linear-gradient(120deg, #4d86ff, #1f52d9);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(29, 78, 216, .48), inset 0 1px 0 rgba(255, 255, 255, .25);
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+.chat-fab svg {
+  width: 19px;
+  height: 19px;
+  flex: none;
+}
+.chat-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 38px rgba(29, 78, 216, .58), inset 0 1px 0 rgba(255, 255, 255, .3);
+  filter: brightness(1.06);
+}
+.chat-fab:active {
+  transform: translateY(0) scale(.97);
+}
+[data-theme="light"] .chat-fab {
+  box-shadow: 0 12px 30px rgba(29, 78, 216, .35), inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+
+@media (max-width: 720px) {
+  .chat-fab {
+    padding: 12px;
+    border-radius: 50%;
+    inset-inline-start: 14px;
+    bottom: 14px;
+  }
+  .chat-fab .chat-fab-label {
+    display: none;
+  }
+}
