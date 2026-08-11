@@ -124,6 +124,11 @@ def main() -> None:
     write_json("dashboard-summary.json", dashboard)
     write_json("opportunities.json", opportunities)
     write_json("price-trends.json", _price_trends)
+    write_json("market-insights.json", guarded(
+        "market-insights",
+        lambda: supabase_store.fetch_market_insights(),
+        {"tableOk": False, "areas": [], "series": [], "months": [], "governorates": []},
+    ))
     write_json("market-matching.json", matching)
     write_json("weekly-digest.json", weekly)
     write_json("whatsapp-alerts.json", alerts)

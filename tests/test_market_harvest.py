@@ -100,3 +100,62 @@ class TestMarketHarvest(unittest.TestCase):
         self.assertEqual(supabase_store.save_market_listings([])["status"], "empty")
         with mock.patch.object(supabase_store, "is_configured", return_value=False):
             self.assertEqual(supabase_store.save_market_listings([{"code": "X"}])["status"], "not_configured")
+
+    # ── تحليلات السوق (الموجة 1): عائد الإيجار واتجاه سعر المتر ──
+
+    def _insights_rows(self):
+        return [
+            # حولي: بيع 600,000 د.ك / 300م + إيجار 2,500 — عائد = (2500*12)/600000 = 5%
+            {"area": "حولي", "governorate": "", "transaction": "للبيع", "price": 600000, "space": 300, "fetched_at": "2026-07-10T08:00:00"},
+            {"area": "حولي", "governorate": "", "transaction": "للبيع", "price": 600000, "space": 300, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "حولي", "governorate": "", "transaction": "للإيجار", "price": 2500, "space": None, "fetched_at": "2026-08-10T08:00:00"},
+            # صف بلا منطقة أو بلا سعر يُتجاهل
+            {"area": "", "governorate": "", "transaction": "للبيع", "price": 100, "space": None, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "الرميثية", "governorate": "", "transaction": "للبيع", "price": 0, "space": None, "fetched_at": "2026-08-10T08:00:00"},
+            # منطقة بيع فقط → بلا عائد لكن بمتوسط سعر المتر
+            {"area": "الفروانية", "governorate": "", "transaction": "بيع", "price": 200000, "space": 400, "fetched_at": "2026-08-10T08:00:00"},
+        ]
+
+    def test_fetch_market_insights_yield_and_totals(self) -> None:
+        from unittest import mock
+
+        from backend.services import supabase_store
+
+        with mock.patch.object(supabase_store, "market_listings_table_available", return_value=True), \
+             mock.patch.object(supabase_store, "_fetch_rows", return_value=self._insights_rows()):
+            result = supabase_store.fetch_market_insights()
+        self.assertTrue(result["tableOk"])
+        areas = {a["area"]: a for a in result["areas"]}
+        # حولي: عائد 5% + سعر متر 2000 + محافظة مستنتجة من خريطة المحلل
+        hawally = areas["حولي"]
+        self.assertAlmostEqual(hawally["rentalYield"], 5.0, places=1)
+        self.assertEqual(hawally["medianSalePerM2"], 2000.0)
+        self.assertEqual(hawally["governorate"], "حولي")
+        self.assertIsNone(areas["الفروانية"]["rentalYield"])
+        # sampleTotals يعدّ كل الصفوف (حتى عديمة المنطقة/السعر) — التصفية داخل المناطق
+        self.assertEqual(result["sampleTotals"], {"sale": 5, "rent": 1})
+        self.assertEqual(len(areas), 2)  # فقط حولي والفروانية (ذواتا منطقة وسعر صالح)
+
+    def test_fetch_market_insights_series_needs_two_months(self) -> None:
+        from unittest import mock
+
+        from backend.services import supabase_store
+
+        with mock.patch.object(supabase_store, "market_listings_table_available", return_value=True), \
+             mock.patch.object(supabase_store, "_fetch_rows", return_value=self._insights_rows()):
+            result = supabase_store.fetch_market_insights()
+        # حولي لها نقطتان (07 و08) → تدخل السلسلة؛ الفروانية نقطة واحدة → لا
+        areas_in_series = {s["area"] for s in result["series"]}
+        self.assertIn("حولي", areas_in_series)
+        self.assertNotIn("الفروانية", areas_in_series)
+        self.assertIn("2026-08", result["months"])
+
+    def test_fetch_market_insights_tolerates_missing_table(self) -> None:
+        from unittest import mock
+
+        from backend.services import supabase_store
+
+        with mock.patch.object(supabase_store, "market_listings_table_available", return_value=False):
+            result = supabase_store.fetch_market_insights()
+        self.assertFalse(result["tableOk"])
+        self.assertEqual(result["areas"], [])

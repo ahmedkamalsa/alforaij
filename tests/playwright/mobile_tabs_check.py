@@ -36,8 +36,8 @@ with sync_playwright() as p:
     # 2) لا تجاوز أفقي
     results["horizontalOverflow"] = page.evaluate("document.documentElement.scrollWidth > document.documentElement.clientWidth")
 
-    # 3) التنقل بين التبويبات الأربعة
-    names = ["search", "opportunities", "board", "sources"]
+    # 3) التنقل بين التبويبات الخمسة
+    names = ["search", "opportunities", "board", "insights", "sources"]
     panels = {}
     for i, name in enumerate(names):
         tabs.nth(i).click()
@@ -74,7 +74,7 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 # تبويب البحث يضم عدة أقسام متراصة تحمل نفس data-main-panel (شريط الأدوات،
 # الشات، منطقة النتائج، لوحة النتائج) — نكشّف التكرار ونقارن المجموعة الفريدة.
 ok = (
-    results["tabCount"] == 4
+    results["tabCount"] == 5
     and not results["horizontalOverflow"]
     and results["minTabHeightPx"] >= 40
     and not errors

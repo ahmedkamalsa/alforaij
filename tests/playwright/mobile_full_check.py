@@ -1,8 +1,8 @@
-"""فحص جوال شامل (390px) لأقسام المنصة الأربعة.
+"""فحص جوال شامل (390px) لأقسام المنصة الخمسة.
 
 يجرّب بحثًا حقيقيًا (نتائج + بطاقات)، وبطاقات الفرص، وجدول المحافظات في اللوحة،
-وقسم المصادر — ويتحقق في كل قسم من: عدم تجاوز الصفحة أفقيًا، ظهور المحتوى،
-وعدم وجود عناصر خارجة عن الشاشة خارج حاويات التمرير الداخلية.
+وتحليلات السوق، وقسم المصادر — ويتحقق في كل قسم من: عدم تجاوز الصفحة أفقيًا،
+ظهور المحتوى، وعدم وجود عناصر خارجة عن الشاشة خارج حاويات التمرير الداخلية.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def offenders(page) -> list[dict]:
         for (const el of document.querySelectorAll('body *')) {
           const r = el.getBoundingClientRect();
           if (r.right > document.documentElement.clientWidth + 1 || r.left < -1) {
-            const scrollable = el.closest('.table-scroll, .results, .board-stats, [style*="overflow"]');
+            const scrollable = el.closest('.table-scroll, .results, .board-stats, .hist-chart, [style*="overflow"]');
             if (scrollable) continue;
             const tag = el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.split(' ').slice(0, 2).join('.') : '');
             out.push({ el: tag.slice(0, 60), left: Math.round(r.left), right: Math.round(r.right), w: Math.round(r.width) });
@@ -146,8 +146,20 @@ with sync_playwright() as p:
     }
     page.screenshot(path="tests/playwright/mobile_board.png")
 
-    # ── 4) المصادر والتشغيل ──
+    # ── 4) تحليلات السوق ──
     tab_click(page, 3)
+    page.wait_for_timeout(2000)
+    results["insights"] = {
+        "overflow": page_overflow(page),
+        "insightCards": page.locator(".insight-card").count(),
+        "govChips": page.locator(".insights-govs .filter-chip").count(),
+        "offenders": offenders(page),
+        "touch": touch_audit(page),
+    }
+    page.screenshot(path="tests/playwright/mobile_insights.png")
+
+    # ── 5) المصادر والتشغيل ──
+    tab_click(page, 4)
     page.wait_for_timeout(2000)
     results["sources"] = {
         "overflow": page_overflow(page),
@@ -165,10 +177,11 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 
 sub = results["opportunities"]["subTabs"]
 failed = (
-    any(results[s]["overflow"] or results[s]["offenders"] or results[s]["touch"] for s in ("search", "opportunities", "board", "sources"))
+    any(results[s]["overflow"] or results[s]["offenders"] or results[s]["touch"] for s in ("search", "opportunities", "board", "insights", "sources"))
     or any(sub[t]["overflow"] or sub[t]["offenders"] or sub[t]["contentLen"] == 0 or sub[t]["touch"] for t in sub)
     or results["search"]["resultCards"] == 0
     or results["opportunities"]["cards"] == 0
+    or results["insights"]["insightCards"] == 0
     or errors
 )
 sys.exit(1 if failed else 0)

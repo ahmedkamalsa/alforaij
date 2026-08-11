@@ -651,6 +651,15 @@ class Handler(BaseHTTPRequestHandler):
                 logger.exception("Market analytics failed")
                 json_response(self, {"error": "Market analytics failed", "detail": str(exc)}, status=500)
             return
+        if path == "/api/market-insights":
+            # تحليلات السوق (الموجة 1): عائد الإيجار واتجاه سعر المتر لكل منطقة
+            from backend.services.supabase_store import fetch_market_insights
+            try:
+                json_response(self, fetch_market_insights())
+            except Exception as exc:
+                logger.exception("Market insights failed")
+                json_response(self, {"error": "Market insights failed", "detail": str(exc)}, status=500)
+            return
         if path == "/api/dashboard/summary":
             params = parse_qs(urlparse(self.path).query)
             selected = {

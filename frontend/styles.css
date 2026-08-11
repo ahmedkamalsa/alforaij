@@ -1467,6 +1467,87 @@ button:hover {
   margin-bottom: 16px;
 }
 
+/* ─── تبويب تحليلات السوق (الموجة 1) ─── */
+.insights-panel {
+  padding: 16px 18px 28px;
+}
+
+.insights-section {
+  margin-top: 18px;
+}
+
+.insight-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.insight-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .05);
+}
+
+.insight-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.insight-card-head strong {
+  font-size: 14px;
+}
+
+.yield-pct {
+  font-size: 15px;
+  font-weight: 900;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.yield-high .yield-pct {
+  background: rgba(26, 127, 79, .2);
+  color: #2fbf7f;
+}
+
+.yield-mid .yield-pct {
+  background: rgba(214, 158, 46, .2);
+  color: #e2b13c;
+}
+
+.yield-low .yield-pct {
+  background: rgba(224, 62, 62, .18);
+  color: #e06565;
+}
+
+.insight-card-body {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  opacity: .92;
+}
+
+.insight-card-body small {
+  opacity: .75;
+}
+
+.insight-gov {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.insights-govs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .similar-external-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -3249,6 +3330,9 @@ summary {
   border-radius: 12px;
   background: rgba(255, 255, 255, .05);
   overflow-x: auto;
+  /* الرسم خطي زمني — يجعل التمرير الأفقي LTR فيبدأ من أول شهر
+     بدل تثبيت المحتوى يمينًا (RTL) وإخفاء الأشهر الأولى خارج الشاشة */
+  direction: ltr;
 }
 
 .hist-chart svg {

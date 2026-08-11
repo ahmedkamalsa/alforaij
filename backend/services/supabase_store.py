@@ -756,6 +756,149 @@ def fetch_market_analytics(limit: int = 5000) -> dict[str, Any]:
     }
 
 
+def fetch_market_insights(limit: int = 8000) -> dict[str, Any]:
+    """تحليلات السوق الموجة 1: عائد الإيجار واتجاه سعر المتر لكل منطقة.
+
+    يُجمع الحصاد المتراكم (market_listings) في Python لأن REST لا يدعم group-by:
+    - لكل منطقة: وسيط سعر البيع، وسيط سعر المتر للبيع، وسيط الإيجار، وسيط
+      إيجار المتر، ثم **عائد الإيجار** = (وسيط الإيجار × 12) ÷ وسيط سعر البيع × 100
+      (المنطقة تُعرض فقط إذا توفر بيع وإيجار معًا بسعر بيع معقول).
+    - سلسلة شهرية لسعر متر البيع لكل منطقة (من fetched_at) لتغذية الرسم الزمني.
+    - اتجاه الوسيط الإجمالي للمحافظات (متوسط سعر المتر عبر مناطقها).
+
+    متسامح تمامًا: غياب الجدول أو فشل القراءة يعيد حالة واضحة بدل كسر الطلب.
+    """
+    empty = {
+        "tableOk": False,
+        "note": "جدول market_listings غير متاح — شغّل migration 010 ثم الوكيل اليومي.",
+        "areas": [],
+        "series": [],
+        "governorates": [],
+    }
+    if not market_listings_table_available():
+        return empty
+    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_listings?select=*&order=fetched_at.desc&limit={int(limit)}")
+    if not rows:
+        return {**empty, "tableOk": True, "note": "لا توجد صفوف بعد — شغّل الوكيل اليومي."}
+
+    def _median(values: list[float]) -> float | None:
+        if not values:
+            return None
+        ordered = sorted(values)
+        middle = len(ordered) // 2
+        if len(ordered) % 2:
+            return round(ordered[middle], 1)
+        return round((ordered[middle - 1] + ordered[middle]) / 2, 1)
+
+    # خريطة رسمية منطقة ← محافظة (من المحلل) لتغطية الصفوف بلا محافظة مخزنة
+    from backend.services.request_parser import GOVERNORATE_AREAS
+    _area_gov: dict[str, str] = {}
+    for _gov, _areas in GOVERNORATE_AREAS.items():
+        for _a in _areas:
+            _area_gov.setdefault(_a, _gov)
+
+    by_area: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        area = str(row.get("area") or "").strip()
+        if not area:
+            continue
+        transaction = str(row.get("transaction") or "").strip()
+        try:
+            price = float(row.get("price"))
+        except (TypeError, ValueError):
+            continue
+        if not price or price <= 0:
+            continue
+        try:
+            space = float(row.get("space"))
+        except (TypeError, ValueError):
+            space = None
+        per_m2 = price / space if space and space > 0 else None
+        governorate = str(row.get("governorate") or "").strip() or _area_gov.get(area, "")
+        bucket = by_area.setdefault(area, {
+            "area": area,
+            "governorate": governorate,
+            "salePrices": [],
+            "salePerM2": [],
+            "rentPrices": [],
+            "rentPerM2": [],
+            "monthlyPerM2": {},  # month -> [per_m2]
+        })
+        is_rent = "إيجار" in transaction
+        is_sale = "بيع" in transaction
+        if is_rent:
+            bucket["rentPrices"].append(price)
+            if per_m2:
+                bucket["rentPerM2"].append(per_m2)
+        elif is_sale:
+            bucket["salePrices"].append(price)
+            if per_m2:
+                bucket["salePerM2"].append(per_m2)
+                month = str(row.get("fetched_at") or "")[:7]
+                if len(month) == 7:
+                    bucket["monthlyPerM2"].setdefault(month, []).append(per_m2)
+
+    areas = []
+    for bucket in by_area.values():
+        sale_median = _median(bucket["salePrices"])
+        sale_per_m2 = _median(bucket["salePerM2"])
+        rent_median = _median(bucket["rentPrices"])
+        rent_per_m2 = _median(bucket["rentPerM2"])
+        # عائد الإيجار فقط عندما يوجد بيع وإيجار معًا وسعر البيع أكبر من الإيجار السنوي
+        yield_pct = None
+        if sale_median and rent_median and sale_median > rent_median * 12:
+            yield_pct = round((rent_median * 12) / sale_median * 100, 2)
+        areas.append({
+            "area": bucket["area"],
+            "governorate": bucket["governorate"],
+            "saleCount": len(bucket["salePrices"]),
+            "rentCount": len(bucket["rentPrices"]),
+            "medianSalePrice": sale_median,
+            "medianSalePerM2": sale_per_m2,
+            "medianRent": rent_median,
+            "medianRentPerM2": rent_per_m2,
+            "rentalYield": yield_pct,
+        })
+    areas.sort(key=lambda a: (a["rentalYield"] is not None, a["rentalYield"] or 0), reverse=True)
+
+    # سلسلة شهرية لسعر متر البيع: خط لكل منطقة (آخر 8 أشهر) للمناطق ذات بيانات كافية
+    months = sorted({m for b in by_area.values() for m in b["monthlyPerM2"]})[-8:]
+    series = []
+    for bucket in by_area.values():
+        pts = []
+        for month in months:
+            values = bucket["monthlyPerM2"].get(month) or []
+            median = _median(values)
+            if median is not None:
+                pts.append({"month": month, "perM2": median})
+        if len(pts) >= 2:
+            series.append({"area": bucket["area"], "points": pts})
+    series.sort(key=lambda s: -max(p["perM2"] for p in s["points"]))
+    series = series[:12]
+
+    # وسيط سعر المتر للمحافظات (من مناطقها) — ترتيب تنازلي
+    gov_buckets: dict[str, list[float]] = {}
+    for area in areas:
+        if area["medianSalePerM2"] and area["governorate"]:
+            gov_buckets.setdefault(area["governorate"], []).append(area["medianSalePerM2"])
+    governorates = [
+        {"governorate": gov, "medianSalePerM2": _median(values)}
+        for gov, values in gov_buckets.items()
+    ]
+    governorates.sort(key=lambda g: g["medianSalePerM2"] or 0, reverse=True)
+
+    return {
+        "tableOk": True,
+        "fetchedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "note": "عائد الإيجار = (وسيط الإيجار × 12) ÷ وسيط سعر البيع — من إعلانات الحصاد المتراكم (بيع وإيجار معًا فقط).",
+        "areas": areas,
+        "series": series,
+        "months": months,
+        "governorates": governorates,
+        "sampleTotals": {"sale": sum(1 for r in rows if "بيع" in str(r.get("transaction") or "")), "rent": sum(1 for r in rows if "إيجار" in str(r.get("transaction") or ""))},
+    }
+
+
 def fetch_official_indicators(region: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     """قراءة مؤشرات السوق الرسمية (أسعار المتر المرجعية) من جدول official_market_indicators.
 

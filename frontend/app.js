@@ -110,6 +110,7 @@ const STATIC_DATA_MAP = {
   "/api/official-reference-sources": "official-reference-sources.json",
   "/api/search-options": "search-options.json",
   "/api/live-db": "live-db.json",
+  "/api/market-insights": "market-insights.json",
 };
 
 function apiUrl(path) {
@@ -847,6 +848,142 @@ function renderGovernorateTable(rows) {
     }
   }
   body.innerHTML = html.join("");
+}
+
+// ─── تحليلات السوق (الموجة 1): عائد الإيجار + اتجاه سعر المتر لكل منطقة ───
+const insightsState = { data: null, loaded: false };
+
+function formatKd(value) {
+  if (value == null || value === "") return "—";
+  const n = Number(value);
+  if (!isFinite(n)) return "—";
+  return n >= 1000 ? `${(n / 1000).toLocaleString("ar-KW", { maximumFractionDigits: 1 })} ألف` : n.toLocaleString("ar-KW", { maximumFractionDigits: 0 });
+}
+
+function renderInsights() {
+  const root = $("insightsRoot");
+  if (!root) return;
+  const data = insightsState.data;
+  const meta = $("insightsMeta");
+  if (!data || !data.tableOk) {
+    if (meta) meta.textContent = "";
+    root.innerHTML = `<div class="empty">لا توجد بيانات تحليلات بعد — شغّل الوكيل اليومي لتراكم حصاد المواقع في market_listings.</div>`;
+    return;
+  }
+  const areas = data.areas || [];
+  const withYield = areas.filter((a) => a.rentalYield != null);
+  const priced = areas.filter((a) => a.medianSalePerM2 != null);
+  if (meta) meta.textContent = `من ${areas.length} منطقة · ${data.sampleTotals ? `${data.sampleTotals.sale} بيع + ${data.sampleTotals.rent} إيجار` : ""} · ${withYield.length} بعائد محسوب`;
+
+  // 1) عائد الإيجار — أعلى المناطق أولًا
+  const yieldCards = withYield.slice(0, 12).map((a) => {
+    const pct = Number(a.rentalYield) || 0;
+    const tier = pct >= 6 ? "yield-high" : pct >= 4 ? "yield-mid" : "yield-low";
+    return `
+      <div class="insight-card ${tier}">
+        <div class="insight-card-head">
+          <strong>${escapeHtml(a.area)}</strong>
+          <span class="yield-pct">${pct.toLocaleString("ar-KW", { maximumFractionDigits: 1 })}%</span>
+        </div>
+        <div class="insight-card-body">
+          <span>بيع: ${formatKd(a.medianSalePrice)} <small>(${a.saleCount})</small></span>
+          <span>إيجار: ${formatKd(a.medianRent)}/شهر <small>(${a.rentCount})</small></span>
+          ${a.medianSalePerM2 != null ? `<span>سعر المتر: ${formatKd(a.medianSalePerM2)}</span>` : ""}
+          <small class="insight-gov">${escapeHtml(a.governorate || "")}</small>
+        </div>
+      </div>`;
+  }).join("");
+
+  // 2) سعر المتر حسب المحافظات
+  const govRows = (data.governorates || []).map((g) => `
+    <span class="filter-chip"><b>${escapeHtml(g.governorate)}</b>${formatKd(g.medianSalePerM2)} د.ك/م²</span>`).join("") || '<div class="empty">لا توجد محافظات ببيانات سعر متر بعد.</div>';
+
+  // 3) الرسم الزمني لسعر المتر (سلسلة market-insights) — يسقط لبيانات price_trends الأعمق
+  let trendHtml = "";
+  if (data.series && data.series.length >= 2) {
+    trendHtml = renderInsightsTrendSvg(data);
+  } else if (oppState.priceTrends && oppState.priceTrends.rows && oppState.priceTrends.rows.length) {
+    trendHtml = renderPriceTrendsChart(root);
+  } else {
+    trendHtml = '<div class="empty">سلسلة سعر المتر تُبنى مع تراكم الأشهر — عدّ بعد التحديث اليومي التالي.</div>';
+  }
+
+  root.innerHTML = `
+    <p class="scope-note">${escapeHtml(data.note || "")}</p>
+    <div class="insights-section">
+      <div class="section-title compact-title">
+        <h3>أعلى عائد إيجار</h3>
+        <span>العائد السنوي = (وسيط الإيجار × 12) ÷ وسيط سعر البيع — المناطق الأقرب للاستثمار المؤجَّر.</span>
+      </div>
+      ${withYield.length ? `<div class="insight-cards">${yieldCards}</div>` : '<div class="empty">لا توجد مناطق بمقارنة بيع/إيجار معًا بعد.</div>'}
+    </div>
+    <div class="insights-section">
+      <div class="section-title compact-title">
+        <h3>وسيط سعر المتر حسب المحافظات</h3>
+        <span>من إعلانات البيع المحصودة (حيثما وُجدت المساحة).</span>
+      </div>
+      <div class="insights-govs">${govRows}</div>
+    </div>
+    <div class="insights-section">
+      <div class="section-title compact-title">
+        <h3>اتجاه سعر المتر عبر الأشهر</h3>
+        <span>سعر المتر (د.ك/م²) لكل منطقة عبر الزمن من الحصاد المتراكم.</span>
+      </div>
+      ${trendHtml}
+    </div>
+  `;
+  setTabCount("tabCountInsights", withYield.length || priced.length);
+}
+
+function renderInsightsTrendSvg(data) {
+  const months = data.months || [];
+  const series = (data.series || []).slice(0, 10);
+  const colors = ["#1a7f4f", "#2b6cb0", "#c05621", "#6b46c1", "#b83280", "#2c7a7b", "#d69e2e", "#3182ce", "#38a169", "#e53e3e"];
+  const width = 720;
+  const height = 240;
+  const padL = 44;
+  const padR = 12;
+  const padT = 14;
+  const padB = 22;
+  const xFor = (i) => padL + (months.length <= 1 ? width / 2 : (i / (months.length - 1)) * (width - padL - padR));
+  const allVals = series.flatMap((s) => s.points.map((p) => p.perM2)).filter((v) => v != null);
+  const min = Math.min(...allVals);
+  const max = Math.max(...allVals);
+  const span = (max - min) || 1;
+  const yFor = (v) => padT + (1 - (v - min) / span) * (height - padT - padB);
+  const lines = series.map((s, idx) => {
+    const pts = s.points.map((p) => `${xFor(months.indexOf(p.month)).toFixed(1)},${yFor(p.perM2).toFixed(1)}`).join(" ");
+    return `<polyline fill="none" stroke="${colors[idx % colors.length]}" stroke-width="2.5" points="${pts}"/>`;
+  }).join("");
+  const legend = series.map((s, idx) => `
+    <span class="hist-legend-item"><i style="background:${colors[idx % colors.length]}"></i>${escapeHtml(s.area)}</span>`).join("");
+  return `
+    <div class="trends-block">
+      <div class="hist-chart">
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="اتجاهات أسعار المتر عبر الأشهر">
+          ${months.map((m, i) => `<text x="${xFor(i).toFixed(1)}" y="${height - 4}" class="hist-date">${escapeHtml(m.slice(5))}</text>`).join("")}
+          ${lines}
+        </svg>
+      </div>
+      <div class="hist-legend">${legend}</div>
+    </div>`;
+}
+
+async function loadInsights() {
+  if (insightsState.loaded) return;
+  const root = $("insightsRoot");
+  if (root) root.innerHTML = '<div class="empty">جاري تحميل تحليلات السوق...</div>';
+  try {
+    insightsState.data = await getJson("/api/market-insights");
+    insightsState.loaded = true;
+    if (oppState.priceTrends == null) {
+      oppState.priceTrends = await getJson("/api/price-trends").catch(() => null);
+    }
+    renderInsights();
+  } catch (err) {
+    console.error(err);
+    if (root) root.innerHTML = `<div class="empty">تعذر تحميل تحليلات السوق: ${escapeHtml(err.message)}</div>`;
+  }
 }
 
 function renderBoard() {
@@ -3596,6 +3733,7 @@ function switchMainTab(name) {
   });
   if (name === "opportunities") loadOpportunities(false);
   if (name === "board") loadDashboardBoard();
+  if (name === "insights") loadInsights();
 }
 
 function bindMainTabs() {

@@ -10,7 +10,7 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260811-trends">
+  <link rel="stylesheet" href="styles.css?v=20260811-insights">
   <script src="config.js?v=20260811-trends"></script>
 </head>
 <body>
@@ -37,6 +37,7 @@
       <button class="main-tab active" data-main-tab="search" type="button">🔍 البحث والتقييم <b class="main-tab-count" id="tabCountSearch"></b></button>
       <button class="main-tab" data-main-tab="opportunities" type="button">💎 أفضل الفرص <b class="main-tab-count" id="tabCountOpp"></b></button>
       <button class="main-tab" data-main-tab="board" type="button">📊 <span class="tab-full">لوحة السوق</span><span class="tab-short">السوق</span> <b class="main-tab-count" id="tabCountBoard"></b></button>
+      <button class="main-tab" data-main-tab="insights" type="button">📈 <span class="tab-full">تحليلات السوق</span><span class="tab-short">التحليلات</span> <b class="main-tab-count" id="tabCountInsights"></b></button>
       <button class="main-tab" data-main-tab="sources" type="button">🔗 <span class="tab-full">المصادر والتشغيل</span><span class="tab-short">المصادر</span> <b class="main-tab-count" id="tabCountSources"></b></button>
     </nav>
 
@@ -160,6 +161,19 @@
             </table>
           </div>
         </section>
+      </div>
+    </section>
+
+    <section class="insights-panel" data-main-panel="insights">
+      <div class="section-title">
+        <div>
+          <h2>تحليلات السوق</h2>
+          <span>عائد الإيجار واتجاه سعر المتر لكل منطقة من بيانات الحصاد المتراكمة — رؤية المستثمر المحلي.</span>
+        </div>
+        <span id="insightsMeta" class="filter-summary"></span>
+      </div>
+      <div id="insightsRoot" class="insights-root">
+        <div class="empty">جاري تحميل تحليلات السوق...</div>
       </div>
     </section>
 
@@ -489,6 +503,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260811-trends"></script>
+  <script src="app.js?v=20260811-insights"></script>
 </body>
 </html>
