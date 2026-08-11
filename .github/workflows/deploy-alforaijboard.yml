@@ -37,6 +37,10 @@ jobs:
 
       - name: Generate static data snapshot
         run: python scripts/export_static_frontend_data.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          AGENT_ROUTER_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
 
       - name: Push frontend to alforaijboard gh-pages
         env:
