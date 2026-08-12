@@ -1641,6 +1641,241 @@ button:hover {
   margin-top: 10px;
 }
 
+/* ─── تحليلات السوق — الواجهة الاحترافية (بطاقات KPI + أشرطة + رسم محسّن) ─── */
+.insights-note {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.insight-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.kpi-card {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  background: var(--glass-bg);
+  box-shadow: var(--shadow);
+}
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: .2px;
+}
+
+.kpi-card strong {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.kpi-card small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.kpi-up {
+  color: var(--green);
+}
+
+.kpi-down {
+  color: var(--red);
+}
+
+.kpi-flat {
+  color: var(--amber);
+}
+
+.yield-list,
+.gov-list,
+.src-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.yield-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.yield-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.yield-area {
+  font-weight: 800;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.yield-area small {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.yield-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rel-badge {
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-style: normal;
+}
+
+.rel-high {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.rel-low {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.yield-val {
+  font-size: 15px;
+  font-weight: 900;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.yield-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(128, 140, 165, .16);
+  overflow: hidden;
+}
+
+.yield-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.yield-row-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.yield-row-meta small {
+  opacity: .8;
+}
+
+.gov-row,
+.src-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.gov-name,
+.src-name {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gov-bar,
+.src-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(128, 140, 165, .16);
+  overflow: hidden;
+}
+
+.gov-bar i,
+.src-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue), #7aa7ff);
+}
+
+.gov-val {
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.src-count {
+  font-size: 13px;
+  font-weight: 800;
+  min-width: 34px;
+  text-align: left;
+}
+
+.src-share {
+  font-size: 10px;
+  color: var(--muted);
+  min-width: 40px;
+  text-align: left;
+}
+
+.src-more {
+  justify-self: start;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue);
+  background: none;
+  border: none;
+  padding: 0 6px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.src-more:hover {
+  text-decoration: underline;
+}
+
+/* الرسم الزمني الاحترافي */
+.grid-line {
+  stroke: rgba(128, 140, 165, .18);
+  stroke-width: 1;
+}
+
+.axis-label {
+  font-size: 10px;
+  fill: var(--muted);
+}
+
+.market-legend i {
+  background: repeating-linear-gradient(90deg, #2d3748 0 6px, transparent 6px 10px);
+}
+
 .similar-external-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

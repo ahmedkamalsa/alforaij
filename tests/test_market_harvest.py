@@ -109,6 +109,11 @@ class TestMarketHarvest(unittest.TestCase):
             {"area": "حولي", "governorate": "", "transaction": "للبيع", "price": 600000, "space": 300, "fetched_at": "2026-07-10T08:00:00"},
             {"area": "حولي", "governorate": "", "transaction": "للبيع", "price": 600000, "space": 300, "fetched_at": "2026-08-10T08:00:00"},
             {"area": "حولي", "governorate": "", "transaction": "للإيجار", "price": 2500, "space": None, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "حولي", "governorate": "", "transaction": "للإيجار", "price": 2500, "space": None, "fetched_at": "2026-08-12T08:00:00"},
+            # منطقة عينة إيجار واحدة فقط → عائد غير محسوب (حارس الموثوقية)
+            {"area": "المنقف", "governorate": "", "transaction": "للبيع", "price": 300000, "space": 200, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "المنقف", "governorate": "", "transaction": "للبيع", "price": 310000, "space": 200, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "المنقف", "governorate": "", "transaction": "للإيجار", "price": 1200, "space": None, "fetched_at": "2026-08-10T08:00:00"},
             # صف بلا منطقة أو بلا سعر يُتجاهل
             {"area": "", "governorate": "", "transaction": "للبيع", "price": 100, "space": None, "fetched_at": "2026-08-10T08:00:00"},
             {"area": "الرميثية", "governorate": "", "transaction": "للبيع", "price": 0, "space": None, "fetched_at": "2026-08-10T08:00:00"},
@@ -132,9 +137,11 @@ class TestMarketHarvest(unittest.TestCase):
         self.assertEqual(hawally["medianSalePerM2"], 2000.0)
         self.assertEqual(hawally["governorate"], "حولي")
         self.assertIsNone(areas["الفروانية"]["rentalYield"])
+        # المنقف: عينتا بيع لكن إيجار واحد → العائد غير محسوب (حارس الموثوقية)
+        self.assertIsNone(areas["المنقف"]["rentalYield"])
         # sampleTotals يعدّ كل الصفوف (حتى عديمة المنطقة/السعر) — التصفية داخل المناطق
-        self.assertEqual(result["sampleTotals"], {"sale": 5, "rent": 1})
-        self.assertEqual(len(areas), 2)  # فقط حولي والفروانية (ذواتا منطقة وسعر صالح)
+        self.assertEqual(result["sampleTotals"], {"sale": 7, "rent": 3})
+        self.assertEqual(len(areas), 3)  # حولي والفروانية والمنقف (ذواتا منطقة وسعر صالح)
 
     def test_fetch_market_insights_series_needs_two_months(self) -> None:
         from unittest import mock

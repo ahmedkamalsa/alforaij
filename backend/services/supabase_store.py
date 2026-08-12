@@ -834,6 +834,24 @@ def fetch_market_insights(limit: int = 8000) -> dict[str, Any]:
         for _a in _areas:
             _area_gov.setdefault(_a, _gov)
 
+    def _clean(values: list[float]) -> list[float]:
+        """إزالة القيم الشاذة بمعيار 3×IQR (للعينات ≥4) قبل حساب الوسيط.
+
+        الأسعار المهرطبة من صفحات الإعلانات (مثل إيجار 127 ألف شهريًا أو بيع 9
+        آلاف لمنطقة سكنية) تُشوّه الوسيط والعائد؛ هذا التنظيف يجعل المتوسطات
+        ممثلة للعرض الفعلي دون حذف بيانات حقيقية عند العينات الصغيرة.
+        """
+        if len(values) < 4:
+            return values
+        ordered = sorted(values)
+        q1 = ordered[len(ordered) // 4]
+        q3 = ordered[(3 * len(ordered)) // 4]
+        iqr = q3 - q1
+        if iqr <= 0:
+            return values
+        lo, hi = q1 - 3 * iqr, q3 + 3 * iqr
+        return [v for v in values if lo <= v <= hi]
+
     by_area: dict[str, dict[str, Any]] = {}
     for row in rows:
         area = str(row.get("area") or "").strip()
@@ -875,26 +893,69 @@ def fetch_market_insights(limit: int = 8000) -> dict[str, Any]:
                 if len(month) == 7:
                     bucket["monthlyPerM2"].setdefault(month, []).append(per_m2)
 
+    # سلسلة شهرية عامة لاتجاه السوق (وسيط سعر المتر لكل أشهر الحصاد)
+    monthly_all: dict[str, list[float]] = {}
+    for row in rows:
+        if "بيع" not in str(row.get("transaction") or ""):
+            continue
+        try:
+            _p = float(row.get("price"))
+            _s = float(row.get("space"))
+        except (TypeError, ValueError):
+            continue
+        if _p <= 0 or _s <= 0:
+            continue
+        month = str(row.get("fetched_at") or "")[:7]
+        if len(month) == 7:
+            monthly_all.setdefault(month, []).append(_p / _s)
+    overall_series = [
+        {"month": m, "perM2": _median(v)}
+        for m, v in sorted(monthly_all.items())
+        if _median(v) is not None
+    ]
+    market_direction = "مستقر"
+    market_change = 0.0
+    if len(overall_series) >= 2:
+        first, last = overall_series[0]["perM2"], overall_series[-1]["perM2"]
+        if first:
+            market_change = round((last - first) / first * 100, 1)
+            market_direction = "صاعد" if market_change >= 3 else ("هابط" if market_change <= -3 else "مستقر")
+
     areas = []
     for bucket in by_area.values():
-        sale_median = _median(bucket["salePrices"])
-        sale_per_m2 = _median(bucket["salePerM2"])
-        rent_median = _median(bucket["rentPrices"])
-        rent_per_m2 = _median(bucket["rentPerM2"])
-        # عائد الإيجار فقط عندما يوجد بيع وإيجار معًا وسعر البيع أكبر من الإيجار السنوي
+        clean_sale = _clean(bucket["salePrices"])
+        clean_sale_per_m2 = _clean(bucket["salePerM2"])
+        clean_rent = _clean(bucket["rentPrices"])
+        clean_rent_per_m2 = _clean(bucket["rentPerM2"])
+        sale_median = _median(clean_sale)
+        sale_per_m2 = _median(clean_sale_per_m2)
+        rent_median = _median(clean_rent)
+        rent_per_m2 = _median(clean_rent_per_m2)
+        # عائد الإيجار فقط عند توفر بيع وإيجار معًا (بعد التنظيف) بحد أدنى لعينتين
+        # لكل منهما، وسعر بيع أكبر من الإيجار السنوي — وإلا يبقى غير محسوب بدل
+        # عرض نسب مضللة من عينات مفردة أو أرقام مهرطبة.
+        sale_ok = len(clean_sale) >= 2
+        rent_ok = len(clean_rent) >= 2
         yield_pct = None
-        if sale_median and rent_median and sale_median > rent_median * 12:
-            yield_pct = round((rent_median * 12) / sale_median * 100, 2)
+        yield_note = ""
+        if sale_ok and rent_ok and sale_median and rent_median and sale_median > rent_median * 12:
+            computed = round((rent_median * 12) / sale_median * 100, 2)
+            # سقف واقعي: عائد > 15% يكاد دائمًا يكون خطأ بيانات لا فرصة حقيقية
+            if 0 < computed <= 15:
+                yield_pct = computed
+                yield_note = "high" if (len(clean_sale) >= 5 and len(clean_rent) >= 5) else "low"
         areas.append({
             "area": bucket["area"],
             "governorate": bucket["governorate"],
             "saleCount": len(bucket["salePrices"]),
             "rentCount": len(bucket["rentPrices"]),
+            "outliersRemoved": len(bucket["salePrices"]) - len(clean_sale) + len(bucket["rentPrices"]) - len(clean_rent),
             "medianSalePrice": sale_median,
             "medianSalePerM2": sale_per_m2,
             "medianRent": rent_median,
             "medianRentPerM2": rent_per_m2,
             "rentalYield": yield_pct,
+            "yieldNote": yield_note,
         })
     areas.sort(key=lambda a: (a["rentalYield"] is not None, a["rentalYield"] or 0), reverse=True)
 
@@ -924,14 +985,28 @@ def fetch_market_insights(limit: int = 8000) -> dict[str, Any]:
     ]
     governorates.sort(key=lambda g: g["medianSalePerM2"] or 0, reverse=True)
 
+    # تفصيل المصادر: أي المواقع غذّت هذا التحليل وبكم (يشمل الفريج المحلي)
+    from collections import Counter
+    _source_counter = Counter(str(row.get("source") or "غير معروف").strip() for row in rows if str(row.get("area") or "").strip())
+    sources = [
+        {"source": name, "count": count, "sharePct": round(count / len(rows) * 100, 1)}
+        for name, count in _source_counter.most_common()
+    ]
+
     return {
         "tableOk": True,
         "fetchedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "note": "عائد الإيجار = (وسيط الإيجار × 12) ÷ وسيط سعر البيع — من إعلانات الحصاد المتراكم (بيع وإيجار معًا فقط).",
+        "note": "عائد الإيجار = (وسيط الإيجار × 12) ÷ وسيط سعر البيع من إعلانات الحصاد المتراكم (بيع وإيجار معًا) بعد استبعاد القيم الشاذة (3×IQR).",
         "areas": areas,
         "series": series,
         "months": months,
         "governorates": governorates,
+        "sources": sources,
+        "market": {
+            "direction": market_direction,
+            "changePct": market_change,
+            "series": overall_series,
+        },
         "sampleTotals": {"sale": sum(1 for r in rows if "بيع" in str(r.get("transaction") or "")), "rent": sum(1 for r in rows if "إيجار" in str(r.get("transaction") or ""))},
     }
 

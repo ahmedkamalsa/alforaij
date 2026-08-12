@@ -993,7 +993,9 @@ function formatKd(value) {
   if (value == null || value === "") return "—";
   const n = Number(value);
   if (!isFinite(n)) return "—";
-  return n >= 1000 ? `${(n / 1000).toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 1 })} ألف` : n.toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 0 });
+  if (n >= 1000000) return `${(n / 1000000).toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 1 })} مليون`;
+  if (n >= 1000) return `${(n / 1000).toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 1 })} ألف`;
+  return n.toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 0 });
 }
 
 function renderInsights() {
@@ -1011,96 +1013,172 @@ function renderInsights() {
   const areas = data.areas || [];
   const withYield = areas.filter((a) => a.rentalYield != null);
   const priced = areas.filter((a) => a.medianSalePerM2 != null);
-  if (meta) meta.textContent = `من ${areas.length} منطقة · ${data.sampleTotals ? `${data.sampleTotals.sale} بيع + ${data.sampleTotals.rent} إيجار` : ""} · ${withYield.length} بعائد محسوب`;
+  const samples = data.sampleTotals || {};
+  const fetched = data.fetchedAt ? String(data.fetchedAt).replace("T", " ").slice(0, 16) : "";
+  if (meta) meta.textContent = `آخر تحديث: ${fetched} · ${areas.length} منطقة · ${samples.sale || 0} بيع + ${samples.rent || 0} إيجار · ${withYield.length} بعائد محسوب`;
 
-  // 1) عائد الإيجار — أعلى المناطق أولًا
-  const yieldCards = withYield.slice(0, 12).map((a) => {
+  // 0) بطاقات المؤشرات الرئيسية (KPI)
+  const market = data.market || {};
+  const dirClass = market.direction === "صاعد" ? "kpi-up" : market.direction === "هابط" ? "kpi-down" : "kpi-flat";
+  const kpis = `
+    <div class="insight-kpis">
+      <div class="kpi-card"><span class="kpi-label">مناطق محللة</span><strong>${areas.length}</strong><small>من الحصاد المتراكم</small></div>
+      <div class="kpi-card"><span class="kpi-label">عينات بيع</span><strong>${samples.sale || 0}</strong><small>إعلان بيع</small></div>
+      <div class="kpi-card"><span class="kpi-label">عينات إيجار</span><strong>${samples.rent || 0}</strong><small>إعلان إيجار</small></div>
+      <div class="kpi-card"><span class="kpi-label">عائد محسوب</span><strong>${withYield.length}</strong><small>منطقة بيع + إيجار معًا</small></div>
+      <div class="kpi-card"><span class="kpi-label">اتجاه السوق</span><strong class="${dirClass}">${escapeHtml(market.direction || "—")}</strong><small>${market.changePct != null ? `${market.changePct > 0 ? "+" : ""}${market.changePct}% سعر المتر العام` : "يُبنى مع تراكم الأشهر"}</small></div>
+    </div>`;
+
+  // 1) عائد الإيجار — أشرطة أفقية مع شارة موثوقية (أعلى المناطق أولًا)
+  const maxYield = Math.max(...withYield.slice(0, 8).map((a) => Number(a.rentalYield) || 0), 1);
+  const yieldRows = withYield.slice(0, 8).map((a) => {
     const pct = Number(a.rentalYield) || 0;
     const tier = pct >= 6 ? "yield-high" : pct >= 4 ? "yield-mid" : "yield-low";
+    const reliable = a.yieldNote === "high";
     return `
-      <div class="insight-card ${tier}">
-        <div class="insight-card-head">
-          <strong>${escapeHtml(a.area)}</strong>
-          <span class="yield-pct">${pct.toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 1 })}%</span>
+      <div class="yield-row">
+        <div class="yield-row-head">
+          <span class="yield-area">${escapeHtml(a.area)}<small>${escapeHtml(a.governorate || "")}</small></span>
+          <span class="yield-badges">${reliable ? '<i class="rel-badge rel-high">ثقة عالية</i>' : '<i class="rel-badge rel-low">تقديري</i>'}<b class="yield-val ${tier}">${pct.toLocaleString("ar-KW-u-nu-latn", { maximumFractionDigits: 1 })}%</b></span>
         </div>
-        <div class="insight-card-body">
-          <span>بيع: ${formatKd(a.medianSalePrice)} <small>(${a.saleCount})</small></span>
-          <span>إيجار: ${formatKd(a.medianRent)}/شهر <small>(${a.rentCount})</small></span>
-          ${a.medianSalePerM2 != null ? `<span>سعر المتر: ${formatKd(a.medianSalePerM2)}</span>` : ""}
-          <small class="insight-gov">${escapeHtml(a.governorate || "")}</small>
-        </div>
+        <div class="yield-bar"><i class="yield-bar-fill ${tier}" style="width:${((pct / maxYield) * 100).toFixed(1)}%"></i></div>
+        <div class="yield-row-meta">بيع ${formatKd(a.medianSalePrice)} <small>(${a.saleCount})</small> · إيجار ${formatKd(a.medianRent)}/شهر <small>(${a.rentCount})</small>${a.medianSalePerM2 != null ? ` · سعر المتر ${formatKd(a.medianSalePerM2)}` : ""}${a.outliersRemoved ? ` · استُبعد ${a.outliersRemoved} قيمة شاذة` : ""}</div>
       </div>`;
   }).join("");
 
-  // 2) سعر المتر حسب المحافظات
-  const govRows = (data.governorates || []).map((g) => `
-    <span class="filter-chip"><b>${escapeHtml(g.governorate)}</b>${formatKd(g.medianSalePerM2)} د.ك/م²</span>`).join("") || '<div class="empty">لا توجد محافظات ببيانات سعر متر بعد.</div>';
+  // 2) سعر المتر حسب المحافظات — أشرطة أفقية
+  const govs = data.governorates || [];
+  const govMax = Math.max(...govs.map((g) => g.medianSalePerM2 || 0), 1);
+  const govRows = govs.map((g) => `
+    <div class="gov-row">
+      <span class="gov-name">${escapeHtml(g.governorate)}</span>
+      <div class="gov-bar"><i style="width:${(((g.medianSalePerM2 || 0) / govMax) * 100).toFixed(1)}%"></i></div>
+      <b class="gov-val">${formatKd(g.medianSalePerM2)} د.ك/م²</b>
+    </div>`).join("") || '<div class="empty">لا توجد محافظات ببيانات سعر متر بعد.</div>';
 
   // 3) الرسم الزمني لسعر المتر (سلسلة market-insights) — يسقط لبيانات price_trends الأعمق
   let trendHtml = "";
   if (data.series && data.series.length >= 2) {
     trendHtml = renderInsightsTrendSvg(data);
   } else if (oppState.priceTrends && oppState.priceTrends.rows && oppState.priceTrends.rows.length) {
-    trendHtml = renderPriceTrendsChart(root);
+    trendHtml = renderPriceTrendsChart(root, true);
   } else {
     trendHtml = '<div class="empty">سلسلة سعر المتر تُبنى مع تراكم الأشهر — عدّ بعد التحديث اليومي التالي.</div>';
   }
 
+  // 4) مصادر هذا التحليل — أي المواقع غذّت الأرقام وبكم
+  const sources = data.sources || [];
+  const srcMax = Math.max(...sources.map((s) => s.count), 1);
+  const srcRows = sources.slice(0, 10).map((s) => `
+    <div class="src-row">
+      <span class="src-name">${escapeHtml(s.source)}</span>
+      <div class="src-bar"><i style="width:${((s.count / srcMax) * 100).toFixed(1)}%"></i></div>
+      <b class="src-count">${s.count}</b>
+      <small class="src-share">${s.sharePct}%</small>
+    </div>`).join("");
+
   root.innerHTML = `
-    <p class="scope-note">${escapeHtml(data.note || "")}</p>
+    ${kpis}
+    <p class="scope-note insights-note">${escapeHtml(data.note || "")}</p>
     <div class="insights-section">
       <div class="section-title compact-title">
         <h3>أعلى عائد إيجار</h3>
-        <span>العائد السنوي = (وسيط الإيجار × 12) ÷ وسيط سعر البيع — المناطق الأقرب للاستثمار المؤجَّر.</span>
+        <span>العائد السنوي = (وسيط الإيجار × 12) ÷ وسيط سعر البيع — بعد استبعاد القيم الشاذة واشتراط عينتين على الأقل لكل جانب.</span>
       </div>
-      ${withYield.length ? `<div class="insight-cards">${yieldCards}</div>` : '<div class="empty">لا توجد مناطق بمقارنة بيع/إيجار معًا بعد.</div>'}
+      ${withYield.length ? `<div class="yield-list">${yieldRows}</div>` : '<div class="empty">لا توجد مناطق بمقارنة بيع/إيجار موثوقة بعد.</div>'}
     </div>
     <div class="insights-section">
       <div class="section-title compact-title">
         <h3>وسيط سعر المتر حسب المحافظات</h3>
-        <span>من إعلانات البيع المحصودة (حيثما وُجدت المساحة).</span>
+        <span>من إعلانات البيع المحصودة (حيثما وُجدت المساحة) بعد التنظيف من الشواذ.</span>
       </div>
-      <div class="insights-govs">${govRows}</div>
+      <div class="gov-list">${govRows}</div>
     </div>
     <div class="insights-section">
       <div class="section-title compact-title">
         <h3>اتجاه سعر المتر عبر الأشهر</h3>
-        <span>سعر المتر (د.ك/م²) لكل منطقة عبر الزمن من الحصاد المتراكم.</span>
+        <span>سعر المتر (د.ك/م²) لكل منطقة عبر الزمن من الحصاد المتراكم — الخط المتقطع هو وسيط السوق العام.</span>
       </div>
       ${trendHtml}
     </div>
+    <div class="insights-section">
+      <div class="section-title compact-title">
+        <h3>مصادر بيانات هذا التحليل</h3>
+        <span>كل رقم أعلاه مبني على الحصاد المتراكم من هذه المنصات — كل إعلان يحمل رابطه الأصلي في لوحة السوق.</span>
+      </div>
+      ${sources.length ? `<div class="src-list">${srcRows}<button type="button" class="src-more" data-goto-sources>تفاصيل الحالة لكل مصدر ←</button></div>` : '<div class="empty">لا توجد بيانات مصادر بعد.</div>'}
+    </div>
   `;
+  const goto = root.querySelector("[data-goto-sources]");
+  if (goto) goto.addEventListener("click", () => switchMainTab("sources"));
   setTabCount("tabCountInsights", withYield.length || priced.length);
 }
 
 function renderInsightsTrendSvg(data) {
   const months = data.months || [];
-  const series = (data.series || []).slice(0, 10);
-  const colors = ["#1a7f4f", "#2b6cb0", "#c05621", "#6b46c1", "#b83280", "#2c7a7b", "#d69e2e", "#3182ce", "#38a169", "#e53e3e"];
-  const width = 720;
-  const height = 240;
-  const padL = 44;
-  const padR = 12;
-  const padT = 14;
-  const padB = 22;
-  const xFor = (i) => padL + (months.length <= 1 ? width / 2 : (i / (months.length - 1)) * (width - padL - padR));
-  const allVals = series.flatMap((s) => s.points.map((p) => p.perM2)).filter((v) => v != null);
+  const series = (data.series || []).slice(0, 6);
+  const marketSeries = (data.market && data.market.series) || [];
+  const colors = ["#1a7f4f", "#2b6cb0", "#c05621", "#6b46c1", "#b83280", "#2c7a7b"];
+  const width = 760;
+  const height = 280;
+  const padL = 54;
+  const padR = 16;
+  const padT = 16;
+  const padB = 26;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+  const xFor = (i) => padL + (months.length <= 1 ? innerW / 2 : (i / (months.length - 1)) * innerW);
+  const allVals = [...series.flatMap((s) => s.points.map((p) => p.perM2)), ...marketSeries.map((p) => p.perM2)].filter((v) => v != null);
+  if (!allVals.length) return '<div class="empty">لا توجد بيانات سلسلة زمنية بعد.</div>';
   const min = Math.min(...allVals);
   const max = Math.max(...allVals);
-  const span = (max - min) || 1;
-  const yFor = (v) => padT + (1 - (v - min) / span) * (height - padT - padB);
+  const pad = (max - min) * 0.08 || 1;
+  const lo = Math.max(0, min - pad);
+  const hi = max + pad;
+  const span = hi - lo || 1;
+  const yFor = (v) => padT + (1 - (v - lo) / span) * innerH;
+  const nice = (v) => (v >= 1000 ? `${(v / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 })}k` : Math.round(v).toLocaleString("en-US"));
+
+  // شبكة أفقية + محور قيم على اليسار
+  const grid = [];
+  for (let t = 0; t <= 4; t++) {
+    const v = hi - (span * t) / 4;
+    const y = yFor(v);
+    grid.push(`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${width - padR}" y2="${y.toFixed(1)}" class="grid-line"/>`);
+    grid.push(`<text x="${padL - 8}" y="${(y + 3).toFixed(1)}" text-anchor="end" class="axis-label">${nice(v)}</text>`);
+  }
+  const monthLabels = months.map((m, i) => `<text x="${xFor(i).toFixed(1)}" y="${height - 6}" text-anchor="middle" class="hist-date">${escapeHtml(m.slice(5))}</text>`).join("");
+
   const lines = series.map((s, idx) => {
-    const pts = s.points.map((p) => `${xFor(months.indexOf(p.month)).toFixed(1)},${yFor(p.perM2).toFixed(1)}`).join(" ");
-    return `<polyline fill="none" stroke="${colors[idx % colors.length]}" stroke-width="2.5" points="${pts}"/>`;
+    const color = colors[idx % colors.length];
+    // النقاط الصالحة فقط — شهر بلا سعر متر لا يُرسم كصفر
+    const valid = s.points.filter((p) => p.perM2 != null);
+    const pts = valid.map((p) => `${xFor(months.indexOf(p.month)).toFixed(1)},${yFor(p.perM2).toFixed(1)}`);
+    const poly = `<polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${pts.join(" ")}"/>`;
+    const dots = valid.map((p, i) => {
+      const [x, y] = pts[i].split(",");
+      return `<circle cx="${x}" cy="${y}" r="3.5" fill="${color}"><title>${escapeHtml(s.area)} · ${p.month} · ${nice(p.perM2)} د.ك/م²</title></circle>`;
+    }).join("");
+    return poly + dots;
   }).join("");
-  const legend = series.map((s, idx) => `
-    <span class="hist-legend-item"><i style="background:${colors[idx % colors.length]}"></i>${escapeHtml(s.area)}</span>`).join("");
+
+  // خط وسيط السوق العام المتقطع + تعبئة متدرجة تحته
+  let marketArea = "";
+  let marketLine = "";
+  let marketLegend = "";
+  if (marketSeries.length >= 2) {
+    const pts = marketSeries.map((p) => `${xFor(months.indexOf(p.month)).toFixed(1)},${yFor(p.perM2).toFixed(1)}`);
+    marketArea = `<polyline fill="url(#mktGrad)" stroke="none" points="${padL},${padT + innerH} ${pts.join(" ")} ${width - padR},${padT + innerH}"/>`;
+    marketLine = `<polyline fill="none" stroke="#2d3748" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round" points="${pts.join(" ")}"/>`;
+    marketLegend = '<span class="hist-legend-item market-legend"><i></i>وسيط السوق العام</span>';
+  }
+  const legend = [...series.map((s, idx) => `<span class="hist-legend-item"><i style="background:${colors[idx % colors.length]}"></i>${escapeHtml(s.area)}</span>`), marketLegend].join("");
   return `
     <div class="trends-block">
       <div class="hist-chart">
         <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="اتجاهات أسعار المتر عبر الأشهر">
-          ${months.map((m, i) => `<text x="${xFor(i).toFixed(1)}" y="${height - 4}" class="hist-date">${escapeHtml(m.slice(5))}</text>`).join("")}
-          ${lines}
+          <defs><linearGradient id="mktGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2d3748" stop-opacity=".12"/><stop offset="100%" stop-color="#2d3748" stop-opacity="0"/></linearGradient></defs>
+          ${grid.join("")}${marketArea}${lines}${marketLine}${monthLabels}
         </svg>
       </div>
       <div class="hist-legend">${legend}</div>
@@ -3332,7 +3410,7 @@ function oppClicksBarChart(buckets, labelKey) {
 
 // رسم اتجاهات الأسعار الشهرية من جدول price_trends (يُملأ يوميًا من الحصاد)
 // — وسيط سعر المتر لكل منطقة/نوع عبر الأشهر: خط لكل منطقة بأحدث قيمة فقط.
-function renderPriceTrendsChart(root) {
+function renderPriceTrendsChart(root, embedded) {
   const data = oppState.priceTrends;
   const rows = (data && data.rows) || [];
   if (!rows.length) {
@@ -3348,6 +3426,8 @@ function renderPriceTrendsChart(root) {
   const series = Object.entries(byArea)
     .map(([area, pts]) => ({ area, pts: pts.sort((a, b) => a.month.localeCompare(b.month)) }))
     .filter((s) => s.pts.filter((p) => p.median_price_per_m2 != null).length >= 2);
+  const heading = `<h3>اتجاهات الأسعار الشهرية (من الحصاد)</h3>
+      <p class="scope-note">وسيط سعر المتر (د.ك/م²) لكل منطقة عبر الأشهر — من جدول price_trends المملوء يوميًا بالحصاد. الخط المتقطع = وسيط السوق العام.</p>`;
   if (!series.length) {
     // لا توجد سلسلة سعر متر كافية — نعرض ملخص أحدث الوسيطات بدل رسم فارغ
     const latest = rows.filter((r) => r.month === months[months.length - 1]);
@@ -3356,38 +3436,79 @@ function renderPriceTrendsChart(root) {
       <span class="filter-chip"><b>${escapeHtml(r.area)}</b>${r.median_price_per_m2 != null ? `${r.median_price_per_m2} د.ك/م²` : `${r.median_price ?? "—"} د.ك`} · ${escapeHtml(r.property_type || "عام")} · ${escapeHtml(r.month)}</span>`);
     return `
       <div class="trends-block">
-        <h3>اتجاهات الأسعار الشهرية (من الحصاد)</h3>
-        <p class="scope-note">أحدث وسيط سعر متر لكل منطقة من ${rows.length} شهرًا محصودًا في جدول price_trends.</p>
+        ${embedded ? "" : heading}
         <div class="similar-external-list">${items.join("")}</div>
       </div>`;
   }
-  const colors = ["#1a7f4f", "#2b6cb0", "#c05621", "#6b46c1", "#b83280", "#2c7a7b", "#d69e2e", "#3182ce"];
-  const width = 720;
-  const height = 240;
-  const padL = 44;
-  const padR = 12;
-  const padT = 14;
-  const padB = 22;
-  const xFor = (i) => padL + (months.length <= 1 ? width / 2 : (i / (months.length - 1)) * (width - padL - padR));
-  const allVals = series.flatMap((s) => s.pts.map((p) => p.median_price_per_m2)).filter((v) => v != null);
+  const colors = ["#1a7f4f", "#2b6cb0", "#c05621", "#6b46c1", "#b83280", "#2c7a7b"];
+  // وسيط السوق العام: لكل شهر وسيط قيم كل المناطق
+  const marketSeries = months.map((m) => {
+    const vals = series.flatMap((s) => s.pts.filter((p) => p.month === m && p.median_price_per_m2 != null).map((p) => p.median_price_per_m2));
+    if (!vals.length) return null;
+    vals.sort((a, b) => a - b);
+    const mid = Math.floor(vals.length / 2);
+    return { month: m, perM2: vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2 };
+  }).filter(Boolean);
+  // أعلى 6 مناطق بأحدث قيمة + وسيط السوق — يُبقي الرسم مقروءًا بدل 27 خطًا متشابكًا
+  const topSeries = series
+    .map((s) => ({ ...s, last: s.pts.filter((p) => p.median_price_per_m2 != null).slice(-1)[0]?.median_price_per_m2 }))
+    .sort((a, b) => (b.last ?? 0) - (a.last ?? 0))
+    .slice(0, 6);
+  const width = 760;
+  const height = 280;
+  const padL = 54;
+  const padR = 16;
+  const padT = 16;
+  const padB = 26;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+  const xFor = (i) => padL + (months.length <= 1 ? innerW / 2 : (i / (months.length - 1)) * innerW);
+  const allVals = [...topSeries.flatMap((s) => s.pts.map((p) => p.median_price_per_m2)), ...marketSeries.map((p) => p.perM2)].filter((v) => v != null);
   const min = Math.min(...allVals);
   const max = Math.max(...allVals);
-  const span = (max - min) || 1;
-  const yFor = (v) => padT + (1 - (v - min) / span) * (height - padT - padB);
-  const lines = series.map((s, idx) => {
-    const pts = s.pts.map((p, i) => `${xFor(months.indexOf(p.month)).toFixed(1)},${yFor(p.median_price_per_m2).toFixed(1)}`).join(" ");
-    return `<polyline fill="none" stroke="${colors[idx % colors.length]}" stroke-width="2.5" points="${pts}"/>`;
+  const pad = (max - min) * 0.08 || 1;
+  const lo = Math.max(0, min - pad);
+  const hi = max + pad;
+  const span = hi - lo || 1;
+  const yFor = (v) => padT + (1 - (v - lo) / span) * innerH;
+  const nice = (v) => (v >= 1000 ? `${(v / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 })}k` : Math.round(v).toLocaleString("en-US"));
+  const grid = [];
+  for (let t = 0; t <= 4; t++) {
+    const v = hi - (span * t) / 4;
+    const y = yFor(v);
+    grid.push(`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${width - padR}" y2="${y.toFixed(1)}" class="grid-line"/>`);
+    grid.push(`<text x="${padL - 8}" y="${(y + 3).toFixed(1)}" text-anchor="end" class="axis-label">${nice(v)}</text>`);
+  }
+  const monthLabels = months.map((m, i) => `<text x="${xFor(i).toFixed(1)}" y="${height - 6}" text-anchor="middle" class="hist-date">${escapeHtml(m.slice(5))}</text>`).join("");
+  const lines = topSeries.map((s, idx) => {
+    const color = colors[idx % colors.length];
+    // النقاط الصالحة فقط — أي شهر بلا سعر متر لا يُرسم كصفر في القاع
+    const valid = s.pts.filter((p) => p.median_price_per_m2 != null);
+    const pts = valid.map((p, i) => `${xFor(months.indexOf(p.month)).toFixed(1)},${yFor(p.median_price_per_m2).toFixed(1)}`);
+    const poly = `<polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${pts.join(" ")}"/>`;
+    const dots = valid.map((p, i) => {
+      const [x, y] = pts[i].split(",");
+      return `<circle cx="${x}" cy="${y}" r="3.5" fill="${color}"><title>${escapeHtml(s.area)} · ${p.month} · ${nice(p.median_price_per_m2)} د.ك/م²</title></circle>`;
+    }).join("");
+    return poly + dots;
   }).join("");
-  const legend = series.map((s, idx) => `
-    <span class="hist-legend-item"><i style="background:${colors[idx % colors.length]}"></i>${escapeHtml(s.area)}</span>`).join("");
+  let marketArea = "";
+  let marketLine = "";
+  let marketLegend = "";
+  if (marketSeries.length >= 2) {
+    const pts = marketSeries.map((p) => `${xFor(months.indexOf(p.month)).toFixed(1)},${yFor(p.perM2).toFixed(1)}`);
+    marketArea = `<polyline fill="url(#ptGrad)" stroke="none" points="${padL},${padT + innerH} ${pts.join(" ")} ${width - padR},${padT + innerH}"/>`;
+    marketLine = `<polyline fill="none" stroke="#2d3748" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round" points="${pts.join(" ")}"/>`;
+    marketLegend = '<span class="hist-legend-item market-legend"><i></i>وسيط السوق العام</span>';
+  }
+  const legend = [...topSeries.map((s, idx) => `<span class="hist-legend-item"><i style="background:${colors[idx % colors.length]}"></i>${escapeHtml(s.area)}</span>`), marketLegend].join("");
   return `
     <div class="trends-block">
-      <h3>اتجاهات الأسعار الشهرية (من الحصاد)</h3>
-      <p class="scope-note">وسيط سعر المتر (د.ك/م²) لكل منطقة عبر الأشهر — من جدول price_trends المملوء يوميًا بالحصاد.</p>
+      ${embedded ? "" : heading}
       <div class="hist-chart">
         <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="اتجاهات أسعار المتر عبر الأشهر">
-          ${months.map((m, i) => `<text x="${xFor(i).toFixed(1)}" y="${height - 4}" class="hist-date">${escapeHtml(m.slice(5))}</text>`).join("")}
-          ${lines}
+          <defs><linearGradient id="ptGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2d3748" stop-opacity=".12"/><stop offset="100%" stop-color="#2d3748" stop-opacity="0"/></linearGradient></defs>
+          ${grid.join("")}${marketArea}${lines}${marketLine}${monthLabels}
         </svg>
       </div>
       <div class="hist-legend">${legend}</div>

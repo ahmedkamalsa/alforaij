@@ -148,11 +148,16 @@ with sync_playwright() as p:
 
     # ── 4) تحليلات السوق ──
     tab_click(page, 3)
-    page.wait_for_timeout(2000)
+    # الرسم غير متزامن (API + تنظيف الشواذ) — ننتظر ظهور بطاقات المؤشرات بدل توقيت ثابت
+    try:
+        page.wait_for_selector(".insight-kpis .kpi-card", timeout=30000)
+    except Exception:
+        pass
+    page.wait_for_timeout(500)
     results["insights"] = {
         "overflow": page_overflow(page),
-        "insightCards": page.locator(".insight-card").count(),
-        "govChips": page.locator(".insights-govs .filter-chip").count(),
+        "insightCards": page.locator(".insight-kpis .kpi-card").count(),
+        "govChips": page.locator(".gov-row").count(),
         # بدون بيانات (CI بلا Supabase) تعرض الواجهة الحالة الفارغة بدل «جاري التحميل»
         "panelLoaded": page.evaluate("!document.querySelector('#insightsRoot').innerText.includes('جاري التحميل')"),
         "offenders": offenders(page),
