@@ -2338,6 +2338,33 @@ a.results-source-link:hover {
   color: var(--blue);
 }
 
+/* شريط مصادر الفرص: شرائح منصات قابلة للنقر (فلترة حية) */
+button.results-source-chip {
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+
+button.results-source-chip:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.opp-platform-chip.active {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+
+.opp-platform-chip.active:hover {
+  color: #fff;
+}
+
+.opp-platform-chip.active b {
+  color: #fff;
+}
+
 .results {
   display: grid;
   /* minmax(0, 1fr) — يمنع أي طفل بعرض أدنى كبير (جداول/صفوف عريضة) من

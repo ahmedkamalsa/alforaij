@@ -3013,6 +3013,7 @@ const oppState = {
   data: null,
   tier: "best",
   source: "", // "" الكل | external مواقع خارجية | local الفريج فقط
+  platform: "", // فلتر منصة دقيق: اسم المصدر (الفريج/Mourjan/OpenSooq/…) أو "" الكل
   kind: "", // "" كل الأنواع | مباشر | مكتب
   gov: "",
   area: "",
@@ -3064,6 +3065,7 @@ function oppFilteredItems(items) {
   return (items || []).filter((item) => {
     if (oppState.source === "external" && oppItemIsLocal(item)) return false;
     if (oppState.source === "local" && !oppItemIsLocal(item)) return false;
+    if (oppState.platform && (item.source || "") !== oppState.platform) return false;
     if (oppState.kind && (item.listingType || "غير محدد") !== oppState.kind) return false;
     if (oppState.gov && item.governorate !== oppState.gov) return false;
     if (oppState.area && item.area !== oppState.area) return false;
@@ -3106,6 +3108,32 @@ function setOppSourceRowVisible(visible) {
   if (row) row.hidden = !visible;
   const kindRow = $("oppKindFilterRow");
   if (kindRow) kindRow.hidden = !visible;
+}
+
+// شريط «مصادر هذه النتائج» فوق بطاقات الفرص: كل منصة ساهمت بعدّاد فرصها،
+// والنقر على أي منصة يفلتر البطاقات إليها فورًا (مثل شريط مصادر نتائج البحث).
+function renderOppPlatformBar(items) {
+  const root = $("oppSourcesBar");
+  if (!root) return;
+  const list = items || [];
+  if (!list.length) {
+    root.hidden = true;
+    root.innerHTML = "";
+    return;
+  }
+  const counts = {};
+  for (const item of list) {
+    const source = (item.source || "غير محدد").trim() || "غير محدد";
+    counts[source] = (counts[source] || 0) + 1;
+  }
+  const chips = [
+    `<button type="button" class="results-source-chip opp-platform-chip${oppState.platform ? "" : " active"}" data-opp-platform="" title="عرض فرص كل المنصات">الكل <b>${list.length}</b></button>`,
+  ];
+  for (const [source, count] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
+    chips.push(`<button type="button" class="results-source-chip opp-platform-chip${oppState.platform === source ? " active" : ""}" data-opp-platform="${escapeHtml(source)}" title="عرض فرص ${escapeHtml(source)} فقط">${escapeHtml(source)} <b>${count}</b></button>`);
+  }
+  root.innerHTML = `<span class="results-sources-label">مصادر هذه النتائج:</span>${chips.join("")}`;
+  root.hidden = false;
 }
 
 function oppClientChips(item) {
@@ -3896,7 +3924,10 @@ function renderOppTier() {
   const root = $("oppList");
   if (!root || !oppState.data) return;
   // مرشّح المصدر ونوع الإعلان (مباشر/مكتب) خاص بتبويبات الفرص (الأفضل + الفئات الزمنية)
-  setOppSourceRowVisible(["best", "daily", "weekly", "monthly", "yearly"].includes(oppState.tier));
+  const cardTiers = ["best", "daily", "weekly", "monthly", "yearly"];
+  setOppSourceRowVisible(cardTiers.includes(oppState.tier));
+  const bar = $("oppSourcesBar");
+  if (bar) bar.hidden = true;
   if (oppState.tier === "clients") { renderClientsTab(root); updateOppTabCount(); return; }
   if (oppState.tier === "alerts") { renderAlertsTab(root); updateOppTabCount(); return; }
   if (oppState.tier === "history") { renderHistoryTab(root); updateOppTabCount(); return; }
@@ -3933,6 +3964,7 @@ function renderOppTier() {
       }
     }
     renderOppSourceCounts(pool);
+    renderOppPlatformBar(pool);
     items = oppFilteredItems(pool);
     note = `أفضل الفرص على الإطلاق — مدمجة من كل الفئات الزمنية (يعرض ${items.length} من أصل ${pool.length}) مع شارة الفئة الأدق لكل فرصة`;
   } else {
@@ -3943,6 +3975,7 @@ function renderOppTier() {
       return;
     }
     renderOppSourceCounts(tier.items || []);
+    renderOppPlatformBar(tier.items || []);
     items = oppFilteredItems(tier.items);
     note = `${tier.label} — ${tier.description} (يعرض ${items.length} من أصل ${(tier.items || []).length})`;
   }
@@ -4210,6 +4243,9 @@ async function loadOpportunityTab(tier) {
   const root = $("oppList");
   if (!root) return;
   oppState.tier = tier;
+  // التبويبات غير البطاقية (عملاء/تنبيهات/موجز/…) لا تعرض شريط مصادر الفرص
+  const bar = $("oppSourcesBar");
+  if (bar) bar.hidden = true;
   root.innerHTML = '<div class="empty">جاري التحميل...</div>';
   try {
     if (tier === "clients") {
@@ -4279,6 +4315,16 @@ function bindOppEvents() {
       renderOppTier();
     });
   });
+  // شريط «مصادر هذه النتائج»: فلترة البطاقات بالنقر على أي منصة (تفويض — الشرائح تُعاد بناؤها)
+  const oppSourcesBar = $("oppSourcesBar");
+  if (oppSourcesBar) {
+    oppSourcesBar.addEventListener("click", (ev) => {
+      const chip = ev.target.closest?.("[data-opp-platform]");
+      if (!chip) return;
+      oppState.platform = chip.dataset.oppPlatform || "";
+      renderOppTier();
+    });
+  }
   // مرشّح نوع الإعلان (كل الأنواع / مباشر / مكتب)
   document.querySelectorAll(".opp-source-chip[data-kind]").forEach((chip) => {
     chip.addEventListener("click", () => {
