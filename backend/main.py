@@ -125,10 +125,12 @@ def _dashboard_record(listing) -> dict:
 
 
 def _area_governorate_map(listings) -> dict[str, str]:
+    """خريطة منطقة ← محافظة بقيم مطبّعة (اسم محافظة موحّد)، حتى لا تصل قيمة
+    غير مطبّعة مثل «محافظة الاحمدي» إلى سجلات السوق التي تكمل محافظتها من هنا."""
     mapping = {}
     for row in listings:
         if row.area and row.governorate and row.area not in mapping:
-            mapping[row.area] = row.governorate
+            mapping[row.area] = _normalize_governorate_name(row.governorate)
     return mapping
 
 
@@ -149,11 +151,35 @@ def _normalize_governorate_name(value: str) -> str:
     clean = str(value or "").strip()
     if not clean:
         return ""
+    canonical = _GOVERNORATE_CANONICAL.get(_governorate_key(clean))
+    if canonical:
+        return canonical
     if clean in _GOVERNORATE_ALIASES:
         return _GOVERNORATE_ALIASES[clean]
     if clean.startswith("محافظة "):
         return clean
     return clean
+
+
+# يوحّد همزات/تاء مربوطة في أسماء المحافظات حتى لا يتكرر «محافظة الأحمدي» و«الاحمدي» كصفين
+_ARABIC_GOV_NORM = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ى": "ي", "ة": "ه"})
+
+
+def _governorate_key(value: str) -> str:
+    clean = str(value or "").strip()
+    if clean.startswith("محافظة "):
+        clean = clean[len("محافظة "):]
+    return clean.translate(_ARABIC_GOV_NORM).strip()
+
+
+_GOVERNORATE_CANONICAL = {
+    "الاحمدي": "محافظة الأحمدي",
+    "حولي": "محافظة حولي",
+    "الجهراء": "محافظة الجهراء",
+    "العاصمة": "محافظة العاصمة",
+    "الفروانية": "محافظة الفروانية",
+    "مبارك الكبير": "محافظة مبارك الكبير",
+}
 
 
 def _normalize_dashboard_place(record: dict, area_map: dict[str, str]) -> None:

@@ -3,12 +3,26 @@ from __future__ import annotations
 import unittest
 
 from backend.connectors.alforaij import _safe_space, load_listings
+from backend.main import _normalize_governorate_name, _area_governorate_map
 
 
 class DataLoadingTests(unittest.TestCase):
     def test_seed_or_dashboard_payload_loads(self) -> None:
         listings = load_listings()
         self.assertGreaterEqual(len(listings), 1)
+
+    def test_governorate_hamza_variants_merge_to_one_canonical_name(self) -> None:
+        """«محافظة الاحمدي» و«محافظة الأحمدي» لا يجب أن يظهرا كصفين منفصلين."""
+        variants = ["محافظة الاحمدي", "محافظة الأحمدي", "الاحمدي", "الأحمدي"]
+        canonical = {_normalize_governorate_name(v) for v in variants}
+        self.assertEqual(canonical, {"محافظة الأحمدي"})
+
+    def test_area_governorate_map_stores_normalized_names(self) -> None:
+        """سجلات السوق تكمل محافظتها من خريطة المنطقة — يجب أن تصل قيمة مطبّعة."""
+        listings = load_listings()
+        mapping = _area_governorate_map(listings)
+        for area, governorate in mapping.items():
+            self.assertEqual(_normalize_governorate_name(governorate), governorate)
 
     def test_loaded_listing_keeps_space_as_missing_when_source_is_missing(self) -> None:
         listings = load_listings()
