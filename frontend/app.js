@@ -2185,9 +2185,26 @@ function renderResultsSources(report) {
         ? `<a class="results-source-chip results-source-link" href="${escapeHtml(s.url)}" target="_blank" rel="noreferrer" title="${title}" ${trustAttr}>${inner}</a>`
         : `<span class="results-source-chip" title="${title}" ${trustAttr}>${inner}</span>`;
     }).join("")}
+    <button type="button" class="results-copy-sources" data-copy-source-links title="نسخ قائمة المنصات وروابطها المفحوصة للمشاركة">نسخ روابط المصادر</button>
   `;
   root.hidden = false;
   bindSourceTrustTip(root);
+  // زر «نسخ روابط المصادر»: قائمة المنصات وروابطها المفحوصة جاهزة للمشاركة
+  root.querySelectorAll("[data-copy-source-links]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const lines = statuses
+        .filter((s) => Number(s.records || 0) > 0 && s.kind !== "internal")
+        .map((s) => {
+          const name = s.name || s.source || "مصدر";
+          const count = Number(s.records || 0);
+          const trust = s.trust || {};
+          const trustPart = trust.score != null ? ` (ثقة ${trust.score}%)` : "";
+          return s.url ? `${name} — ${count} إعلان${trustPart} — ${s.url}` : `${name} — ${count} إعلان${trustPart}`;
+        });
+      const text = [`مصادر نتائج التحليل العقاري (منصة الفريج):`, ...lines].join("\n");
+      copyText(text, btn);
+    });
+  });
 }
 
 // تلميح «ثقة المصدر» المخصص عند التمرير على شريحة مصدر (أخضر/كهرماني/أحمر)

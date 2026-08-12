@@ -2351,6 +2351,33 @@ button:hover {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, .18);
 }
 
+/* زر نسخ روابط المصادر من الشريط */
+.results-copy-sources {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  padding: 4px 14px;
+  min-height: 44px;
+  border: 1px solid rgba(56, 120, 255, .45);
+  border-radius: 999px;
+  background: rgba(56, 120, 255, .10);
+  color: var(--blue);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.results-copy-sources:hover,
+.results-copy-sources:focus-visible {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+  outline: none;
+}
+
 /* تلميح «ثقة المصدر» عند التمرير على شريحة المصدر */
 .source-trust-tip {
   position: fixed;
