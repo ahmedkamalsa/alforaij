@@ -44,16 +44,6 @@ def build_update_notifications(
     official_transactions = tables.get("official_transactions") or {}
     official_indicators = tables.get("official_market_indicators") or {}
 
-    actions: list[str] = []
-    if counts.get("priceDrops"):
-        actions.append("ابدأ بانخفاضات السعر وارسلها للعملاء المطابقين فورًا.")
-    if counts.get("added"):
-        actions.append("راجع الفرص الجديدة الأعلى درجة قبل إرسالها.")
-    if official.get("status") in {"skipped", "missing", "empty"}:
-        actions.append("أضف ملف/رابط صفقات وزارة العدل اليومي حتى يصبح التقييم أقوى من الإعلانات فقط.")
-    if not actions:
-        actions.append("لا توجد تغييرات حرجة؛ راجع أفضل الفرص اليومية فقط.")
-
     return {
         "generatedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "hasPrevious": bool(delta.get("hasPrevious")),
@@ -77,8 +67,6 @@ def build_update_notifications(
             "added": _top_items(delta.get("added") or [], 3),
             "removed": _top_items(delta.get("removed") or [], 3),
         },
-        "actions": actions[:3],
-        "note": "ملخص مجاني من آخر تحديث يومي: يقارن آخر لقطة فرص باللقطة الحالية ويعرض ما يحتاج متابعة.",
     }
 
 

@@ -129,7 +129,7 @@ mcp_server/            ← نقطة ربط مستقبلية بأدوات خار�
 | `POST /api/official-transactions/import` | استيراد صفقات رسمية (ملف/رابط) |
 | `POST /api/daily-agent/run` / `GET …/status` | تشغيل الوكيل اليومي وحالته |
 | `POST /api/report-pdf` | توليد تقرير PDF عربي (reportlab) |
-| `GET /api/update-notifications` | إشعارات التحديث اليومي |
+| `GET /api/update-notifications` | سجل التغيير اليومي (أرقام + أعلى الفروق بروابطها) — تُعرض فعليًا في تبويب «أفضل الفرص → الفرق اليومي» |
 | `GET /api/developments` | تطورات السوق من وكيل الاكتشاف (ملف محلي ← Supabase) |
 | `GET /*` | خدمة ملفات الواجهة (بلا كاش: `Cache-Control: no-store`) |
 

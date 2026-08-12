@@ -44,7 +44,10 @@ class UpdateNotificationsTests(unittest.TestCase):
         self.assertEqual(result["counts"]["removed"], 1)
         self.assertEqual(result["counts"]["priceDrops"], 1)
         self.assertEqual(result["officialTransactions"]["storedCount"], 0)
-        self.assertTrue(result["actions"])
+        # الإشعارات تبقى أرقامًا وأدلة فقط (top بروابطها) — لا توجيهات نصية بلا قيمة
+        self.assertNotIn("actions", result)
+        self.assertIn("top", result)
+        self.assertEqual(result["top"]["added"][0]["code"], "C")
 
 
 if __name__ == "__main__":

@@ -453,12 +453,13 @@
         <div class="ops-panel">
           <div class="ops-card ops-card-primary">
             <h3>وكيل التحديث اليومي</h3>
-            <p>يجلب أحدث المصادر، يحدّث فرص المكسب، يحفظ اللقطات، ويعرض إشعارات التغيير. التشغيل المجدول المقترح: يوميًا 6:00 صباحًا مع كاش يومي للفرص وكاش أسبوعي للموجز.</p>
+            <p>يجلب أحدث المصادر من كل منصة، يحدّث فرص المكسب، ويحفظ لقطات السوق يوميًا 6:00 صباحًا — وكل رقم في المنصة يحمل مصدره ورابطه الأصلي.</p>
             <div class="ops-actions">
               <button id="runDailyAgentBtnInline" class="primary" type="button">تشغيل التحديث الآن</button>
             </div>
             <p id="dailyAgentStateInline" class="ops-status">سيظهر هنا وقت آخر تشغيل وحالته.</p>
             <p id="dailyAgentWhatsAppInline" class="ops-status"></p>
+            <div id="officialRefStrip" class="ops-status" hidden></div>
             <div id="marketAnalyticsStrip" class="ops-status ops-analytics"></div>
             <details class="collapsible" open>
               <summary>تحليلات الحصاد لكل موقع (الإعلانات الفعلية من كل منصة)</summary>
@@ -473,7 +474,6 @@
             </details>
           </div>
         </div>
-        <div id="dailyUpdateNotice" class="daily-update-notice" hidden></div>
         <details class="collapsible ops-advanced">
           <summary>استيراد يدوي احتياطي لصفقات وزارة العدل</summary>
           <p class="scope-note">المسار الأساسي أوتوماتيكي عبر الوكيل اليومي و <code>OFFICIAL_TRANSACTIONS_SOURCE</code>. استخدم هذا فقط عند توفر CSV/JSON موثق وتريد إدخاله فورًا.</p>
@@ -613,6 +613,6 @@
     <span class="chat-fab-label">اسأل المساعد</span>
   </button>
 
-  <script src="app.js?v=20260812-insights3"></script>
+  <script src="app.js?v=20260812-clean1"></script>
 </body>
 </html>

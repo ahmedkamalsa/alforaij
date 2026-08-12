@@ -3835,73 +3835,27 @@ function renderOppMeta() {
   }
 }
 
-function updateNoticeItem(label, value, tone = "") {
-  return `<span class="update-count ${tone}"><b>${escapeHtml(String(value ?? 0))}</b>${escapeHtml(label)}</span>`;
-}
-
-function renderDailyUpdateNotice(data) {
-  const box = $("dailyUpdateNotice");
+function renderDailyAgentOfficialSources(status) {
+  // المصادر الرسمية المرجعية (أدلة حية بروابطها) — داخل بطاقة وكيل التحديث
+  const box = $("officialRefStrip");
   if (!box) return;
-  if (!data) {
+  if (!status || !status.summary) {
     box.hidden = true;
     return;
   }
-  const counts = data.counts || {};
-  const official = data.officialTransactions || {};
-  const generated = data.generatedAt ? String(data.generatedAt).replace("T", " ").slice(0, 16) : "لم يعمل بعد";
-  const nextRun = "6:00 صباحًا يوميًا";
-  const officialText = official.storedCount != null
-    ? `${official.storedCount} صفقة رسمية محفوظة`
-    : "لا يوجد عداد صفقات رسمية";
-  const actions = (data.actions || []).map((action) => `<li>${escapeHtml(action)}</li>`).join("");
-  box.innerHTML = `
-    <div class="update-main">
-      <strong>ملخص التحديث اليومي</strong>
-      <span>آخر تشغيل: ${escapeHtml(generated)} · القادم: ${escapeHtml(nextRun)}</span>
-    </div>
-    <div class="update-counts">
-      ${updateNoticeItem("فرص جديدة", counts.added, "good")}
-      ${updateNoticeItem("انخفاض سعر", counts.priceDrops, "hot")}
-      ${updateNoticeItem("محذوف/اختفى", counts.removed, "muted")}
-      ${updateNoticeItem("صفقات وزارة العدل", official.importCount || 0, official.importCount ? "good" : "warn")}
-    </div>
-    <div class="update-official">${escapeHtml(officialText)} · حالة آخر استيراد: ${escapeHtml(official.importStatus || "غير معروف")} · الكاش: يومي للفرص، أسبوعي للموجز.</div>
-    ${actions ? `<ul class="update-actions">${actions}</ul>` : ""}
-    <div class="update-agent-actions">
-      <button id="runDailyAgentBtn" class="secondary" type="button">تشغيل وكيل التحديث الآن</button>
-      <span id="dailyAgentState" class="update-agent-state"></span>
-    </div>
-  `;
-  box.hidden = false;
-  const runBtn = $("runDailyAgentBtn");
-  if (runBtn) runBtn.addEventListener("click", runDailyAgentNow);
-}
-
-function renderDailyAgentOfficialSources(status) {
-  const box = $("dailyUpdateNotice");
-  if (!box || !status || !status.summary) return;
   const official = status.summary.officialReferenceSources;
-  if (!official || !official.sources) return;
-  const existing = box.querySelector(".official-reference-strip");
-  if (existing) existing.remove();
-  const strip = document.createElement("div");
-  strip.className = "official-reference-strip";
-  strip.innerHTML = `
+  if (!official || !official.sources || !official.sources.length) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = `<div class="official-reference-strip">
     <strong>مصادر رسمية مرجعية:</strong>
     <span>${official.reachable || 0}/${official.count || 0} متاح</span>
     ${(official.sources || []).slice(0, 4).map((source) => `
       <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>
     `).join("")}
-  `;
-  box.appendChild(strip);
-}
-
-async function loadDailyUpdateNotice() {
-  try {
-    renderDailyUpdateNotice(await getJson("/api/update-notifications"));
-  } catch (err) {
-    console.warn("Update notifications unavailable", err);
-  }
+  </div>`;
 }
 
 async function loadMarketAnalytics() {
@@ -3954,18 +3908,13 @@ function whatsappSendStatusText(status) {
 }
 
 async function loadDailyAgentStatus() {
-  const stateEl = $("dailyAgentState");
   const inlineStateEl = $("dailyAgentStateInline");
   const waStateEl = $("dailyAgentWhatsAppInline");
   try {
     const status = await getJson("/api/daily-agent/status");
-    if (stateEl) {
-      const finished = status.finishedAt ? String(status.finishedAt).replace("T", " ").slice(0, 16) : "";
-      stateEl.textContent = `حالة الوكيل: ${status.status || "غير معروف"}${finished ? ` · ${finished}` : ""}`;
-    }
     if (inlineStateEl) {
       const finished = status.finishedAt ? String(status.finishedAt).replace("T", " ").slice(0, 16) : "";
-      inlineStateEl.textContent = `آخر تشغيل: ${finished || "لم يعمل بعد"} · الحالة: ${status.status || "غير معروف"} · التحديث المجدول 6:00 صباحًا.`;
+      inlineStateEl.textContent = `آخر تشغيل: ${finished || "لم يعمل بعد"} · الحالة: ${status.status || "غير معروف"}`;
     }
     if (waStateEl) {
       const text = whatsappSendStatusText(status);
@@ -3975,7 +3924,6 @@ async function loadDailyAgentStatus() {
     renderDailyAgentOfficialSources(status);
     loadMarketAnalytics();
   } catch (err) {
-    if (stateEl) stateEl.textContent = "تعذر قراءة حالة الوكيل";
     if (inlineStateEl) inlineStateEl.textContent = "تعذر قراءة حالة الوكيل من الباك إند.";
     loadMarketAnalytics();
   }
@@ -3984,14 +3932,12 @@ async function loadDailyAgentStatus() {
 async function runDailyAgentNow() {
   const buttons = ["runDailyAgentBtn", "runDailyAgentBtnInline"].map((id) => $(id)).filter(Boolean);
   const btn = buttons[0] || null;
-  const stateEl = $("dailyAgentState");
   const inlineStateEl = $("dailyAgentStateInline");
   const originals = buttons.map((button) => button.textContent);
   // النسخة المنشورة (GitHub Pages) لا تستضيف خادم API — الوكيل يعمل على الخادم
   // المباشر فقط؛ هنا نوضح ذلك بدل إرسال طلب لنقطة غير موجودة يعيد صفحة HTML.
   if (STATIC_SNAPSHOT_MODE) {
     const msg = "وكيل التحديث يعمل على الخادم المباشر فقط — هذه النسخة المنشورة تعرض أحدث لقطة (تُحدَّث تلقائيًا يوميًا).";
-    if (stateEl) stateEl.textContent = msg;
     if (inlineStateEl) inlineStateEl.textContent = msg;
     return;
   }
@@ -3999,7 +3945,6 @@ async function runDailyAgentNow() {
     button.disabled = true;
     button.textContent = "جاري تشغيل الوكيل...";
   });
-  if (stateEl) stateEl.textContent = "يتم تحديث المصادر والفرص الآن...";
   if (inlineStateEl) inlineStateEl.textContent = "يتم تحديث المصادر والفرص الآن...";
   try {
     const response = await fetch(apiUrl("/api/daily-agent/run"), {
@@ -4009,13 +3954,10 @@ async function runDailyAgentNow() {
     });
     const result = await readJsonResponse(response, "/api/daily-agent/run");
     if (!response.ok) throw new Error(result.error || result.detail || "فشل تشغيل الوكيل");
-    if (stateEl) stateEl.textContent = `اكتمل التشغيل: ${result.status}`;
     if (inlineStateEl) inlineStateEl.textContent = `اكتمل التشغيل: ${result.status}`;
-    await loadDailyUpdateNotice();
     await loadDailyAgentStatus();
     await loadOpportunities(false);
   } catch (err) {
-    if (stateEl) stateEl.textContent = `فشل التشغيل: ${err.message}`;
     if (inlineStateEl) inlineStateEl.textContent = `فشل التشغيل: ${err.message}`;
   } finally {
     buttons.forEach((button, index) => {
@@ -4086,7 +4028,6 @@ async function loadOpportunities(forceRefresh = false) {
     fillOppSelect("oppTypeFilter", allItems.map((item) => item.propertyType));
 
     renderOppMeta();
-    loadDailyUpdateNotice();
     loadDailyAgentStatus();
     renderOppTier();
     updateOppTabCount();
