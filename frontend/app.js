@@ -2021,6 +2021,36 @@ function renderSourceSummary(statuses) {
   `;
 }
 
+function renderResultsSources(report) {
+  // شريط «مصادر هذه النتائج» فوق النتائج المرتبة: كل منصة ساهمت بعدّاد إعلاناتها
+  // ورابط مباشر للموقع المفحوص — الدليل بنقرة واحدة دون مغادرة صفحة النتائج.
+  const root = $("resultsSources");
+  if (!root) return;
+  const statuses = report.sourceStatus || [];
+  // الوكلاء الداخليون (إكمال التفاصيل وغيرها) ليسوا مصادر — لا يظهرون في الشريط
+  const contributed = statuses.filter((s) => Number(s.records || 0) > 0 && s.kind !== "internal");
+  if (!contributed.length) {
+    root.hidden = true;
+    root.innerHTML = "";
+    return;
+  }
+  root.innerHTML = `
+    <span class="results-sources-label">مصادر هذه النتائج:</span>
+    ${contributed.map((s) => {
+      const name = escapeHtml(s.name || s.source || "مصدر");
+      const count = Number(s.records || 0);
+      const inner = `${name} <b>${count}</b>`;
+      const title = s.url
+        ? `فتح المصدر المفحوص — ${escapeHtml(s.fetchMethod || "آلية الجلب")}`
+        : (s.fetchMethod ? `آلية الجلب: ${escapeHtml(s.fetchMethod)}` : "");
+      return s.url
+        ? `<a class="results-source-chip results-source-link" href="${escapeHtml(s.url)}" target="_blank" rel="noreferrer" title="${title}">${inner}</a>`
+        : `<span class="results-source-chip" title="${title}">${inner}</span>`;
+    }).join("")}
+  `;
+  root.hidden = false;
+}
+
 function renderSources(report) {
   const root = $("sourceStatus");
   const statuses = report.sourceStatus || [];
@@ -2418,6 +2448,7 @@ function renderReport(report) {
     badge.classList.toggle("local", report.analysisMethod === "local");
   }
   renderSources(report);
+  renderResultsSources(report);
   renderProfitOpportunities(report);
   renderSimilarExternal(report);
   renderMethod(report);    const results = report.results || [];
@@ -2655,6 +2686,8 @@ function renderReport(report) {
     const link = node.querySelector(".open-link");
     link.href = item.originalUrl || "#";
     link.hidden = !item.originalUrl;
+    // اسم المصدر في زر الفتح — يعرف المستخدم أين يذهب قبل النقر
+    link.textContent = item.source ? `فتح على ${item.source}` : "فتح الإعلان الأصلي";
     // زر «تواصل مع المعلن» عبر واتساب: يظهر عندما يحمل الإعلان رقم هاتف المعلن
     // (يُستخرج من صفحة تفاصيل الإعلان — Q8Aqar/Mourjan/4Sale…) برسالة جاهزة مخصصة
     if (item.phone) {
@@ -3115,7 +3148,7 @@ function oppCard(item, index) {
       ${oppEvidenceBox(item)}
       ${oppClientChips(item)}
       <div class="opp-actions">
-        ${item.url ? `<a class="open-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>` : ""}
+        ${item.url ? `<a class="open-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">فتح على ${escapeHtml(item.source || "الإعلان الأصلي")}</a>` : ""}
         ${item.phone ? `<a class="wa-contact" href="${escapeHtml(waLink(item.phone))}?text=${encodeURIComponent(oppWhatsAppSummary(item))}" target="_blank" rel="noreferrer">تواصل مع المعلن (واتساب)</a>` : ""}
         <button class="opp-copy-btn" type="button">نسخ ملخص الفرصة</button>
         <a class="wa-share" href="${waShareLink(oppWhatsAppSummary(item))}" target="_blank" rel="noreferrer">إرسال واتساب</a>
@@ -3714,7 +3747,7 @@ function renderDeltaTab(root) {
           ${d.oldPriceText || d.oldPrice ? `<p class="delta-price">قبل: ${escapeHtml(d.oldPriceText || oppMoney(d.oldPrice))} ← بعد: ${escapeHtml(d.priceText || oppMoney(d.price))}</p>` : ""}
           <p class="delta-guidance">${DEV_SVG('<path d="M12 16v-4"/><path d="M12 8h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>')} ${escapeHtml(d.guidance || "")}</p>
           ${d.clients && d.clients.length ? `<div class="opp-clients"><strong>عملاء مطابقون (${d.clients.length}):</strong> ${d.clients.map((c) => `<span>${escapeHtml(c.area || "")} ${escapeHtml(c.type || "")} — تطابق ${c.matchScore}/100</span>`).join(" · ")}</div>` : ""}
-          ${d.url ? `<a class="open-link" href="${escapeHtml(d.url)}" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>` : ""}
+          ${d.url ? `<a class="open-link" href="${escapeHtml(d.url)}" target="_blank" rel="noreferrer">فتح على ${escapeHtml(d.source || "الإعلان الأصلي")}</a>` : ""}
         </div>
       </article>`).join("")}` : "";
   const DELTA_ICONS = {

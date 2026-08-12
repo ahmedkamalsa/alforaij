@@ -640,6 +640,7 @@ def build_report(
                     "availableCount": status.get("availableCount"),
                     "fetchMethod": status.get("fetchMethod", ""),
                     "endpoint": status.get("endpoint", ""),
+                    "kind": status.get("kind"),
                     "trust": _source_trust(status),
                 }
                 for status in (external_statuses or [])

@@ -1014,6 +1014,9 @@ def build_opportunities(limit_per_tier: int = 30, include_external: bool = True,
                     "records": _enrich.get("enriched", 0),
                     "candidates": _enrich.get("read", 0),
                     "note": _enrich.get("note", ""),
+                    # وكيل معالجة داخلي — يُعرض في تفاصيل المصادر بشفافية لكنه
+                    # ليس مصدرًا حقيقيًا فلا يظهر في شريط «مصادر هذه النتائج».
+                    "kind": "internal",
                 })
                 logger.info("harvest: %s", _enrich.get("note"))
             # إزالة التكرار بالكود: نفس الإعلان قد يظهر في المسح العام والمسح المركّب
