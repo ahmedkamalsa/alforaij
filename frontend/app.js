@@ -2170,16 +2170,63 @@ function renderResultsSources(report) {
     ${contributed.map((s) => {
       const name = escapeHtml(s.name || s.source || "مصدر");
       const count = Number(s.records || 0);
-      const inner = `${name} <b>${count}</b>`;
-      const title = s.url
-        ? `فتح المصدر المفحوص — ${escapeHtml(s.fetchMethod || "آلية الجلب")}`
-        : (s.fetchMethod ? `آلية الجلب: ${escapeHtml(s.fetchMethod)}` : "");
+      // مؤشر جودة المصدر: ثقة % بلون أخضر/كهرماني/أحمر (يظهر بالتفصيل عند التمرير)
+      const trust = s.trust || {};
+      const tone = trust.tone || (s.status === "success" ? "strong" : s.status === "fallback" ? "medium" : "weak");
+      const score = trust.score != null ? Number(trust.score) : null;
+      const trustLine = score != null
+        ? `ثقة المصدر: ${score}% — ${trust.label || ""}`
+        : (trust.label ? `ثقة المصدر: ${trust.label}` : "");
+      const inner = `<span class="results-source-dot ${toneClass(tone)}" aria-hidden="true"></span>${name} <b>${count}</b>`;
+      const trustAttr = score != null ? `data-trust-score="${score}" data-trust-tone="${toneClass(tone)}" data-trust-label="${escapeHtml(trust.label || "")}"` : "";
+      const mechLine = s.fetchMethod ? ` | آلية الجلب: ${escapeHtml(s.fetchMethod)}` : "";
+      const title = [trustLine, s.url ? `فتح المصدر المفحوص` : "", mechLine].filter(Boolean).join(" ");
       return s.url
-        ? `<a class="results-source-chip results-source-link" href="${escapeHtml(s.url)}" target="_blank" rel="noreferrer" title="${title}">${inner}</a>`
-        : `<span class="results-source-chip" title="${title}">${inner}</span>`;
+        ? `<a class="results-source-chip results-source-link" href="${escapeHtml(s.url)}" target="_blank" rel="noreferrer" title="${title}" ${trustAttr}>${inner}</a>`
+        : `<span class="results-source-chip" title="${title}" ${trustAttr}>${inner}</span>`;
     }).join("")}
   `;
   root.hidden = false;
+  bindSourceTrustTip(root);
+}
+
+// تلميح «ثقة المصدر» المخصص عند التمرير على شريحة مصدر (أخضر/كهرماني/أحمر)
+function bindSourceTrustTip(scope) {
+  const tip = $("sourceTrustTip");
+  if (!tip) return;
+  const root = scope || document;
+  root.querySelectorAll("[data-trust-score]").forEach((chip) => {
+    chip.addEventListener("mouseenter", (ev) => {
+      const score = Number(chip.dataset.trustScore);
+      const tone = chip.dataset.trustTone || "weak";
+      const label = chip.dataset.trustLabel || "";
+      tip.querySelector(".source-trust-tone").className = `source-trust-tone ${tone}`;
+      tip.querySelector(".source-trust-line").textContent = `${score}% — ${label}`;
+      tip.hidden = false;
+      positionTrustTip(tip, chip);
+    });
+    chip.addEventListener("mouseleave", () => {
+      tip.hidden = true;
+    });
+    chip.addEventListener("focus", (ev) => {
+      const score = Number(chip.dataset.trustScore);
+      const tone = chip.dataset.trustTone || "weak";
+      const label = chip.dataset.trustLabel || "";
+      tip.querySelector(".source-trust-tone").className = `source-trust-tone ${tone}`;
+      tip.querySelector(".source-trust-line").textContent = `${score}% — ${label}`;
+      tip.hidden = false;
+      positionTrustTip(tip, chip);
+    });
+    chip.addEventListener("blur", () => {
+      tip.hidden = true;
+    });
+  });
+}
+
+function positionTrustTip(tip, chip) {
+  const rect = chip.getBoundingClientRect();
+  tip.style.left = `${Math.min(rect.left + rect.width / 2, window.innerWidth - 220)}px`;
+  tip.style.top = `${Math.max(8, rect.top - 52)}px`;
 }
 
 function renderSources(report) {
@@ -3122,18 +3169,30 @@ function renderOppPlatformBar(items) {
     return;
   }
   const counts = {};
+  const confidences = {};
   for (const item of list) {
     const source = (item.source || "غير محدد").trim() || "غير محدد";
     counts[source] = (counts[source] || 0) + 1;
+    const conf = Number(item.confidence);
+    if (isFinite(conf) && conf > 0) {
+      confidences[source] = (confidences[source] || []).concat(conf);
+    }
   }
+  const trustToneOf = (avg) => (avg >= 0.8 ? "strong" : avg >= 0.55 ? "medium" : "weak");
   const chips = [
     `<button type="button" class="results-source-chip opp-platform-chip${oppState.platform ? "" : " active"}" data-opp-platform="" title="عرض فرص كل المنصات">الكل <b>${list.length}</b></button>`,
   ];
   for (const [source, count] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
-    chips.push(`<button type="button" class="results-source-chip opp-platform-chip${oppState.platform === source ? " active" : ""}" data-opp-platform="${escapeHtml(source)}" title="عرض فرص ${escapeHtml(source)} فقط">${escapeHtml(source)} <b>${count}</b></button>`);
+    const confs = confidences[source] || [];
+    const avg = confs.length ? confs.reduce((a, b) => a + b, 0) / confs.length : null;
+    const trustAttr = avg != null
+      ? `data-trust-score="${Math.round(avg * 100)}" data-trust-tone="${trustToneOf(avg)}" data-trust-label="متوسط ثقة الفرص"`
+      : "";
+    chips.push(`<button type="button" class="results-source-chip opp-platform-chip${oppState.platform === source ? " active" : ""}" data-opp-platform="${escapeHtml(source)}" title="عرض فرص ${escapeHtml(source)} فقط" ${trustAttr}>${avg != null ? `<span class="results-source-dot ${trustToneOf(avg)}" aria-hidden="true"></span>` : ""}${escapeHtml(source)} <b>${count}</b></button>`);
   }
   root.innerHTML = `<span class="results-sources-label">مصادر هذه النتائج:</span>${chips.join("")}`;
   root.hidden = false;
+  bindSourceTrustTip(root);
 }
 
 function oppClientChips(item) {
