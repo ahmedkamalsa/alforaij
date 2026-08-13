@@ -60,6 +60,15 @@ def _ttl_cached(key: str, ttl: float, builder):
     return value
 
 
+def _dashboard_cache_key(selected: set[str], include_local: bool) -> str | None:
+    """مفتاح الكاش الذكي للوحة: اللوحة الافتراضية (كل المنصات + المحلي) مخزنة،
+    وأي فلاتر مخصصة أو إقصاء للمحلي يُبنى حيًا دائمًا — فلاتر المستخدم لا تنتظر كاشًا.
+    يعيد None عند الحاجة للبناء الحي (بلا كاش) ومفتاح الكاش عند التخزين."""
+    if not selected and include_local:
+        return "dashboard:default"
+    return None
+
+
 def _build_health_payload() -> dict:
     listings = load_listings()
     data_summary = supabase_data_summary(len(listings))
@@ -767,11 +776,11 @@ class Handler(BaseHTTPRequestHandler):
             def _build_dashboard():
                 return _dashboard_summary(load_listings(), selected_platforms=selected, include_local=include_local)
 
-            # كاش ذكي حسب الفلاتر: اللوحة الافتراضية (كل المنصات + المحلي) مخزنة 90
-            # ثانية لأنها الأكثر فتحًا وبياناتها تتغير بالحصاد اليومي فقط؛ أما أي فلاتر
-            # مخصصة فتُبنى حية دائمًا حتى يشعر المستخدم بفلاتره فورًا بلا انتظار كاش.
-            if not selected and include_local:
-                json_response(self, _ttl_cached("dashboard:default", 90, _build_dashboard))
+            # كاش ذكي حسب الفلاتر: الافتراضية مخزنة 90 ثانية، والفلاتر المخصصة حية
+            # دائمًا (انظر _dashboard_cache_key — القرار مُختبر باختبار وحدة).
+            cache_key = _dashboard_cache_key(selected, include_local)
+            if cache_key:
+                json_response(self, _ttl_cached(cache_key, 90, _build_dashboard))
             else:
                 json_response(self, _build_dashboard())
             return
