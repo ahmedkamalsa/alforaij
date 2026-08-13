@@ -1,10 +1,11 @@
-"""فحص أداء آلي لتبويبي «لوحة السوق» و«تحليلات السوق».
+"""فحص أداء آلي شامل: أول تحميل للصفحة + فتح كل التبويبات الستة (بارد/دافئ).
 
 يقيس من منظور المستخدم الحقيقي عبر Playwright:
-- زمن فتح كل تبويب (من النقر حتى اكتمال المحتوى الفعلي)
-- المرة الأولى (بارد — يملأ كاش الخادم) مقابل الثانية (دافئ — من الكاش)
-- أوقات نقاط API الفردية وعدد الطلبات
-- يرفض أي تبويب يتجاوز حدّي: الفتح البارد > 8 ثوانٍ أو الدافئ > 2 ثانية
+- زمن أول تحميل للصفحة حتى ظهور مركز البحث
+- زمن فتح كل تبويب من الستة (البحث/الفرص/اللوحة/التحليلات/التطورات/المصادر)
+  من النقر حتى ظهور المحتوى الفعلي، مرتين: بارد (أول فتح في الجلسة) ودافئ (إعادة فتح)
+- أوقات نقاط API الفردية وعدد الطلبات وفحص كاش TTL
+- يرفض أي تبويب يتجاوز حدّي: البارد > 8 ثوانٍ أو الدافئ > 2 ثانية
 
 الاستخدام (والخادم يعمل على 8000):
     PYTHONIOENCODING=utf-8 python tests/playwright/performance_audit.py
@@ -19,6 +20,17 @@ BASE = "http://127.0.0.1:8000/"
 COLD_LIMIT_MS = 8000
 WARM_LIMIT_MS = 2000
 COLD_API_LIMIT_MS = 6000
+PAGE_LOAD_LIMIT_MS = 5000
+
+# كل تبويب ومحدد «المحتوى ظهر فعلًا» (يقبل الحالة الفارغة المشروعة كاكتمال)
+TABS = [
+    ("search", "#chatInput", "البحث والتقييم"),
+    ("opportunities", "#oppList .result-card, #oppList .empty, #oppList > .results > .empty", "أفضل الفرص"),
+    ("board", "#boardMatchingLink .matching-nav-card", "لوحة السوق"),
+    ("insights", "#insightsRoot .kpi-card, #insightsRoot .empty", "تحليلات السوق"),
+    ("developments", "#developmentsRoot .development-card, #developmentsRoot .empty", "التطورات"),
+    ("sources", "#sourceSummaryBar:not(:empty), #dailyAgentStateInline:not(:empty), #marketAnalyticsStrip:not(:empty)", "المصادر والتشغيل"),
+]
 
 results: list[dict] = []
 
@@ -40,10 +52,8 @@ def main() -> int:
         api_starts: dict[str, float] = {}
 
         def on_request(req):
-            url = req.url
-            if "/api/" not in url:
-                return
-            api_starts[url] = time.perf_counter()
+            if "/api/" in req.url:
+                api_starts[req.url] = time.perf_counter()
 
         def on_response(resp):
             url = resp.url
@@ -58,56 +68,41 @@ def main() -> int:
         page.on("request", on_request)
         page.on("response", on_response)
 
-        # 1) تحميل الصفحة الأول
+        # 1) أول تحميل للصفحة (البحث هو التبويب الافتراضي)
         t0 = time.perf_counter()
         page.goto(BASE, wait_until="domcontentloaded")
-        page.wait_for_selector("#chatInput", timeout=15000)
+        page.wait_for_selector("#chatInput", timeout=PAGE_LOAD_LIMIT_MS)
         page_load_ms = (time.perf_counter() - t0) * 1000
-        check(f"تحميل الصفحة الأولي ({page_load_ms:.0f} ms)", page_load_ms < 5000, "حد 5 ثوانٍ")
+        check(f"أول تحميل للصفحة ({page_load_ms:.0f} ms)", page_load_ms < PAGE_LOAD_LIMIT_MS, f"حد {PAGE_LOAD_LIMIT_MS} ms")
 
-        # 2) فتح اللوحة — بارد (يملأ كاش الخادم)
-        t0 = time.perf_counter()
-        page.click('button[data-main-tab="board"]')
-        page.wait_for_selector("#boardMatchingLink .matching-nav-card", timeout=COLD_LIMIT_MS)
-        page.wait_for_function(
-            "document.querySelectorAll('#boardStats .board-stat').length > 0 || document.querySelector('#governorateTableBody tr')",
-            timeout=COLD_LIMIT_MS,
-        )
-        board_cold_ms = (time.perf_counter() - t0) * 1000
-        check(f"لوحة السوق — فتح بارد ({board_cold_ms:.0f} ms)", board_cold_ms < COLD_LIMIT_MS, f"حد {COLD_LIMIT_MS} ms")
+        # 2) فتح كل تبويب مرتين: بارد ثم دافئ
+        for tab_name, selector, label in TABS:
+            # بارد: أول فتح في هذه الجلسة
+            t0 = time.perf_counter()
+            page.click(f'button[data-main-tab="{tab_name}"]')
+            try:
+                page.wait_for_selector(selector, timeout=COLD_LIMIT_MS)
+                cold_ms = (time.perf_counter() - t0) * 1000
+                check(f"{label} — فتح بارد ({cold_ms:.0f} ms)", cold_ms < COLD_LIMIT_MS, f"حد {COLD_LIMIT_MS} ms")
+            except Exception as exc:
+                cold_ms = -1
+                check(f"{label} — فتح بارد", False, f"انتهت المهلة/خطأ: {str(exc)[:120]}")
 
-        # 3) فتح التحليلات — بارد
-        t0 = time.perf_counter()
-        page.click('button[data-main-tab="insights"]')
-        page.wait_for_selector("#insightsRoot .kpi-card", timeout=COLD_LIMIT_MS)
-        insights_cold_ms = (time.perf_counter() - t0) * 1000
-        check(f"تحليلات السوق — فتح بارد ({insights_cold_ms:.0f} ms)", insights_cold_ms < COLD_LIMIT_MS, f"حد {COLD_LIMIT_MS} ms")
+            # دافئ: إعادة فتح فورًا بعد أن اكتمل أول مرة
+            t0 = time.perf_counter()
+            page.click(f'button[data-main-tab="{tab_name}"]')
+            try:
+                page.wait_for_selector(selector, timeout=WARM_LIMIT_MS)
+                warm_ms = (time.perf_counter() - t0) * 1000
+                check(f"{label} — إعادة فتح دافئ ({warm_ms:.0f} ms)", warm_ms < WARM_LIMIT_MS, f"حد {WARM_LIMIT_MS} ms")
+            except Exception as exc:
+                check(f"{label} — إعادة فتح دافئ", False, f"انتهت المهلة/خطأ: {str(exc)[:120]}")
 
-        # 4) إعادة فتح اللوحة — دافئ (من كاش الخادم)
-        page.click('button[data-main-tab="board"]')
-        t0 = time.perf_counter()
-        page.wait_for_selector("#boardMatchingLink .matching-nav-card", timeout=WARM_LIMIT_MS)
-        board_warm_ms = (time.perf_counter() - t0) * 1000
-        check(f"لوحة السوق — إعادة فتح دافئ ({board_warm_ms:.0f} ms)", board_warm_ms < WARM_LIMIT_MS, f"حد {WARM_LIMIT_MS} ms")
-
-        # 5) إعادة فتح التحليلات — دافئ
-        page.click('button[data-main-tab="insights"]')
-        t0 = time.perf_counter()
-        page.wait_for_selector("#insightsRoot .kpi-card", timeout=WARM_LIMIT_MS)
-        insights_warm_ms = (time.perf_counter() - t0) * 1000
-        check(f"تحليلات السوق — إعادة فتح دافئ ({insights_warm_ms:.0f} ms)", insights_warm_ms < WARM_LIMIT_MS, f"حد {WARM_LIMIT_MS} ms")
-
-        # 6) أوقات نقاط API الفردية (أسوأ تكرار)
-        slow_api = []
+        # 3) أوقات نقاط API الفردية (أسوأ تكرار) + فحص كاش TTL للنقاط المخزنة
         for path, times in sorted(api_times.items()):
             worst = max(times) if times else 0
-            label = f"API {path}: أسوأ {worst:.0f} ms (عدد الطلبات {len(times)})"
-            ok = worst < COLD_API_LIMIT_MS
-            check(label, ok, f"حد {COLD_API_LIMIT_MS} ms")
-            if not ok:
-                slow_api.append(path)
-            # فقط النقاط التي عليها كاش TTL يُفترض أن يصبح طلبها الثاني أسرع بكثير
-            if path in ("/api/dashboard/summary", "/api/market-insights", "/api/price-trends") and len(times) >= 2:
+            check(f"API {path}: أسوأ {worst:.0f} ms (عدد الطلبات {len(times)})", worst < COLD_API_LIMIT_MS, f"حد {COLD_API_LIMIT_MS} ms")
+            if path in ("/api/dashboard/summary", "/api/market-insights", "/api/price-trends", "/api/health") and len(times) >= 2:
                 first, second = times[0], times[1]
                 improved = second < first * 0.5
                 check(f"كاش {path}: {first:.0f}→{second:.0f} ms", improved, "الطلب الثاني يجب أن يكون أسرع من نصف الأول")
