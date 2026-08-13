@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
+
+# كاش بفترة صلاحية: روابط المصادر المرجعية لا تتغير كل لحظة،
+# فلا داعي لإعادة فحصها تسلسليًا (حتى ~48 ثانية) عند كل استدعاء.
+_CACHE: dict[str, Any] = {"at": 0.0, "payload": None}
+_CACHE_TTL_SECONDS = 6 * 60 * 60  # 6 ساعات
 
 
 OFFICIAL_REFERENCE_SOURCES: list[dict[str, str]] = [
@@ -50,26 +57,48 @@ OFFICIAL_REFERENCE_SOURCES: list[dict[str, str]] = [
 ]
 
 
-def check_official_reference_sources(timeout: int = 10) -> dict[str, Any]:
-    checks = []
-    for source in OFFICIAL_REFERENCE_SOURCES:
-        status = "unchecked"
-        detail = ""
-        try:
-            request = urllib.request.Request(
-                source["url"],
-                headers={"User-Agent": "Mozilla/5.0 alforaij-research-assistant/1.0"},
-                method="GET",
-            )
-            with urllib.request.urlopen(request, timeout=timeout) as response:
-                status = "reachable" if 200 <= response.status < 400 else f"http_{response.status}"
-        except Exception as exc:
-            status = "unreachable"
-            detail = str(exc)[:180]
-        checks.append({**source, "status": status, "detail": detail})
+def _check_one(source: dict[str, str], timeout: int) -> dict[str, Any]:
+    status = "unchecked"
+    detail = ""
+    try:
+        request = urllib.request.Request(
+            source["url"],
+            headers={"User-Agent": "Mozilla/5.0 alforaij-research-assistant/1.0"},
+            method="GET",
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = "reachable" if 200 <= response.status < 400 else f"http_{response.status}"
+    except Exception as exc:
+        status = "unreachable"
+        detail = str(exc)[:180]
+    return {**source, "status": status, "detail": detail}
+
+
+def _build_payload(timeout: int) -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=len(OFFICIAL_REFERENCE_SOURCES)) as pool:
+        futures = {pool.submit(_check_one, source, timeout): source for source in OFFICIAL_REFERENCE_SOURCES}
+        for future in as_completed(futures):
+            checks.append(future.result())
+    checks.sort(key=lambda row: (row["status"] != "reachable", row["name"]))
     return {
         "count": len(checks),
         "reachable": sum(1 for row in checks if row["status"] == "reachable"),
         "sources": checks,
         "note": "هذه مصادر مرجعية مجانية. لا تدخل أرقامها في التقييم إلا عند استخراج بيانات منظمة أو إدخال CSV/JSON موثق.",
     }
+
+
+def check_official_reference_sources(timeout: int = 10, force: bool = False) -> dict[str, Any]:
+    """فحص المصادر الرسمية بالتوازي مع كاش بفترة صلاحية.
+
+    - الفحص المتوازي يحدّ زمن الانتظار إلى أقصى مهلة واحدة بدل مجموعها.
+    - الكاش (6 ساعات) يمنع إعادة الفحص عند كل استدعاء — يكفي الوكيل اليومي.
+    """
+    now = time.time()
+    cached = _CACHE.get("payload")
+    if not force and cached is not None and (now - _CACHE["at"]) < _CACHE_TTL_SECONDS:
+        return cached
+    payload = _build_payload(timeout)
+    _CACHE.update(at=time.time(), payload=payload)
+    return payload

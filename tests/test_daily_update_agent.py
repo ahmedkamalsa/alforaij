@@ -18,6 +18,20 @@ class DailyUpdateAgentTests(unittest.TestCase):
             mock.patch.object(daily_update_agent, "save_opportunities"), \
             mock.patch.object(daily_update_agent, "supabase_data_summary", return_value={"tables": {}}), \
             mock.patch.object(daily_update_agent, "save_update_notifications"), \
+            mock.patch.object(daily_update_agent, "check_official_reference_sources", \
+                       return_value={"count": 0, "reachable": 0, "sources": []}), \
+            mock.patch.object(daily_update_agent, "_import_official", \
+                       return_value={"status": "empty", "count": 0, "note": "mocked"}), \
+            mock.patch.object(daily_update_agent, "save_market_listings", \
+                       return_value={"status": "empty", "count": 0}), \
+            mock.patch.object(daily_update_agent, "save_price_trends", \
+                       return_value={"status": "empty", "count": 0}), \
+            mock.patch.object(daily_update_agent, "discover_market_developments", \
+                       return_value={"status": "ok", "count": 0, "developments": [], "note": "mocked"}), \
+            mock.patch.object(daily_update_agent, "save_developments_local", \
+                       return_value={"status": "empty"}), \
+            mock.patch.object(daily_update_agent, "save_market_developments", \
+                       return_value={"status": "empty"}), \
             mock.patch("backend.services.whatsapp_sender.send_whatsapp_alerts", \
                        return_value={"status": "not_configured", "sent": 0, "failed": 0, "total": 0}), \
             mock.patch.object(daily_update_agent, "_write_status"):

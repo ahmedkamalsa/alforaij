@@ -478,7 +478,7 @@
         <details class="collapsible ops-advanced">
           <summary>استيراد يدوي احتياطي لصفقات وزارة العدل</summary>
           <p class="scope-note">المسار الأساسي أوتوماتيكي عبر الوكيل اليومي و <code>OFFICIAL_TRANSACTIONS_SOURCE</code>. استخدم هذا فقط عند توفر CSV/JSON موثق وتريد إدخاله فورًا.</p>
-          <input id="officialImportFile" type="file" accept=".csv,.json,text/csv,application/json">
+          <input id="officialImportFile" type="file" accept=".csv,.json,text/csv,application/json" aria-label="ملف صفقات وزارة العدل (CSV/JSON)" title="اختر ملف CSV أو JSON لصفقات وزارة العدل">
           <div class="ops-actions">
             <button id="officialImportBtn" class="primary" type="button">استيراد الصفقات</button>
           </div>
@@ -640,6 +640,6 @@
     <span class="chat-fab-label">اسأل المساعد</span>
   </button>
 
-  <script src="app.js?v=20260814-copylinks"></script>
+  <script src="app.js?v=20260814-a11yfile"></script>
 </body>
 </html>

@@ -36,7 +36,9 @@ class TestMarketHarvest(unittest.TestCase):
         with mock.patch(
             "backend.services.opportunities.search_external_sources",
             return_value=([ext], [{"name": "Mourjan", "status": "success", "records": 1}]),
-        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
+        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])), \
+             mock.patch("backend.services.opportunities.scan_opensooq_inventory", return_value=([], {"name": "OpenSooq (جرد كامل)", "status": "no_results", "records": 0})), \
+             mock.patch("backend.services.opportunities.enrich_listings_from_details", return_value={"enriched": 0, "read": 0, "status": "no_candidates", "note": "mocked"}):
             snapshot = opportunities.build_opportunities(include_external=True, return_external=True)
         rows = snapshot.get("externalListings", [])
         self.assertTrue(rows)
@@ -55,7 +57,9 @@ class TestMarketHarvest(unittest.TestCase):
         with mock.patch(
             "backend.services.opportunities.search_external_sources",
             return_value=([self._external_listing()], []),
-        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])):
+        ), mock.patch("backend.services.opportunities.search_combo_sources", return_value=([], [])), \
+             mock.patch("backend.services.opportunities.scan_opensooq_inventory", return_value=([], {"name": "OpenSooq (جرد كامل)", "status": "no_results", "records": 0})), \
+             mock.patch("backend.services.opportunities.enrich_listings_from_details", return_value={"enriched": 0, "read": 0, "status": "no_candidates", "note": "mocked"}):
             snapshot = opportunities.build_opportunities(include_external=True, return_external=False)
         self.assertNotIn("externalListings", snapshot)
 
