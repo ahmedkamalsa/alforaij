@@ -40,6 +40,52 @@ _OPPORTUNITIES_PREVIOUS: dict | None = None  # اللقطة السابقة لل�
 _OPPORTUNITIES_CACHE_AT = 0.0
 _OPPORTUNITIES_TTL_SECONDS = 300
 
+# ---- كاش TTL عام لنقاط اللوحة والتحليلات (البيانات تتغير بالحصاد اليومي فقط،
+# فإعادة الاستعلام من Supabase عند كل فتح تبويب إهدار للوقت بلا فائدة) ----
+_TTL_CACHE: dict[str, tuple[float, dict]] = {}
+_TTL_CACHE_LOCK = _threading.Lock()
+
+
+def _ttl_cached(key: str, ttl: float, builder):
+    """يعيد قيمة من الكاش إن لم تنتهِ مدة صلاحيتها، وإلا يبنيها ويخزنها."""
+    now = time.time()
+    with _TTL_CACHE_LOCK:
+        hit = _TTL_CACHE.get(key)
+        if hit and now - hit[0] < ttl:
+            return hit[1]
+    value = builder()
+    with _TTL_CACHE_LOCK:
+        _TTL_CACHE[key] = (time.time(), value)
+    return value
+
+
+def _build_health_payload() -> dict:
+    listings = load_listings()
+    data_summary = supabase_data_summary(len(listings))
+    tables = (data_summary or {}).get("tables") or {}
+    market_harvested = int((tables.get("market_listings") or {}).get("count") or 0)
+    market_live = int((tables.get("market_ads") or {}).get("count") or 0)
+    external_total = market_harvested + market_live
+    by_source: list[dict] = []
+    try:
+        from backend.services.supabase_store import fetch_market_listing_source_counts
+        by_source = fetch_market_listing_source_counts() or []
+    except Exception as exc:
+        logger.warning("Health bySource failed: %s", exc)
+    return {
+        "status": "ok",
+        "records": len(listings),
+        "recordsMeaning": "إعلانات الفريج المحلية المحملة كخط أساس.",
+        "totalRecords": len(listings) + external_total,
+        "localRecords": len(listings),
+        "externalRecords": external_total,
+        "bySource": by_source,
+        "supabase": supabase_is_configured(),
+        "dataSummary": data_summary,
+        "aiAnalysis": bool(AGENT_ROUTER_API_KEY),
+    }
+
+
 # ---- بثّ تقدم البحث الحي: يُملأ أثناء تشغيل /api/analyze ويُقرأ من الواجهة بالاقتراع ----
 _ANALYZE_PROGRESS: dict[str, dict] = {}
 _ANALYZE_PROGRESS_LOCK = _threading.Lock()
@@ -621,30 +667,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/health":
             # الإجمالي عبر كل المصادر: الفريج المحلي + حصاد المواقع الخارجية (market_listings)
             # + إعلانات السوق الحية (market_ads) — لا نكتفي بعدد الفريج المحلي وحده.
-            listings = load_listings()
-            data_summary = supabase_data_summary(len(listings))
-            tables = (data_summary or {}).get("tables") or {}
-            market_harvested = int((tables.get("market_listings") or {}).get("count") or 0)
-            market_live = int((tables.get("market_ads") or {}).get("count") or 0)
-            external_total = market_harvested + market_live
-            by_source: list[dict] = []
-            try:
-                from backend.services.supabase_store import fetch_market_listing_source_counts
-                by_source = fetch_market_listing_source_counts() or []
-            except Exception as exc:
-                logger.warning("Health bySource failed: %s", exc)
-            json_response(self, {
-                "status": "ok",
-                "records": len(listings),
-                "recordsMeaning": "إعلانات الفريج المحلية المحملة كخط أساس.",
-                "totalRecords": len(listings) + external_total,
-                "localRecords": len(listings),
-                "externalRecords": external_total,
-                "bySource": by_source,
-                "supabase": supabase_is_configured(),
-                "dataSummary": data_summary,
-                "aiAnalysis": bool(AGENT_ROUTER_API_KEY),
-            })
+            # كاش 120 ثانية: الفحص يستعلم ~13 جدولًا في Supabase (3-6 ثوانٍ) والمعلومات
+            # تتغير بالحصاد اليومي فقط — تكراره في كل تحميل صفحة إهدار.
+            json_response(self, _ttl_cached("health", 120, _build_health_payload))
             return
         if path == "/api/sources":
             json_response(self, {"sources": source_registry()})
@@ -684,7 +709,8 @@ class Handler(BaseHTTPRequestHandler):
             # تحليلات السوق (الموجة 1): عائد الإيجار واتجاه سعر المتر لكل منطقة
             from backend.services.supabase_store import fetch_market_insights
             try:
-                json_response(self, fetch_market_insights())
+                # كاش 5 دقائق: تجميع 8000 صف من market_listings ثقيل — يُعاد فقط عند انتهاء الصلاحية
+                json_response(self, _ttl_cached("market-insights", 300, fetch_market_insights))
             except Exception as exc:
                 logger.exception("Market insights failed")
                 json_response(self, {"error": "Market insights failed", "detail": str(exc)}, status=500)
@@ -698,7 +724,10 @@ class Handler(BaseHTTPRequestHandler):
                 if item.strip()
             }
             include_local = params.get("includeLocal", ["1"])[0] != "0"
-            json_response(self, _dashboard_summary(load_listings(), selected_platforms=selected, include_local=include_local))
+            # كاش 90 ثانية: البيانات تتغير بالحصاد اليومي فقط، واللوحة تُفتح كثيرًا
+            # دون تغيير الفلاتر — المفتاح يشمل الفلاتر فلا يُخلط طلب بآخر.
+            cache_key = f"dashboard:{','.join(sorted(selected))}:{include_local}"
+            json_response(self, _ttl_cached(cache_key, 90, lambda: _dashboard_summary(load_listings(), selected_platforms=selected, include_local=include_local)))
             return
         if path == "/api/update-notifications":
             from backend.services.update_notifications import load_update_notifications
@@ -793,10 +822,9 @@ class Handler(BaseHTTPRequestHandler):
             from backend.services.supabase_store import fetch_price_trends
             params = parse_qs(urlparse(self.path).query)
             area = (params.get("area") or [""])[0]
-            json_response(self, {
-                "rows": fetch_price_trends(area=area or None, limit=2000),
-                "tableOk": True,
-            })
+            # كاش 5 دقائق — المفتاح يشمل المنطقة المطلوبة.
+            cache_key = f"price-trends:{area or '*'}"
+            json_response(self, _ttl_cached(cache_key, 300, lambda: {"rows": fetch_price_trends(area=area or None, limit=2000), "tableOk": True}))
             return
         if path == "/api/market-matching":
             # العرض والطلب: التوفيق العملي بين طلبات «مطلوب للشراء/للإيجار» وأفضل الفرص المقيّمة
