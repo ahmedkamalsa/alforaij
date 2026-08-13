@@ -63,13 +63,13 @@ backend/
     official_data.py       (الصفقات الرسمية من Supabase/ملف/الحسبة)
     official_indicators.py (مؤشرات رسمية: سعر المتر المرجعي)
     alhisba_public.py      (الحسبة العامة — صفقات موثقة)
-    browser_search.py / external_search.py / partner_api.py / partner_feed.py
+    external_search.py     (بحث المواقع الحية)
   services/          ← منطق الأعمال
     request_parser.py      (فهم النص الحر)
     matching.py            (درجة المطابقة: منطقة 40 + نوع 30 + ميزانية 30)
     valuation.py           (المقارنات + حكم السعر + درجة الثقة)
-    comparables.py / evidence.py / official_valuation.py / financing_calculator.py
-    deduplication.py / normalizer.py / query_planner.py / property_profile.py
+    official_valuation.py / financing_calculator.py
+    deduplication.py / property_profile.py
     report_generator.py    (تقرير JSON عربي كامل + حالة المصادر + الخطة)
     ai_evaluator.py        (تحليل الخبير AI أو المحلي)
     opportunities.py       (الفرص: فئات زمنية/توقعات/توفيق العرض والطلب/دلتا/موجز)
@@ -77,7 +77,7 @@ backend/
     supabase_store.py      (كل عمليات Supabase — متسامحة تمامًا)
     pdf_report.py          (تقرير PDF عربي بـ reportlab)
     source_registry.py / official_source_agent.py / official_import.py
-    update_notifications.py / deal_index.py
+    update_notifications.py
   data/              ← seed_listings.json (182) + قواعد/مستخلصات
 supabase/
   migrations/ 001..010   ← مخطط قاعدة البيانات (يُدمج في setup_all.sql)

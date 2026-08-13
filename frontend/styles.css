@@ -1216,26 +1216,10 @@ button:hover {
   box-shadow: 0 8px 18px rgba(37, 84, 217, .18);
 }
 
-.mode-row,
 .actions {
   display: flex;
   gap: 8px;
   margin-top: 12px;
-}
-
-.mode-row {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.mode-row button {
-  flex: 1;
-  border: 0;
-  border-radius: 0;
-}
-
-.actions {
   flex-wrap: wrap;
 }
 
@@ -1515,78 +1499,6 @@ button:hover {
 
 .insights-section {
   margin-top: 18px;
-}
-
-.insight-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.insight-card {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .05);
-}
-
-.insight-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.insight-card-head strong {
-  font-size: 14px;
-}
-
-.yield-pct {
-  font-size: 15px;
-  font-weight: 900;
-  border-radius: 999px;
-  padding: 3px 10px;
-}
-
-.yield-high .yield-pct {
-  background: rgba(26, 127, 79, .2);
-  color: #2fbf7f;
-}
-
-.yield-mid .yield-pct {
-  background: rgba(214, 158, 46, .2);
-  color: #e2b13c;
-}
-
-.yield-low .yield-pct {
-  background: rgba(224, 62, 62, .18);
-  color: #e06565;
-}
-
-.insight-card-body {
-  display: grid;
-  gap: 4px;
-  font-size: 12px;
-  opacity: .92;
-}
-
-.insight-card-body small {
-  opacity: .75;
-}
-
-.insight-gov {
-  color: var(--blue);
-  font-weight: 700;
-}
-
-.insights-govs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
 }
 
 /* ─── تحليلات السوق — الواجهة الاحترافية (بطاقات KPI + أشرطة + رسم محسّن) ─── */
@@ -3079,11 +2991,6 @@ button.results-source-chip:hover {
   background: var(--red-soft);
   color: var(--red);
   border-color: rgba(248, 113, 113, .5);
-}
-
-.watched-count {
-  color: var(--amber);
-  font-size: 12px;
 }
 
 .heat-cell {
@@ -4847,10 +4754,6 @@ body.drill-open {
     width: 36px;
   }
 
-  .mode-row {
-    display: grid;
-  }
-
   .status,
   .verdict {
     margin-top: 12px;
@@ -4862,7 +4765,6 @@ body.drill-open {
   .topbar,
   .action-toolbar,
   .actions,
-  .mode-row,
   #downloadReportBtn,
   #downloadReportBtnTop {
     display: none;
