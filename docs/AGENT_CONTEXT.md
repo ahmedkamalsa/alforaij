@@ -311,6 +311,10 @@ PYTHONIOENCODING=utf-8 python tests/playwright/testsprint_audit.py
 # فحص حي لنقاط API: /api/health، المصادر، التحليلات، اللوحة، الفرص، التطورات،
 #   الوكيل اليومي، /api/parse (فهم الطلب كاملًا) و /api/analyze (تحليل كامل)
 PYTHONIOENCODING=utf-8 python tests/playwright/api_audit.py
+# فحص تباين ألوان تلقائي (WCAG AA) لبطاقات النتائج والشرائح في الوضعين الفاتح
+#   والداكن: يقيس نسبة التباين الفعلية (نص عادي ≥4.5:1، كبير ≥3:1) مع دمج
+#   الخلفيات الشفافة وأسوأ نقطة توقف في التدرجات
+PYTHONIOENCODING=utf-8 python tests/playwright/contrast_audit.py
 ```
 
 - `tests/test_*.py` (21 ملفًا): التحليل، API، الفرص، الحصاد، المصادر الحية، التوفيق،
@@ -326,6 +330,13 @@ PYTHONIOENCODING=utf-8 python tests/playwright/api_audit.py
   `tests/playwright/api_audit.py` (13 فحصًا حيًا لنقاط API) — أدوات مراجعة دائمة
   بأسلوب TestSprint: تكشف أخطاء الكونسول، الطلبات الفاشلة، تكرار المحافظات،
   العناصر بلا أسماء وصفية، وأهداف اللمس الصغيرة.
+- `tests/playwright/contrast_audit.py` — فحص تباين WCAG AA تلقائي لبطاقات النتائج
+  (`.result-card` بكافة أنواعها) والشرائح (`.results-source-chip`،
+  `.opp-platform-chip`، `.filter-chip`، `.area-chip`، `.pill`) في الوضعين:
+  يدمج الألوان الشفافة مع الطبقات تحتها ويأخذ أسوأ نقطة توقف في التدرجات
+  (يدعم rgba وhex). يكشف الأخطاء مثل الخلفيات الصلبة المنسية (#fbfdff) وألوان
+  الثيم الضعيفة — أُصلح بفضله 194 مخالفة (متغيرات الثيم، واتساب، rank-cell،
+  شرائح الإحصاءات، وملفات تفاصيل النتائج).
 - **CI**: `.github/workflows/mobile-checks.yml` يعمل عند أي تغيير في `frontend/**`
   (يُثبّت Chromium ويشغّل الفحصين) — فلا يرتد التجاوز/الأهداف الصغيرة مستقبلًا.
 

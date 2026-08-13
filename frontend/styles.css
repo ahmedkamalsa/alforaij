@@ -4,16 +4,20 @@
   --surface: rgba(255, 255, 255, .07);
   --panel: rgba(255, 255, 255, .04);
   --ink: #e8eef7;
-  --muted: #9fb0c6;
+  --muted: #b3c2d5;
   --line: rgba(255, 255, 255, .14);
   --navy: #0f172a;
-  --blue: #5b8cff;
-  --blue-soft: rgba(91, 140, 255, .16);
-  --green: #34d399;
+  --blue: #a5c2ff;
+  --blue-deep: #3b66f0;
+  --blue-soft: rgba(91, 140, 255, .10);
+  --violet: #b7a0ff;
+  --violet-soft: rgba(139, 92, 246, .16);
+  --green: #4ade80;
   --green-soft: rgba(52, 211, 153, .14);
   --amber: #fbbf24;
   --amber-soft: rgba(251, 191, 36, .14);
-  --red: #f87171;
+  --red: #fca5a5;
+  --red-soft: rgba(248, 113, 113, .08);
   --shadow: 0 10px 30px rgba(2, 6, 16, .45);
   --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, .10) 0%, rgba(255, 255, 255, .04) 55%, rgba(255, 255, 255, .08) 100%);
   --glass-border: rgba(255, 255, 255, .16);
@@ -32,13 +36,17 @@
   --muted: #4b5d79;
   --line: rgba(21, 34, 56, .14);
   --navy: #e2eaf8;
-  --blue: #2563eb;
+  --blue: #1d4ed8;
+  --blue-deep: #1d4ed8;
   --blue-soft: rgba(37, 99, 235, .12);
-  --green: #059669;
+  --violet: #6d28d9;
+  --violet-soft: rgba(109, 40, 217, .12);
+  --green: #065f46;
   --green-soft: rgba(5, 150, 105, .12);
-  --amber: #d97706;
+  --amber: #92400e;
   --amber-soft: rgba(217, 119, 6, .12);
-  --red: #dc2626;
+  --red: #b91c1c;
+  --red-soft: rgba(248, 113, 113, .12);
   --shadow: 0 10px 30px rgba(30, 41, 59, .14);
   --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, .78) 0%, rgba(255, 255, 255, .50) 55%, rgba(255, 255, 255, .66) 100%);
   --glass-border: rgba(30, 58, 138, .20);
@@ -153,6 +161,11 @@
 [data-theme="light"] .result-card {
   background: rgba(255, 255, 255, .92);
   box-shadow: 0 6px 22px rgba(30, 41, 59, .10);
+}
+
+/* رقم الترتيب على الفاتح: أزرق ثابت حتى يبقى النص الأبيض مقروءًا (AA) */
+[data-theme="light"] .rank-cell {
+  background: linear-gradient(120deg, #2563eb, #1d4ed8);
 }
 
 [data-theme="light"] .fact-cell,
@@ -440,7 +453,7 @@ textarea {
   margin-inline-start: 6px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: var(--blue, #1457A8);
+  background: var(--blue-deep, #1457A8);
   color: #fff;
   font-size: 12px;
   font-weight: 900;
@@ -852,7 +865,7 @@ textarea {
 .companion-head span {
   padding: 4px 8px;
   border-radius: 999px;
-  background: #eaf2ff;
+  background: var(--blue-soft);
   color: var(--blue);
   font-size: 12px;
   font-weight: 900;
@@ -935,7 +948,7 @@ textarea {
 
 .companion-actions button:hover,
 .companion-actions a:hover {
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
 }
 
@@ -1010,7 +1023,7 @@ textarea {
 }
 
 .gov-areas-btn:hover {
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
 }
 
@@ -1046,7 +1059,7 @@ textarea {
 }
 
 .count-button:not(:disabled):hover {
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
 }
 
@@ -1066,7 +1079,7 @@ textarea {
 }
 
 .governorate-table td.selected .count-button {
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
 }
 
@@ -1196,9 +1209,9 @@ button:hover {
 
 .primary,
 .mode.active {
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
-  border-color: var(--blue);
+  border-color: var(--blue-deep);
   box-shadow: 0 8px 18px rgba(37, 84, 217, .18);
 }
 
@@ -2031,7 +2044,7 @@ button:hover {
 
 .ops-card-primary {
   border-right: 5px solid var(--blue);
-  background: #fbfdff;
+  background: var(--panel);
 }
 
 .ops-card h3 {
@@ -2050,7 +2063,7 @@ button:hover {
   padding: 8px;
   border: 1px dashed #b9c7db;
   border-radius: 8px;
-  background: #fbfdff;
+  background: var(--panel);
 }
 
 .ops-actions {
@@ -2372,9 +2385,9 @@ button:hover {
 
 .results-copy-sources:hover,
 .results-copy-sources:focus-visible {
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
-  border-color: var(--blue);
+  border-color: var(--blue-deep);
   outline: none;
 }
 
@@ -2454,8 +2467,8 @@ button.results-source-chip:hover {
 }
 
 .opp-platform-chip.active {
-  border-color: var(--blue);
-  background: var(--blue);
+  border-color: var(--blue-deep);
+  background: var(--blue-deep);
   color: #fff;
 }
 
@@ -2627,7 +2640,7 @@ button.results-source-chip:hover {
 .details-btn {
   padding: 8px 16px;
   border-radius: 9px;
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
   font-weight: 800;
   border: 1px solid transparent;
@@ -2723,12 +2736,12 @@ button.results-source-chip:hover {
 }
 
 .score-item.yield-mid {
-  background: var(--accent-soft, var(--blue-soft, #EFF6FF));
+  background: var(--blue-soft);
   border-color: #BFDBFE;
 }
 
 .score-item.yield-weak {
-  background: var(--warn-soft, #FFF7ED);
+  background: var(--amber-soft);
   border-color: #FDBA74;
 }
 
@@ -2776,7 +2789,7 @@ button.results-source-chip:hover {
 
 .insight-chip.weak,
 .trust-badge.weak {
-  background: rgba(248, 113, 113, .12);
+  background: var(--red-soft);
   color: var(--red);
   border-color: #ffc9c4;
 }
@@ -2797,7 +2810,7 @@ button.results-source-chip:hover {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
-  background: #fbfdff;
+  background: var(--panel);
 }
 
 .result-details > summary {
@@ -2842,7 +2855,7 @@ button.results-source-chip:hover {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
-  background: #fbfdff;
+  background: transparent;
 }
 
 .number-sources,
@@ -2889,7 +2902,7 @@ button.results-source-chip:hover {
 }
 
 .pill.warn {
-  background: rgba(248, 113, 113, .12);
+  background: var(--red-soft);
   color: var(--red);
   border: 1px solid #ffc7c2;
 }
@@ -2995,8 +3008,8 @@ button.results-source-chip:hover {
 }
 
 .mode-btn.active {
-  background: var(--blue);
-  border-color: var(--blue);
+  background: var(--blue-deep);
+  border-color: var(--blue-deep);
   color: #fff;
 }
 
@@ -3228,7 +3241,7 @@ button.results-source-chip:hover {
 }
 
 .price-gap-badge.gap-expensive {
-  background: rgba(248, 113, 113, .12);
+  background: var(--red-soft);
   color: var(--red);
   border-color: #ffc7c2;
 }
@@ -3253,14 +3266,14 @@ button.results-source-chip:hover {
   padding: 7px 10px;
   border: 1px solid #c7d7ef;
   border-radius: 8px;
-  background: #f3f7ff;
-  color: #173b66;
+  background: var(--blue-soft);
+  color: var(--blue);
   font-size: 13px;
   font-weight: 700;
 }
 
 .profile-chip b {
-  color: #5a708a;
+  color: var(--muted);
   font-size: 11px;
 }
 
@@ -3416,9 +3429,9 @@ summary {
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  border: 1px solid #25d366;
+  border: 1px solid #15803d;
   border-radius: 8px;
-  background: #25d366;
+  background: #15803d;
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -3438,9 +3451,9 @@ summary {
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  border: 1px solid #128c7e;
+  border: 1px solid #0f766e;
   border-radius: 8px;
-  background: #128c7e;
+  background: #0f766e;
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -3547,7 +3560,7 @@ summary {
   min-width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -3621,7 +3634,7 @@ summary {
   min-width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -3786,8 +3799,8 @@ summary {
 }
 
 .opp-source-chip.active {
-  background: var(--blue);
-  border-color: var(--blue);
+  background: var(--blue-deep);
+  border-color: var(--blue-deep);
   color: #fff;
 }
 
@@ -3823,15 +3836,15 @@ summary {
 }
 
 .opp-badge-kind.kind-مباشر {
-  background: #e7f6ec;
-  color: #1a7f4f;
-  border: 1px solid #b7dfc2;
+  background: var(--green-soft);
+  color: var(--green);
+  border: 1px solid var(--green);
 }
 
 .opp-badge-kind.kind-مكتب {
-  background: #f3eefc;
-  color: #6b46c1;
-  border: 1px solid #d9c9f5;
+  background: var(--violet-soft);
+  color: var(--violet);
+  border: 1px solid var(--violet);
 }
 
 /* عناوين أقسام داخل قائمة الفرص */
@@ -3862,11 +3875,11 @@ summary {
   color: var(--blue);
 }
 
-.stat-chip.stat-buy { border-color: #b7dfc2; background: #e7f6ec; }
-.stat-chip.stat-rent { border-color: #c4d8f0; background: #eaf2fb; }
-.stat-chip.stat-ok b { color: #1a7f4f; }
-.stat-chip.stat-new { border-color: #b7dfc2; background: #e7f6ec; }
-.stat-chip.stat-removed { border-color: #ecc8c8; background: #fbecec; }
+.stat-chip.stat-buy { border-color: #b7dfc2; background: var(--green-soft); }
+.stat-chip.stat-rent { border-color: #c4d8f0; background: var(--blue-soft); }
+.stat-chip.stat-ok b { color: var(--green); }
+.stat-chip.stat-new { border-color: #b7dfc2; background: var(--green-soft); }
+.stat-chip.stat-removed { border-color: #ecc8c8; background: var(--red-soft); }
 .stat-chip.stat-drop { border-color: #ead59a; background: var(--amber-soft); }
 
 .demand-card {
@@ -3959,8 +3972,8 @@ summary {
   margin-inline-start: auto;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #e7f6ec;
-  color: #1a7f4f;
+  background: var(--green-soft);
+  color: var(--green);
   font-size: 12px;
   font-weight: 800;
 }
@@ -4007,7 +4020,7 @@ summary {
   width: 24px;
   height: 24px;
   border-radius: 8px;
-  background: #b7791f;
+  background: #b45309;
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -4085,7 +4098,7 @@ summary {
 }
 
 .opp-rank {
-  background: var(--blue);
+  background: var(--blue-deep);
 }
 
 .opp-verdict {
@@ -4126,7 +4139,7 @@ summary {
   display: inline-block;
   margin-top: 4px;
   padding: 3px 8px;
-  background: var(--green-soft);
+  background: rgba(255, 255, 255, .04);
   border: 1px solid rgba(52, 211, 153, .4);
   border-radius: 6px;
   color: var(--green);
@@ -4222,7 +4235,7 @@ summary {
   display: inline-block;
   padding: 6px 12px;
   border-radius: 8px;
-  background: #25d366;
+  background: #15803d;
   color: #fff;
   font-weight: 800;
   text-decoration: none;
@@ -4578,7 +4591,7 @@ summary {
 }
 
 .drill-actions a:hover {
-  background: var(--blue);
+  background: var(--blue-deep);
   color: #fff;
 }
 
@@ -4588,8 +4601,8 @@ summary {
 }
 
 .drill-actions .wa-contact:hover {
-  background: #16a34a;
-  border-color: #16a34a;
+  background: #15803d;
+  border-color: #15803d;
   color: #fff;
 }
 
