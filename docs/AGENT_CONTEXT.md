@@ -322,6 +322,8 @@ PYTHONIOENCODING=utf-8 python tests/playwright/contrast_audit.py
 #   الوصول للمحتوى الفعلي، مع أوقات نقاط API الفردية وفحص أن كاش TTL يجعل
 #   الطلب الثاني أسرع من نصف الأول. الحدود: بارد ≤8 ثوانٍ، دافئ ≤2 ثانية.
 PYTHONIOENCODING=utf-8 python tests/playwright/performance_audit.py
+# أو أمر واحد يشغّل الخادم بنفسه إن لم يكن قائمًا (محليًا وفي CI):
+python scripts/run_performance_checks.py
 ```
 
 - `tests/test_*.py` (21 ملفًا): التحليل، API، الفرص، الحصاد، المصادر الحية، التوفيق،
@@ -341,10 +343,21 @@ PYTHONIOENCODING=utf-8 python tests/playwright/performance_audit.py
   من منظور المستخدم (نقر → محتوى فعلًا) بالبارد والدافئ + أوقات كل نقطة API وفحص
   الكاش. كشف بفضله: `/api/dashboard/summary` (3+ استعلامات Supabase بلا كاش،
   ~5 ثوانٍ) و`/api/market-insights` و`/api/price-trends` و`/api/health` (3-6 ثوانٍ)
-  — أُضيف كاش TTL عام (`_ttl_cached`) في `backend/main.py`: اللوحة 90 ثانية
-  (مفتاحه يشمل فلاتر المنصات)، التحليلات/الاتجاهات 5 دقائق، health 120 ثانية
-  — النتيجة: 5.1s→8ms للوحة، 1.4s→2ms للتحليلات، 5.7s→120ms للصحة،
-  وكل إعادة فتح للتبويبات بعدها دون 300ms.
+  — أُضيف كاش TTL عام (`_ttl_cached`) في `backend/main.py`: اللوحة الافتراضية 90
+  ثانية (الفلاتر المخصصة حية دائمًا بلا كاش)، التحليلات/الاتجاهات 5 دقائق،
+  health 120 ثانية — النتيجة: 5.1s→8ms للوحة، 1.4s→2ms للتحليلات، 5.7s→120ms
+  للصحة، وكل إعادة فتح للتبويبات بعدها دون 300ms.
+- **توازي بناء اللوحة الباردة**: جلبات `_dashboard_market_records` الثلاثة
+  (market_listings + market_ads + صفقات الحسبة التي فيها جلب ويب حي 1.7s لصفّين)
+  تُشغَّل بالتوازي عبر ThreadPoolExecutor، وشطرا اللوحة (سجلات السوق + لقطة
+  الفرص) يتوازيان أيضًا، و`_flat_dashboard_opportunities` يعيد استخدام
+  `_OPPORTUNITIES_CACHE` في الذاكرة بدل استعلام Supabase — أول فتح للوحة انخفض
+  من ~5.9s إلى ~3.3s ودالة dashboard الباردة من 5.1s إلى ~1.8s.
+- **CI**: `.github/workflows/performance-checks.yml` يشغّل فحص الأداء عند أي تغيير
+  في frontend/backend/main.py/الفاحص/المشغّل (وفي وضع السقوط بلا مفاتيح Supabase
+  يبقى حارسًا هيكليًا للواجهة والكاش؛ التشغيل الكامل ببيانات حقيقية عبر
+  workflow_dispatch مع secrets). المشغّل: `python scripts/run_performance_checks.py`
+  (يعيد استخدام خادم قائم أو يشغّل مؤقتًا ثم يوقفه).
 - `tests/playwright/contrast_audit.py` — فحص تباين WCAG AA تلقائي لكل عناصر
   الواجهة في الوضعين: يمر على التبويبات الستة (البحث/الفرص/اللوحة/التحليلات/
   التطورات/المصادر) + يفتح درج تفاصيل اللوحة، ويُفحص كل نص مرئي + حقول

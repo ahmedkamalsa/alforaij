@@ -1,0 +1,46 @@
+name: Performance checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "backend/main.py"
+      - "tests/playwright/performance_audit.py"
+      - "scripts/run_performance_checks.py"
+      - ".github/workflows/performance-checks.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "backend/main.py"
+      - "tests/playwright/performance_audit.py"
+      - "scripts/run_performance_checks.py"
+      - ".github/workflows/performance-checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-checks
+  cancel-in-progress: true
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install playwright
+          playwright install --with-deps chromium
+      - name: Run performance audit (board + insights tabs, cold/warm)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/run_performance_checks.py

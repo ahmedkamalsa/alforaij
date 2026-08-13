@@ -33,6 +33,7 @@ from backend.services.ai_evaluator import generate_professional_analysis
 
 # ذاكرة مؤقتة للفرص (تُحدَّث أول بأول): تُبنى عند أول طلب وتُعاد لفترة قصيرة
 import threading as _threading
+from concurrent.futures import ThreadPoolExecutor
 
 _OPPORTUNITIES_LOCK = _threading.Lock()
 _OPPORTUNITIES_CACHE: dict | None = None
@@ -316,7 +317,10 @@ def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> l
     """سجلات السوق الخارجية: الحصاد المتراكم من القاعدة (market_listings) هو المصدر
     الأساسي بدل الفحص الحي الصغير — فكل إعلان موثق برابطه الأصلي ووقت جليه، وتتسق
     الأرقام مع إجمالي القاعدة. إعلانات market_ads الحية تُدمج بلا تكرار، والفحص الحي
-    يُستخدم كسقوط آمن فقط عند غياب القاعدة."""
+    يُستخدم كسقوط آمن فقط عند غياب القاعدة.
+
+    كل الجلبات الشبكية (market_listings + market_ads + صفقات الحسبة) تُشغَّل
+    بالتوازي لأنها التكلفة الحقيقية للفتح البارد — تسلسلها كان يضاعف الزمن."""
     market_names = {"السوق المباشر", "بوشملان", "OpenSooq", "Mourjan", "Q8Aqar", "Sakan", "Waseet", "4Sale", "Bu3qar", "Aqarat", "NabdAqar", "Yebtah"}
     records: list[dict] = []
     known_codes: set[str] = set()
@@ -324,13 +328,39 @@ def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> l
     def _accept(raw_source: str) -> bool:
         return not selected or _platform_match(raw_source, selected) or "السوق المباشر" in selected
 
+    def _fetch_harvested() -> list[dict]:
+        try:
+            from backend.services.supabase_store import fetch_market_listings
+            return fetch_market_listings(limit=2000) or []
+        except Exception as exc:
+            logger.warning("Dashboard harvested market records skipped: %s", exc)
+            return []
+
+    def _fetch_live() -> list[dict]:
+        try:
+            from backend.services.supabase_store import _fetch_rows, SUPABASE_URL
+            return _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_ads?select=*&limit=2000") or []
+        except Exception as exc:
+            logger.warning("Dashboard live saved market records skipped: %s", exc)
+            return []
+
+    def _fetch_transactions() -> list[dict]:
+        try:
+            from backend.connectors.official_data import load_transactions
+            return load_transactions()
+        except Exception as exc:
+            logger.warning("Dashboard Alhisba reference records skipped: %s", exc)
+            return []
+
+    with ThreadPoolExecutor(max_workers=3) as _pool:
+        _f_harvested = _pool.submit(_fetch_harvested)
+        _f_live = _pool.submit(_fetch_live)
+        _f_transactions = _pool.submit(_fetch_transactions)
+        harvested = _f_harvested.result()
+        live_rows = _f_live.result()
+        transactions = _f_transactions.result()
+
     # 1) الحصاد المتراكم من market_listings (المصدر الأساسي — كل المواقع الموثقة)
-    harvested = []
-    try:
-        from backend.services.supabase_store import fetch_market_listings
-        harvested = fetch_market_listings(limit=2000) or []
-    except Exception as exc:
-        logger.warning("Dashboard harvested market records skipped: %s", exc)
     for row in harvested:
         raw_source = str(row.get("source") or "السوق المباشر")
         if not _accept(raw_source):
@@ -342,22 +372,17 @@ def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> l
             known_codes.add(record["code"])
 
     # 2) إعلانات market_ads الحية المحفوظة (بوشملان وغيرها) — بلا تكرار مع الحصاد
-    try:
-        from backend.services.supabase_store import _fetch_rows, SUPABASE_URL
-        live_rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_ads?select=*&limit=2000") or []
-        for row in live_rows:
-            raw_source = str(row.get("source_name") or "السوق المباشر")
-            if not _accept(raw_source):
-                continue
-            record = _market_ad_row_to_record(row)
-            _normalize_dashboard_place(record, area_map)
-            if record["code"] in known_codes:
-                continue
-            records.append(record)
-            if record["code"]:
-                known_codes.add(record["code"])
-    except Exception as exc:
-        logger.warning("Dashboard live saved market records skipped: %s", exc)
+    for row in live_rows:
+        raw_source = str(row.get("source_name") or "السوق المباشر")
+        if not _accept(raw_source):
+            continue
+        record = _market_ad_row_to_record(row)
+        _normalize_dashboard_place(record, area_map)
+        if record["code"] in known_codes:
+            continue
+        records.append(record)
+        if record["code"]:
+            known_codes.add(record["code"])
 
     # 3) الفحص الحي — سقوط آمن فقط عند غياب القاعدة (أو عند طلب منصة بعينها غير محصودة)
     if not harvested and (not selected or selected & market_names):
@@ -382,11 +407,12 @@ def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> l
             records.append(record)
             if code:
                 known_codes.add(code)
+    # 4) صفقات الحسبة الرسمية المرجعية (جُلبت بالتوازي أعلاه)
     if not selected or _platform_match("الحسبة - الصفقات المسجلة العامة", selected):
         try:
-            from backend.connectors.official_data import load_transactions, _transaction_listing
+            from backend.connectors.official_data import _transaction_listing
 
-            for index, row in enumerate(load_transactions()):
+            for index, row in enumerate(transactions):
                 if not str(row.get("source") or "").startswith("الحسبة"):
                     continue
                 listing = _transaction_listing(row, index)
@@ -435,7 +461,12 @@ def _flat_dashboard_opportunities(selected: set[str], include_local: bool, area_
     try:
         from backend.services.supabase_store import fetch_latest_opportunities
 
-        snapshot = fetch_latest_opportunities()
+        # إعادة استخدام لقطة الفرص الحية في الذاكرة (كاش 5 دقائق نفسه الذي تستخدمه
+        # نقاط التوفيق والدلتا) بدل استعلام Supabase جديد في كل فتح للوحة — القراءة
+        # فقط بلا كتابة حتى لا تتداخل مع قفل /api/opportunities.
+        snapshot = _OPPORTUNITIES_CACHE
+        if snapshot is None or time.time() - _OPPORTUNITIES_CACHE_AT > _OPPORTUNITIES_TTL_SECONDS:
+            snapshot = fetch_latest_opportunities()
     except Exception as exc:
         logger.warning("Dashboard opportunities skipped: %s", exc)
         snapshot = None
@@ -477,15 +508,21 @@ def _dashboard_summary(listings, selected_platforms: set[str] | None = None, inc
     if selected_platforms and "__all" not in selected_platforms and not _is_local_platform_selected(selected_platforms):
         local_records = []
     external_platforms = selected_platforms - {"الفريج", "alforaij", "Alforaij", "الفريج المحلي", "__all"}
-    if not selected_platforms or "__all" in selected_platforms:
-        market_records = _dashboard_market_records(set(), area_map)
-    elif external_platforms:
-        market_records = _dashboard_market_records(external_platforms, area_map)
-    else:
-        market_records = []
+    # شطرا اللوحة الثقيلان (سجلات السوق + لقطة الفرص) يُشغَّلان بالتوازي — كلاهما
+    # يجلب من Supabase، وتسلسلهما كان يضاعف زمن الفتح البارد.
+    with ThreadPoolExecutor(max_workers=2) as _pool:
+        if not selected_platforms or "__all" in selected_platforms:
+            _f_market = _pool.submit(_dashboard_market_records, set(), area_map)
+        elif external_platforms:
+            _f_market = _pool.submit(_dashboard_market_records, external_platforms, area_map)
+        else:
+            # فلترة محلية فقط (مثل «الفريج»): لا سجلات سوق خارجية أصلًا
+            _f_market = _pool.submit(lambda: [])
+        _f_opps = _pool.submit(_flat_dashboard_opportunities, selected_platforms, include_local, area_map)
+        market_records = _f_market.result()
+        opportunity_items, opportunities_by_code, opportunity_snapshot = _f_opps.result()
     records = local_records + market_records
     raw_count = len(records)
-    opportunity_items, opportunities_by_code, opportunity_snapshot = _flat_dashboard_opportunities(selected_platforms, include_local, area_map)
     existing_codes = {str(record.get("code") or "") for record in records}
     for record in records:
         opp = opportunities_by_code.get(str(record.get("code") or ""))
@@ -724,10 +761,17 @@ class Handler(BaseHTTPRequestHandler):
                 if item.strip()
             }
             include_local = params.get("includeLocal", ["1"])[0] != "0"
-            # كاش 90 ثانية: البيانات تتغير بالحصاد اليومي فقط، واللوحة تُفتح كثيرًا
-            # دون تغيير الفلاتر — المفتاح يشمل الفلاتر فلا يُخلط طلب بآخر.
-            cache_key = f"dashboard:{','.join(sorted(selected))}:{include_local}"
-            json_response(self, _ttl_cached(cache_key, 90, lambda: _dashboard_summary(load_listings(), selected_platforms=selected, include_local=include_local)))
+
+            def _build_dashboard():
+                return _dashboard_summary(load_listings(), selected_platforms=selected, include_local=include_local)
+
+            # كاش ذكي حسب الفلاتر: اللوحة الافتراضية (كل المنصات + المحلي) مخزنة 90
+            # ثانية لأنها الأكثر فتحًا وبياناتها تتغير بالحصاد اليومي فقط؛ أما أي فلاتر
+            # مخصصة فتُبنى حية دائمًا حتى يشعر المستخدم بفلاتره فورًا بلا انتظار كاش.
+            if not selected and include_local:
+                json_response(self, _ttl_cached("dashboard:default", 90, _build_dashboard))
+            else:
+                json_response(self, _build_dashboard())
             return
         if path == "/api/update-notifications":
             from backend.services.update_notifications import load_update_notifications
