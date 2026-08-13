@@ -1,12 +1,15 @@
-"""فحص تباين ألوان تلقائي (WCAG AA) لبطاقات النتائج والشرائح في الوضعين الفاتح والداكن.
+"""فحص تباين ألوان تلقائي (WCAG AA) لكل عناصر الواجهة في الوضعين الفاتح والداكن.
+
+النطاق: كل النصوص المرئية في الصفحة (التبويبات، الشريط العلوي، الجداول، الأزرار،
+الشرائح، بطاقات النتائج، الرسائل…) + حقول الإدخال (نص مكتوب + placeholder)،
+مع فتح درج تفاصيل لوحة السوق لفحص محتواه أيضًا.
 
 يقيس نسبة التباين الفعلية بين لون النص وخلفيته الفعالة:
 - دمج الألوان الشفافة (rgba) مع الطبقات تحتها حتى الخلفية الأساسية للصفحة.
-- أخذ التدرجات الخطية (linear-gradient) بعين الاعتبار بفحص أسوأ نقطة توقف.
+- أخذ التدرجات الخطية بعين الاعتبار بفحص أسوأ نقطة توقف (يدعم rgba وhex).
 - تصنيف النص: عادي ≥ 4.5:1 ، كبير (≥24px أو ≥18.66px عريض) ≥ 3:1.
-
-النطاق: بطاقات النتائج (.result-card بكافة أنواعها) والشرائح
-(.results-source-chip, .opp-platform-chip, .filter-chip, .area-chip, .pill).
+- العناصر فوق صورة خلفية (url) تُفحص على الطبقة الأساسية وتُبلّغ كتحذير
+  «غير قابل للقياس الكامل» دون أن تُسقط الفحص.
 
 الاستخدام:
     python tests/playwright/contrast_audit.py [base_url]
@@ -14,7 +17,6 @@
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
 
@@ -41,7 +43,6 @@ AUDIT_JS = r"""
     g: fg.g * fg.a + bg.g * (1 - fg.a),
     b: fg.b * fg.a + bg.b * (1 - fg.a),
   });
-  // كل ألوان التوقف في تدرج خطي (أول طبقة خلفية مرسومة)
   const hexToRgb = (h) => {
     const m = h.match(/^#([0-9a-f]{6}|[0-9a-f]{3})$/i);
     if (!m) return null;
@@ -59,6 +60,7 @@ AUDIT_JS = r"""
     }
     return bgImage;
   };
+  const layerHasImage = (bgImage) => /url\(/.test(firstLayer(bgImage || ''));
   // كل ألوان التوقف في تدرج خطي (أول طبقة خلفية مرسومة) — يدعم rgba() و hex
   const gradStops = (bgImage) => {
     const out = [];
@@ -99,59 +101,93 @@ AUDIT_JS = r"""
     const hi = Math.max(L1, L2), lo = Math.min(L1, L2);
     return (hi + 0.05) / (lo + 0.05);
   };
-  const hasDirectText = (el) =>
+  const isVisible = (el) => {
+    if (el.closest('[hidden]')) return false;
+    if (el.getClientRects().length > 0) {
+      const cs = getComputedStyle(el);
+      return cs.display !== 'none' && cs.visibility !== 'hidden';
+    }
+    // محتوى <details> مغلق قابل للفتح — يُفحص أيضًا لأنه سيظهر عند الفتح
+    return !!el.closest('details') && getComputedStyle(el).display !== 'none';
+  };
+  const hasOwnText = (el) =>
     [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 0);
-  const cardSel = '.result-card';
-  const chipSel = '.results-source-chip, .opp-platform-chip, .filter-chip, .area-chip, .pill';
+  // هل أي طبقة خلفية (أو ::before/::after) في سلسلة الآباء تحتوي صورة url()؟
+  const hasImageLayer = (el) => {
+    let node = el;
+    while (node && node !== document.documentElement.parentNode) {
+      for (const pseudo of ['', '::before', '::after']) {
+        if (layerHasImage(getComputedStyle(node, pseudo).backgroundImage)) return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  };
+  const SKIP_TAGS = new Set(['script', 'style', 'canvas', 'svg', 'path', 'circle', 'line', 'polyline', 'polygon', 'rect', 'defs', 'title', 'meta', 'link', 'br', 'hr', 'img', 'option', 'template']);
   const targets = [];
-  document.querySelectorAll(cardSel).forEach((card) => {
-    if (card.textContent.trim().length === 0) return;
-    targets.push({ el: card, label: 'بطاقة نتيجة' });
-    card.querySelectorAll('*').forEach((el) => {
-      if (hasDirectText(el)) targets.push({ el, label: 'نص بطاقة' });
-    });
+  // 1) كل النصوص المرئية (أعمق عنصر يحمل نصًا مباشرًا)
+  document.querySelectorAll('body *').forEach((el) => {
+    if (SKIP_TAGS.has(el.tagName.toLowerCase())) return;
+    if (el.closest('.source-trust-tip')) return;
+    if (!isVisible(el)) return;
+    if (!hasOwnText(el)) return;
+    targets.push({ el, kind: 'نص' });
   });
-  document.querySelectorAll(chipSel).forEach((chip) => {
-    if (chip.textContent.trim().length === 0) return;
-    targets.push({ el: chip, label: 'شريحة' });
-    chip.querySelectorAll('b, strong, span').forEach((el) => {
-      if (hasDirectText(el)) targets.push({ el, label: 'نص شريحة' });
-    });
+  // 2) حقول الإدخال: لون النص المكتوب + placeholder
+  document.querySelectorAll('body input, body textarea, body select').forEach((el) => {
+    if (!isVisible(el)) return;
+    targets.push({ el, kind: 'حقل', hasPlaceholder: !!(el.getAttribute && el.getAttribute('placeholder')) });
   });
   const base = toRgb(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()) ||
                { r: 11, g: 18, b: 32, a: 1 };
   const seen = new Set();
   const results = [];
-  for (const t of targets) {
-    const cs = getComputedStyle(t.el);
-    const key = t.label + '|' + (t.el.className ? String(t.el.className).split(' ').slice(0, 2).join('.') : t.el.tagName) + '|' + cs.color + '|' + (t.el.textContent || '').trim().slice(0, 18);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const fg = toRgb(cs.color) || { r: 255, g: 255, b: 255, a: 1 };
-    const bgs = resolveBgs(t.el, base);
-    // أسوأ حالة: أقل نسبة تباين بين كل الخلفيات المحتملة
-    let r = Infinity, worstBg = bgs[0];
-    for (const bg of bgs) {
+  const emit = (el, kind, fgColor, bgCands, extra = {}) => {
+    const fg = toRgb(fgColor) || { r: 255, g: 255, b: 255, a: 1 };
+    let r = Infinity, worstBg = bgCands[0];
+    for (const bg of bgCands) {
       const rr = ratio(blend(fg, bg), bg);
       if (rr < r) { r = rr; worstBg = bg; }
     }
+    const cs = getComputedStyle(el);
     const size = parseFloat(cs.fontSize) || 16;
     const weight = parseInt(cs.fontWeight, 10) || 400;
     const isLarge = size >= 24 || (size >= 18.66 && weight >= 700);
     const need = isLarge ? 3 : 4.5;
-    const cls = (t.el.className && typeof t.el.className === 'string') ? t.el.className.split(' ').slice(0, 3).join('.') : t.el.tagName;
+    const cls = (el.className && typeof el.className === 'string') ? el.className.split(' ').slice(0, 3).join('.') : el.tagName;
+    const text = (el.getAttribute && el.getAttribute('placeholder')) ||
+                 (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+    const key = kind + '|' + cls + '|' + fgColor + '|' + text.slice(0, 18);
+    if (seen.has(key)) return;
+    seen.add(key);
+    const img = hasImageLayer(el);
     results.push({
       ok: r >= need,
-      label: t.label,
+      img: img,
+      kind: kind,
       cls: cls,
-      text: (t.el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40),
+      text: text,
       ratio: Math.round(r * 100) / 100,
       need: need,
-      fg: cs.color,
+      fg: fgColor,
       bg: `rgb(${Math.round(worstBg.r)},${Math.round(worstBg.g)},${Math.round(worstBg.b)})`,
       size: size,
       weight: weight,
+      ...extra,
     });
+  };
+  for (const t of targets) {
+    const cs = getComputedStyle(t.el);
+    const bgs = resolveBgs(t.el, base);
+    if (t.kind === 'حقل') {
+      emit(t.el, 'حقل', cs.color, bgs, { hasPlaceholder: t.hasPlaceholder });
+      if (t.hasPlaceholder) {
+        const ph = getComputedStyle(t.el, '::placeholder').color;
+        if (ph && ph !== 'rgba(0, 0, 0, 0)') emit(t.el, 'placeholder', ph, bgs);
+      }
+    } else {
+      emit(t.el, 'نص', cs.color, bgs);
+    }
   }
   return results;
 }
@@ -159,13 +195,21 @@ AUDIT_JS = r"""
 
 
 def main() -> int:
+    TABS = [
+        ("search", "البحث", 1.2),
+        ("opportunities", "أفضل الفرص", 3.0),
+        ("board", "لوحة السوق", 3.0),
+        ("insights", "تحليلات السوق", 5.0),
+        ("developments", "التطورات", 4.0),
+        ("sources", "المصادر", 3.0),
+    ]
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 1440, "height": 900})
         page.goto(BASE, wait_until="networkidle", timeout=90000)
         page.wait_for_timeout(1200)
 
-        # نتائج حقيقية لتوليد بطاقات وشرائح
+        # نتائج حقيقية لتوليد بطاقات وشرائح ورسائل
         page.click("[data-main-tab='search']")
         page.wait_for_timeout(500)
         chat = page.locator("#chatInput")
@@ -173,35 +217,79 @@ def main() -> int:
         page.keyboard.press("Enter")
         page.wait_for_timeout(35000)
 
-        audits = {"داكن": "dark", "فاتح": "light"}
         all_failures: list[dict] = []
+        all_warnings: list[dict] = []
+        audits = {"داكن": "dark", "فاتح": "light"}
 
         for theme_name, theme in audits.items():
             page.evaluate("(t) => document.documentElement.setAttribute('data-theme', t)", theme)
             page.wait_for_timeout(800)
-            results = page.evaluate(AUDIT_JS)
-            fails = [r for r in results if not r["ok"]]
-            print(f"\n===== الوضع {theme_name} — {len(results)} عنصر مفحوص =====")
-            if fails:
-                for f in fails:
-                    print(f"  ❌ [{theme_name}] {f['label']} [{f['cls']}] «{f['text']}» — {f['ratio']}:1 (مطلوب {f['need']}:1) — نص {f['fg']} على {f['bg']} ({f['size']}px/{f['weight']})")
-                    f["theme"] = theme_name
-                    all_failures.append(f)
-            else:
-                print("  ✅ لا مخالفات تباين")
-            # تأكيد أن الوضع فعلاً تغيّر
+            total_checked = 0
+            theme_fails = 0
+            for tab, tab_name, wait_s in TABS:
+                page.click(f"[data-main-tab='{tab}']")
+                page.wait_for_timeout(int(wait_s * 1000))
+                results = page.evaluate(AUDIT_JS)
+                total_checked += len(results)
+                for r in results:
+                    if not r["ok"]:
+                        r["theme"] = theme_name
+                        r["tab"] = tab_name
+                        all_failures.append(r)
+                        theme_fails += 1
+                    elif r["img"]:
+                        r["theme"] = theme_name
+                        r["tab"] = tab_name
+                        all_warnings.append(r)
+                # درج تفاصيل لوحة السوق: نفتحه لفحص محتواه ثم نغلقه
+                if tab == "board":
+                    stat = page.locator("button.board-stat, .board-stat").first
+                    if stat.count() > 0:
+                        stat.click()
+                        page.wait_for_timeout(1200)
+                        results = page.evaluate(AUDIT_JS)
+                        total_checked += len(results)
+                        for r in results:
+                            if not r["ok"]:
+                                r["theme"] = theme_name
+                                r["tab"] = "درج التفاصيل"
+                                all_failures.append(r)
+                                theme_fails += 1
+                            elif r["img"]:
+                                r["theme"] = theme_name
+                                r["tab"] = "درج التفاصيل"
+                                all_warnings.append(r)
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(700)
+            print(f"\n===== الوضع {theme_name} — {total_checked} عنصر مفحوص عبر كل التبويبات =====")
+            print(f"  مخالفات: {theme_fails}  |  تحذيرات فوق صور: {sum(1 for w in all_warnings if w['theme'] == theme_name)}")
             bg = page.evaluate("getComputedStyle(document.body).backgroundColor")
             print(f"  (خلفية الصفحة: {bg})")
 
         browser.close()
 
-    print("\n" + "=" * 60)
-    if all_failures:
-        print(f"النتيجة: فشل — {len(all_failures)} مخالفة تباين WCAG AA")
-        print("=" * 60)
+    # طباعة المخالفات مكررة فقط
+    unique_fails: list[dict] = []
+    seen_fails: set = set()
+    for f in all_failures:
+        key = (f["theme"], f["kind"], f["cls"], f["fg"], f["bg"], f["text"][:18])
+        if key not in seen_fails:
+            seen_fails.add(key)
+            unique_fails.append(f)
+
+    print("\n" + "=" * 70)
+    if unique_fails:
+        print(f"النتيجة: فشل — {len(unique_fails)} مخالفة تباين WCAG AA (من {len(all_failures)} تكرارًا)")
+        for f in unique_fails:
+            tag = f["tab"]
+            print(f"  ❌ [{f['theme']}|{tag}] {f['kind']} [{f['cls']}] «{f['text']}» — {f['ratio']}:1 (مطلوب {f['need']}:1) — {f['fg']} على {f['bg']} ({f['size']}px/{f['weight']})")
+        print("=" * 70)
         return 1
-    print("النتيجة: نجاح — كل الألوان مطابقة WCAG AA في الوضعين")
-    print("=" * 60)
+
+    print(f"النتيجة: نجاح — كل الألوان مطابقة WCAG AA في الوضعين (تحذيرات فوق صور: {len(all_warnings)})")
+    for w in all_warnings:
+        print(f"  ⚠️ [{w['theme']}|{w['tab']}] {w['kind']} [{w['cls']}] «{w['text']}» — {w['ratio']}:1 فوق صورة خلفية (تحقق بصريًا)")
+    print("=" * 70)
     return 0
 
 

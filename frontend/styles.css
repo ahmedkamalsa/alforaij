@@ -13,9 +13,9 @@
   --violet: #b7a0ff;
   --violet-soft: rgba(139, 92, 246, .16);
   --green: #4ade80;
-  --green-soft: rgba(52, 211, 153, .14);
+  --green-soft: rgba(52, 211, 153, .10);
   --amber: #fbbf24;
-  --amber-soft: rgba(251, 191, 36, .14);
+  --amber-soft: rgba(251, 191, 36, .10);
   --red: #fca5a5;
   --red-soft: rgba(248, 113, 113, .08);
   --shadow: 0 10px 30px rgba(2, 6, 16, .45);
@@ -137,7 +137,7 @@
 
 [data-theme="light"] input::placeholder,
 [data-theme="light"] textarea::placeholder {
-  color: #7a8ba3;
+  color: var(--muted);
 }
 
 [data-theme="light"] select option {
@@ -154,7 +154,7 @@
 
 [data-theme="light"] .governorate-table th.col-active {
   border-bottom: 3px solid #f59e0b;
-  background: linear-gradient(120deg, #1e40af, #3b82f6);
+  background: linear-gradient(120deg, #1e40af, #2563eb);
 }
 
 /* بطاقات النتائج على الفاتح: خلفية بيضاء وإطارات ناعمة */
@@ -314,6 +314,11 @@ textarea {
   border-radius: 8px;
   padding: 18px 24px 20px;
   background: linear-gradient(90deg, rgba(15, 23, 42, .02), rgba(15, 23, 42, .54));
+}
+
+/* على الفاتح: تظليل فاتح بدل الداكن حتى يبقى النص الداكن مقروءًا (WCAG AA) */
+[data-theme="light"] .hero-title {
+  background: linear-gradient(90deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .40));
 }
 
 .topbar h1 {
@@ -802,7 +807,7 @@ textarea {
 
 .match-mini-head strong,
 .match-mini-offer b {
-  color: var(--navy);
+  color: var(--ink);
 }
 
 .match-mini-head span {
@@ -859,7 +864,7 @@ textarea {
 
 .companion-head strong {
   font-size: 15px;
-  color: var(--navy);
+  color: var(--ink);
 }
 
 .companion-head span {
@@ -1175,7 +1180,7 @@ select {
 
 input::placeholder,
 textarea::placeholder {
-  color: #7f90a8;
+  color: var(--muted);
 }
 
 /* عناصر القوائم المنسدلة داخل النوافذ الزجاجية الداكنة */
@@ -2983,6 +2988,10 @@ button.results-source-chip:hover {
   background: rgba(2, 6, 16, .55);
 }
 
+[data-theme="light"] .heat-watch-btn {
+  background: rgba(2, 6, 16, .6);
+}
+
 .heat-watch-btn.watched {
   background: rgba(245, 158, 11, .85);
   border: 1px solid #fbbf24;
@@ -3053,7 +3062,7 @@ button.results-source-chip:hover {
 .watched-area strong {
   margin-inline-start: auto;
   font-size: 14px;
-  color: var(--heat);
+  color: var(--ink);
 }
 
 .watched-delta {
@@ -3071,7 +3080,7 @@ button.results-source-chip:hover {
 .watched-area .watched-remove {
   position: static;
   min-height: 28px;
-  background: rgba(248, 113, 113, .15);
+  background: var(--red-soft);
   color: var(--red);
   border-color: rgba(248, 113, 113, .5);
 }
@@ -3734,6 +3743,12 @@ summary {
   box-shadow: 0 4px 14px rgba(2, 6, 16, .35);
 }
 
+/* على الفاتح: أزرق عميق حتى يبقى النص الأبيض مقروءًا (WCAG AA) */
+[data-theme="light"] .opp-tab.active {
+  background: linear-gradient(120deg, #1d4ed8, #2563eb);
+  border-color: rgba(30, 58, 138, .35);
+}
+
 .opp-filters summary {
   color: var(--ink);
 }
@@ -3805,7 +3820,7 @@ summary {
 }
 
 .opp-source-chip.active b {
-  background: rgba(255, 255, 255, .22);
+  background: rgba(2, 6, 16, .22);
   color: #fff;
 }
 
@@ -4171,7 +4186,7 @@ summary {
 }
 
 .opp-direction.down {
-  background: rgba(248, 113, 113, .12);
+  background: var(--red-soft);
   color: var(--red);
 }
 
@@ -4510,7 +4525,7 @@ summary {
 }
 
 .drill-card .drill-head strong {
-  color: var(--navy);
+  color: var(--ink);
 }
 
 .drill-score {
@@ -4566,8 +4581,8 @@ summary {
 .drill-evidence span {
   padding: 2px 9px;
   border-radius: 999px;
-  background: rgba(16, 185, 129, .12);
-  color: #34d399;
+  background: var(--green-soft);
+  color: var(--green);
   font-size: 11px;
   font-weight: 800;
 }
@@ -5110,7 +5125,7 @@ body.drill-open {
   padding: 13px 19px;
   border: 1px solid rgba(255, 255, 255, .28);
   border-radius: 999px;
-  background: linear-gradient(120deg, #4d86ff, #1f52d9);
+  background: linear-gradient(120deg, #2f57e8, #1d4ed8);
   color: #fff;
   font-family: inherit;
   font-size: 14px;

@@ -1414,7 +1414,7 @@ function setHeatmapMode(mode) {
 function syncHeatmapLegends() {
   const isYield = heatmapMode === "yield";
   const html = isYield
-    ? '<i class="legend-swatch" style="background:hsl(120 72% 42% / .85)"></i>عائد مرتفع (فرصة)<i class="legend-swatch" style="background:hsl(60 72% 42% / .85)"></i>عائد متوسط<i class="legend-swatch" style="background:hsl(0 72% 42% / .85)"></i>عائد منخفض'
+    ? '<i class="legend-swatch" style="background:hsl(120 62% 26% / .92)"></i>عائد مرتفع (فرصة)<i class="legend-swatch" style="background:hsl(60 62% 26% / .92)"></i>عائد متوسط<i class="legend-swatch" style="background:hsl(0 62% 26% / .92)"></i>عائد منخفض'
     : '<i class="legend-swatch legend-cheap"></i>أرخص من وسيط المحافظة (فرصة)<i class="legend-swatch legend-neutral"></i>قريب من الوسيط<i class="legend-swatch legend-expensive"></i>أعلى من الوسيط (مضخم)';
   const boardLegend = $("boardHeatmapLegend");
   const insightsLegend = $("insightsHeatmapLegend");
@@ -1423,18 +1423,20 @@ function syncHeatmapLegends() {
 }
 
 // لون متدرج من الأخضر (فرصة) عبر الكهرماني إلى الأحمر (مضخم) حسب فجوة ±30%
+// الإضاءة 26% حتى يبقى النص الأبيض فوق الخلايا مقروءًا (WCAG AA ≥4.5:1)
 function heatColor(gapPct) {
   const t = Math.max(0, Math.min(1, (gapPct + 30) / 60)); // 0 عند -30% ... 1 عند +30%
   const hue = Math.round(120 * (1 - t)); // 120 أخضر → 0 أحمر
-  return `hsl(${hue} 72% 42% / .85)`;
+  return `hsl(${hue} 62% 26% / .92)`;
 }
 
 // لون حسب العائد السنوي: أخضر عند ≥6% (فرصة استثمارية) عبر الكهرماني إلى أحمر عند ≤2%
+// الإضاءة 26% حتى يبقى النص الأبيض فوق الخلايا مقروءًا (WCAG AA ≥4.5:1)
 function yieldColor(yieldPct) {
-  if (yieldPct == null) return "hsl(220 20% 45% / .7)";
+  if (yieldPct == null) return "hsl(220 18% 26% / .85)";
   const t = Math.max(0, Math.min(1, (yieldPct - 2) / 4)); // 0 عند 2% ... 1 عند 6%
   const hue = Math.round(120 * t); // 0 أحمر → 120 أخضر
-  return `hsl(${hue} 72% 42% / .85)`;
+  return `hsl(${hue} 62% 26% / .92)`;
 }
 
 function heatmapCellsHtml(areas) {
