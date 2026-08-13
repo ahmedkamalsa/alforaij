@@ -120,28 +120,6 @@
 
       <div id="boardMetricCards" class="board-metrics"></div>
 
-      <div class="section-title compact-title heatmap-title">
-        <div>
-          <h3>خريطة حرارية للمناطق</h3>
-          <span class="heatmap-legend" id="boardHeatmapLegend">
-            <i class="legend-swatch legend-cheap"></i>أرخص من وسيط المحافظة (فرصة)
-            <i class="legend-swatch legend-neutral"></i>قريب من الوسيط
-            <i class="legend-swatch legend-expensive"></i>أعلى من الوسيط (مضخم)
-          </span>
-        </div>
-        <div class="heatmap-mode-switch" role="group" aria-label="أساس تلوين الخريطة">
-          <button type="button" class="mode-btn" data-heat-mode="gap">فجوة السعر</button>
-          <button type="button" class="mode-btn" data-heat-mode="yield">عائد الإيجار</button>
-        </div>
-      </div>
-      <div id="boardHeatmap" class="board-heatmap"></div>
-
-      <div class="section-title compact-title heatmap-title" id="watchedTitle">
-        <h3>المناطق المراقبة <span id="watchedCount" class="watched-count"></span></h3>
-        <span>المناطق التي حجزتها — تُحدَّث فجوتها تلقائيًا عند تغيّر بيانات الحصاد.</span>
-      </div>
-      <div id="watchedAreas" class="watched-areas"></div>
-
       <div class="board-layout">
         <section class="board-overview">
           <div class="section-title compact-title">
@@ -640,6 +618,6 @@
     <span class="chat-fab-label">اسأل المساعد</span>
   </button>
 
-  <script src="app.js?v=20260814-contrast-full"></script>
+  <script src="app.js?v=20260815-dedup-heatmap"></script>
 </body>
 </html>

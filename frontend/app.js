@@ -1333,59 +1333,6 @@ async function loadInsights() {
   }
 }
 
-// خريطة حرارية للمناطق: فجوة سعر كل منطقة (وسيط سعر المتر) مقابل وسيط محافظتها،
-// وعائد الإيجار السنوي = (وسيط الإيجار × 12) ÷ وسيط سعر البيع
-function computeAreaHeatmap(rows) {
-  const all = rows || [];
-  const saleRows = all.filter((row) => String(row.transaction || "").includes("بيع") && Number(row.price) > 0 && Number(row.space) > 0);
-  const rentRows = all.filter((row) => String(row.transaction || "").includes("إيجار") && Number(row.price) > 0);
-  const perM2ByArea = {};
-  const perM2ByGov = {};
-  const salePriceByArea = {};
-  const rentPriceByArea = {};
-  for (const row of saleRows) {
-    const perM2 = Number(row.price) / Number(row.space);
-    (perM2ByArea[row.area] ||= []).push(perM2);
-    (salePriceByArea[row.area] ||= []).push(Number(row.price));
-    if (row.governorate) (perM2ByGov[row.governorate] ||= []).push(perM2);
-  }
-  for (const row of rentRows) {
-    (rentPriceByArea[row.area] ||= []).push(Number(row.price));
-  }
-  const medianOf = (arr) => {
-    if (!arr || !arr.length) return null;
-    const sorted = arr.slice().sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-  };
-  const govMedian = {};
-  for (const [gov, arr] of Object.entries(perM2ByGov)) govMedian[gov] = medianOf(arr);
-  const areas = [];
-  for (const [area, arr] of Object.entries(perM2ByArea)) {
-    const med = medianOf(arr);
-    const row = saleRows.find((r) => r.area === area);
-    const gov = row && row.governorate ? row.governorate : "";
-    const base = govMedian[gov];
-    if (med == null || !base) continue;
-    const saleMedian = medianOf(salePriceByArea[area]);
-    const rentMedian = medianOf(rentPriceByArea[area]);
-    let yieldPct = null;
-    if (saleMedian && rentMedian && saleMedian > rentMedian * 12) {
-      yieldPct = Math.round(((rentMedian * 12) / saleMedian) * 1000) / 10;
-    }
-    areas.push({
-      area,
-      governorate: gov,
-      count: arr.length,
-      rentCount: (rentPriceByArea[area] || []).length,
-      perM2: med,
-      gapPct: Math.round(((med / base) - 1) * 1000) / 10,
-      yieldPct,
-    });
-  }
-  return areas.sort((a, b) => a.gapPct - b.gapPct);
-}
-
 // وضع تلوين الخريطة: «فجوة السعر» (افتراضي) أو «عائد الإيجار» — يُحفظ في المتصفح
 const heatmapModeKey = "alforaij_heatmap_mode_v1";
 let heatmapMode = (() => {
@@ -1407,7 +1354,6 @@ function setHeatmapMode(mode) {
     btn.classList.toggle("active", btn.dataset.heatMode === heatmapMode);
   });
   syncHeatmapLegends();
-  renderBoardHeatmap(boardState.records);
   renderInsightsHeatmap(insightsState.data);
 }
 
@@ -1416,9 +1362,7 @@ function syncHeatmapLegends() {
   const html = isYield
     ? '<i class="legend-swatch" style="background:hsl(120 62% 26% / .92)"></i>عائد مرتفع (فرصة)<i class="legend-swatch" style="background:hsl(60 62% 26% / .92)"></i>عائد متوسط<i class="legend-swatch" style="background:hsl(0 62% 26% / .92)"></i>عائد منخفض'
     : '<i class="legend-swatch legend-cheap"></i>أرخص من وسيط المحافظة (فرصة)<i class="legend-swatch legend-neutral"></i>قريب من الوسيط<i class="legend-swatch legend-expensive"></i>أعلى من الوسيط (مضخم)';
-  const boardLegend = $("boardHeatmapLegend");
   const insightsLegend = $("insightsHeatmapLegend");
-  if (boardLegend) boardLegend.innerHTML = html;
   if (insightsLegend) insightsLegend.innerHTML = html;
 }
 
@@ -1464,21 +1408,6 @@ function heatmapCellsHtml(areas) {
         <button type="button" class="heat-watch-btn${watched ? " watched" : ""}" data-watch-area="${escapeHtml(a.area)}" data-watch-gov="${escapeHtml(a.governorate)}" data-watch-gap="${a.gapPct}" data-watch-yield="${a.yieldPct ?? ""}" title="${watched ? "إلغاء مراقبة المنطقة" : "احجز هذه المنطقة لمراقبة تغيّر فجوتها"}">${watched ? "★ مراقَبة" : "☆ احجز"}</button>
       </div>`;
   }).join("");
-}
-
-function renderBoardHeatmap(rows) {
-  const root = $("boardHeatmap");
-  if (!root) return;
-  const areas = computeAreaHeatmap(rows);
-  const countEl = $("watchedCount");
-  if (countEl) countEl.textContent = readWatchedAreas().length ? `(${readWatchedAreas().length})` : "";
-  if (!areas.length) {
-    root.innerHTML = '<div class="empty">لا توجد بيانات سعر/مساحة كافية للرسم الحراري — تتراكم مع الحصاد اليومي.</div>';
-    renderWatchedAreas($("watchedAreas"), []);
-    return;
-  }
-  root.innerHTML = heatmapCellsHtml(areas);
-  renderWatchedAreas($("watchedAreas"), areas);
 }
 
 // خريطة حرارية تبويب التحليلات: تُبنى من /api/market-insights (مناطق بوسيط سعر المتر والمحافظة)
@@ -1575,8 +1504,6 @@ function renderBoard() {
   renderCompanionAds(rows);
   renderBoardMarketMatches(rows);
   renderGovernorateTable(rows);
-  // الخريطة الحرارية تُبنى من كل السجلات بنطاق المنصات المختار (لا تتأثر بفلتر المنطقة)
-  renderBoardHeatmap(boardState.records);
 }
 
 async function loadDashboardBoard() {
@@ -4557,7 +4484,6 @@ function bind() {
       const gov = watchBtn.dataset.watchGov || "";
       const gap = watchBtn.dataset.watchGap != null && watchBtn.dataset.watchGap !== "" ? Number(watchBtn.dataset.watchGap) : null;
       toggleWatchedArea(area, gov, gap);
-      renderBoardHeatmap(boardState.records);
       renderInsightsHeatmap(insightsState.data);
       return;
     }
