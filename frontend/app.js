@@ -893,72 +893,52 @@ function renderCompanionAds(rows) {
   `).join("");
 }
 
-function matchInCurrentBoardScope(match) {
-  const filters = boardFilterValues();
-  const sourceScope = selectedBoardPlatforms();
-  if (filters.governorate && normalizeArabic(match.governorate) !== normalizeArabic(filters.governorate)) return false;
-  if (filters.area && normalizeArabic(match.area) !== normalizeArabic(filters.area)) return false;
-  if (filters.propertyType && normalizeArabic(match.propertyType) !== normalizeArabic(filters.propertyType)) return false;
-  if (sourceScope.sourceMode !== "all") {
-    const source = normalizeArabic(match.source || "");
-    const selected = sourceScope.selectedSources.map(normalizeArabic);
-    const isLocal = source.includes("الفريج") || source.includes("alforaij");
-    if (sourceScope.includeLocal && !sourceScope.includeExternal && !isLocal) return false;
-    if (selected.length && !selected.some((name) => source.includes(name))) return false;
-  }
-  return true;
-}
-
-function renderBoardMarketMatches(rows) {
-  const root = $("boardMarketMatches");
+// بطاقة ملخص «فرص الربط» في اللوحة — البيانات الكاملة تعيش في تبويب «العرض والطلب» داخل أفضل الفرص،
+// وهذه البطاقة تلخصها فقط مع زر تنقّل ذكي يفتح التبويب في نفس الصفحة.
+function renderBoardMatchingLink(rows) {
+  const root = $("boardMatchingLink");
   if (!root) return;
   const data = boardState.matching;
   if (!data) {
-    root.innerHTML = '<div class="empty compact-empty">جاري تحميل فرص الربط...</div>';
+    root.innerHTML = '<div class="empty compact-empty">جاري تحميل ملخص العرض والطلب...</div>';
     return;
   }
-  const currentCodes = new Set(rows.map((row) => String(row.code || "")));
-  const cards = [];
-  for (const req of data.requests || []) {
-    for (const match of req.matches || []) {
-      if (!matchInCurrentBoardScope(match)) continue;
-      if (currentCodes.size && match.code && !currentCodes.has(String(match.code)) && boardFilterValues().metric !== "movement") continue;
-      const budget = Number(req.budget || 0);
-      const price = Number(match.price || 0);
-      const margin = budget && price && budget > price ? budget - price : 0;
-      cards.push({ req, match, margin });
-    }
+  const byKind = data.byKind || {};
+  const stats = [
+    { label: "طلبات شراء", value: byKind.buy || 0 },
+    { label: "طلبات إيجار", value: byKind.rent || 0 },
+    { label: "طلبات لها فرص مطابقة", value: data.matchedDemandCount || 0 },
+    { label: "فرص متاحة مقيّمة", value: data.supplyCount || 0 },
+  ];
+  root.innerHTML = `
+    <div class="section-title compact-title companion-title">
+      <h3>فرص الربط والعرض والطلب</h3>
+      <span>البيانات الكاملة لكل طلب وفرصه المطابقة بتقييمها ومصادرها في تبويب «العرض والطلب» — هذه بطاقة ملخص فقط.</span>
+    </div>
+    <article class="matching-nav-card">
+      <div class="matching-nav-stats">${stats.map((s) => `
+        <div class="matching-nav-stat">
+          <b>${s.value}</b>
+          <span>${escapeHtml(s.label)}</span>
+        </div>`).join("")}
+      </div>
+      <button type="button" id="openMatchingTabBtn" class="primary matching-nav-btn">${DEV_SVG('<path d="M5 12h14"/><path d="M13 5l7 7-7 7"/>')} فتح تفاصيل العرض والطلب</button>
+    </article>`;
+  const btn = $("openMatchingTabBtn");
+  if (btn && !btn.dataset.bound) {
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", () => goToMatchingTab());
   }
-  cards.sort((a, b) => (b.margin - a.margin) || (Number(b.match.matchScore || 0) - Number(a.match.matchScore || 0)) || (Number(b.match.score || 0) - Number(a.match.score || 0)));
-  const top = cards.slice(0, 5);
-  if (!top.length) {
-    root.innerHTML = '<div class="empty compact-empty">لا توجد فرص ربط مؤكدة حسب الفلاتر الحالية.</div>';
-    return;
-  }
-  root.innerHTML = top.map(({ req, match, margin }) => {
-    const kind = req.kind === "rent" ? "إيجار" : "شراء";
-    const marginText = margin ? `${formatMoney(margin)} هامش محتمل` : "هامش غير محسوب";
-    return `
-      <article class="board-match-card">
-        <div class="match-mini-head">
-          <strong>${escapeHtml(kind)}: ${escapeHtml(req.area || match.area || "غير محددة")}</strong>
-          <span>تطابق ${escapeHtml(match.matchScore || 0)} / 100</span>
-        </div>
-        <p>${escapeHtml(req.summary || req.transaction || "")}</p>
-        <div class="match-mini-offer">
-          <span>${escapeHtml(match.code || "")}</span>
-          <b>${escapeHtml(match.priceText || formatMoney(match.price))}</b>
-          <small>${escapeHtml(match.source || "")}</small>
-        </div>
-        <div class="match-margin">${escapeHtml(marginText)}</div>
-        <div class="companion-actions">
-          <button type="button" data-board-ad-code="${escapeHtml(match.code || "")}" data-board-ad-area="${escapeHtml(match.area || "")}" data-board-ad-type="${escapeHtml(match.propertyType || "")}">تحليل الفرصة</button>
-          ${match.url ? `<a href="${escapeHtml(match.url)}" target="_blank" rel="noreferrer">فتح العرض</a>` : ""}
-          ${req.url ? `<a href="${escapeHtml(req.url)}" target="_blank" rel="noreferrer">فتح الطلب</a>` : ""}
-        </div>
-      </article>
-    `;
-  }).join("");
+}
+
+// تنقّل ذكي: لوحة السوق ← أفضل الفرص ← تبويب «العرض والطلب» (يحتفظ بفلتر المصدر المحدد في اللوحة)
+function goToMatchingTab() {
+  switchMainTab("opportunities");
+  const tabs = document.querySelectorAll(".opp-tab");
+  tabs.forEach((t) => t.classList.toggle("active", t.dataset.tier === "matching"));
+  oppState.tier = "matching";
+  loadOpportunityTab("matching");
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function metricCells(rows, governorate = "", area = "") {
@@ -1502,7 +1482,7 @@ function renderBoard() {
   renderBoardMetricCards(boardState.records.filter((row) => rowMatchesBoardFilters(row, false, false, true)));
   renderBoardStats(rows);
   renderCompanionAds(rows);
-  renderBoardMarketMatches(rows);
+  renderBoardMatchingLink(rows);
   renderGovernorateTable(rows);
 }
 
