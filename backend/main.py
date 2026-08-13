@@ -737,7 +737,9 @@ class Handler(BaseHTTPRequestHandler):
             # تحليلات الحصاد المتراكم: كل موقع على حدة (عدد/مناطق/أسعار) من market_listings
             from backend.services.supabase_store import fetch_market_analytics
             try:
-                json_response(self, fetch_market_analytics())
+                # كاش 5 دقائق: تجميع 5000 صف من market_listings ثقيل (~1.8 ثانية بارد)
+                # والبيانات تتغير بالحصاد اليومي فقط — أُضيف بنفس نمط market-insights.
+                json_response(self, _ttl_cached("market-analytics", 300, fetch_market_analytics))
             except Exception as exc:
                 logger.exception("Market analytics failed")
                 json_response(self, {"error": "Market analytics failed", "detail": str(exc)}, status=500)
@@ -1228,7 +1230,24 @@ class Handler(BaseHTTPRequestHandler):
         return
 
 
+def _warm_opportunities_cache() -> None:
+    """تسخين كاش الفرص عند الإقلاع في خيط خلفي: يقرأ آخر لقطة محفوظة من Supabase
+    فيكون أول طلب لتبويب «أفضل الفرص» (ولقطة الفرص في اللوحة) فوريًا بدل دفع
+    ~0.8 ثانية لقراءة القاعدة. لا يبطئ الإقلاع ولا يكسر التشغيل عند غياب القاعدة."""
+    try:
+        from backend.services.supabase_store import fetch_latest_opportunities
+        snapshot = fetch_latest_opportunities()
+        if snapshot:
+            global _OPPORTUNITIES_CACHE, _OPPORTUNITIES_CACHE_AT
+            _OPPORTUNITIES_CACHE = snapshot
+            _OPPORTUNITIES_CACHE_AT = time.time()
+    except Exception as exc:
+        logger.warning("Startup opportunities warm skipped: %s", exc)
+
+
 def main() -> None:
+    # تسخين خلفي بلا انتظار: الخادم يبدأ فورًا والكاش يمتلئ في نفس اللحظات الأولى
+    _threading.Thread(target=_warm_opportunities_cache, daemon=True).start()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     logger.info("Alforaij Research Assistant running on http://%s:%s", HOST, PORT)
     server.serve_forever()

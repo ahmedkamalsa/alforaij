@@ -354,6 +354,11 @@ python scripts/run_performance_checks.py
   الفرص) يتوازيان أيضًا، و`_flat_dashboard_opportunities` يعيد استخدام
   `_OPPORTUNITIES_CACHE` في الذاكرة بدل استعلام Supabase — أول فتح للوحة انخفض
   من ~5.9s إلى ~3.3s ودالة dashboard الباردة من 5.1s إلى ~1.8s.
+- **كاش بقية النقاط الثقيلة**: `/api/market-analytics` (تجميع 5000 صف ~1.8s بارد)
+  أُضيف له كاش 5 دقائق بنفس نمط `_ttl_cached` → 1.7s→91ms؛ و`/api/opportunities`
+  (الذي له كاش 5 دقائق أصلًا) يُسخَّن الآن عند إقلاع الخادم في خيط خلفي بلا
+  انتظار — أول طلب للفرص 754ms→98ms واللوحة تستفيد من اللقطة الدافئة (البارد
+  2.7s→1.8s).
 - **CI**: `.github/workflows/performance-checks.yml` يشغّل فحص الأداء عند أي تغيير
   في frontend/backend/main.py/الفاحص/المشغّل (وفي وضع السقوط بلا مفاتيح Supabase
   يبقى حارسًا هيكليًا للواجهة والكاش؛ التشغيل الكامل ببيانات حقيقية عبر
