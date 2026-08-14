@@ -1217,11 +1217,9 @@ function renderInsights() {
         <h3>مصادر بيانات هذا التحليل</h3>
         <span>كل رقم أعلاه مبني على الحصاد المتراكم من هذه المنصات — كل إعلان يحمل رابطه الأصلي في لوحة السوق.</span>
       </div>
-      ${sources.length ? `<div class="src-list">${srcRows}<button type="button" class="src-more" data-goto-sources>تفاصيل الحالة لكل مصدر ←</button></div>` : '<div class="empty">لا توجد بيانات مصادر بعد.</div>'}
+      ${sources.length ? `<div class="src-list">${srcRows}</div>` : '<div class="empty">لا توجد بيانات مصادر بعد.</div>'}
     </div>
   `;
-  const goto = root.querySelector("[data-goto-sources]");
-  if (goto) goto.addEventListener("click", () => switchMainTab("sources"));
   setTabCount("tabCountInsights", withYield.length || priced.length);
 }
 
@@ -2008,57 +2006,10 @@ async function sendChat() {
 }
 
 // تسمية عربية مفهومة لحالات المصادر بدل الكود الإنجليزي الخام
-function sourceStatusLabel(status) {
-  if (status === "success") return "نجح";
-  if (status === "fallback") return "نجح عبر بديل";
-  if (status === "failed") return "فشل";
-  if (status === "no_results") return "لا نتائج";
-  if (status === "no_data") return "لا بيانات";
-  if (status === "page_reachable") return "الصفحة متاحة";
-  return status || "";
-}
-
 function toneClass(tone) {
   if (tone === "strong") return "strong";
   if (tone === "medium") return "medium";
   return "weak";
-}
-
-function renderSourceSummary(statuses) {
-  const root = $("sourceSummaryBar");
-  if (!root) return;
-  const list = statuses || [];
-  const entered = list.filter((s) => s.trust && s.trust.scored).length;
-  const helpers = list.filter((s) => s.trust && !s.trust.scored && ["page_reachable", "search_links"].includes(s.status)).length;
-  const missing = list.filter((s) => s.trust && !s.trust.scored && !["page_reachable", "search_links"].includes(s.status)).length;
-  const records = list.reduce((sum, s) => sum + Number(s.records || 0), 0);
-  const topNames = list
-    .filter((s) => s.trust && s.trust.scored)
-    .slice(0, 4)
-    .map((s) => s.name)
-    .join("، ");
-  root.innerHTML = `
-    <div class="source-summary-card strong">
-      <span>دخل التقييم</span>
-      <strong>${entered}</strong>
-      <p>${escapeHtml(topNames || "لا يوجد")}</p>
-    </div>
-    <div class="source-summary-card">
-      <span>نتائج قابلة للتحليل</span>
-      <strong>${records}</strong>
-      <p>إجمالي السجلات الداخلة من المصادر</p>
-    </div>
-    <div class="source-summary-card medium">
-      <span>مصادر مساعدة فقط</span>
-      <strong>${helpers}</strong>
-      <p>روابط أو صفحات لا تكفي وحدها للتقييم</p>
-    </div>
-    <div class="source-summary-card weak">
-      <span>لم تدخل</span>
-      <strong>${missing}</strong>
-      <p>لا نتائج أو لا بيانات لهذا الطلب</p>
-    </div>
-  `;
 }
 
 function renderResultsSources(report) {
@@ -2156,99 +2107,16 @@ function positionTrustTip(tip, chip) {
 }
 
 function renderSources(report) {
-  const root = $("sourceStatus");
+  // تبويب «المصادر والتشغيل» أُزيل من الواجهة؛ يبقى من هذه الدالة عداد المصادر
+  // المتصلة في لوحة البحث (connectedSources) فقط.
   const statuses = report.sourceStatus || [];
-  renderSourceSummary(statuses);
-  if (!root) return;
-  root.innerHTML = "";
   let connected = 0;
   for (const source of statuses) {
     // «نجح عبر بديل» يعوّض المصدر المتعذر بنتائج فعلية، لذا يُحتسب ضمن المتصل
     if (source.status === "success" || (source.status === "fallback" && source.records > 0)) connected += 1;
-    const response = source.responseMs ? ` | ${source.responseMs}ms` : "";
-    const available = source.availableCount ? ` | متاح بالموقع: ${source.availableCount}` : "";
-    const candidates = source.candidates !== undefined ? ` | مفحوص: ${source.candidates}` : "";
-    const url = source.url ? `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">فتح المصدر المفحوص</a>` : "";
-    const trust = source.trust || {};
-    const trustLine = trust.label
-      ? `<em class="trust-badge ${toneClass(trust.tone)}">${escapeHtml(trust.label)} ${trust.score !== undefined ? `(${trust.score}%)` : ""}</em>`
-      : "";
-    // شفافية آلية الجلب: كيف جُلبت البيانات فعلًا (JSON مضمّن / بيانات منظمة / فحص HTML / تغذية رسمية)
-    // ونقطة النهاية الحقيقية — فلا يظهر رقم بلا مصدر قابل للتتبع
-    const mechLine = source.fetchMethod
-      ? `<span class="source-mech" dir="auto">${DEV_SVG('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>')} آلية الجلب: ${escapeHtml(source.fetchMethod)}${source.endpoint ? ` · <code dir="ltr">${escapeHtml(source.endpoint)}</code>` : ""}</span>`
-      : "";
-    const item = document.createElement("div");
-    item.className = `source-card ${source.status}`;
-    item.innerHTML = `
-      <strong>${escapeHtml(source.name)}</strong>
-      <span>${escapeHtml(sourceStatusLabel(source.status))} | دخل التقييم: ${escapeHtml(source.records)}${escapeHtml(candidates)}${escapeHtml(response)}${escapeHtml(available)}</span>
-      ${trustLine}
-      ${mechLine}
-      <p>${escapeHtml(source.note)}</p>
-      ${trust.reason ? `<p class="source-trust-reason">${escapeHtml(trust.reason)}</p>` : ""}
-      ${url}
-    `;
-    root.appendChild(item);
   }
   const connectedEl = $("connectedSources");
   if (connectedEl) connectedEl.textContent = connected || "-";
-
-  const planRoot = $("externalSourcePlan");
-  if (planRoot) {
-    planRoot.innerHTML = "";
-    for (const source of report.externalSourcePlan || []) {
-      const item = document.createElement("div");
-      const statusText = source.status || "";
-      const done = /^منفذ ✓/.test(statusText);
-      const partial = /منفذ جزئيًا/.test(statusText);
-      item.className = done ? "source-card done" : (partial ? "source-card partial" : "source-card pending");
-      item.innerHTML = `
-        <strong>${escapeHtml(source.name)}</strong>
-        <span>${escapeHtml(source.status)}</span>
-        <p>${escapeHtml(source.action)}</p>
-      `;
-      planRoot.appendChild(item);
-    }
-  }
-
-  const registryRoot = $("sourceRegistry");
-  if (registryRoot) {
-    registryRoot.innerHTML = "";
-    for (const source of report.sourceRegistry || []) {
-      const row = document.createElement("div");
-      row.className = `registry-row ${source.status || ""}`;
-      row.innerHTML = `
-        <div>
-          <strong>${escapeHtml(source.name)}</strong>
-          <span>${escapeHtml(source.category)} | ${escapeHtml(source.connection)}</span>
-        </div>
-        <p>${escapeHtml(source.role)}</p>
-        <p>${escapeHtml(source.scoringPolicy)}</p>
-        <em>${escapeHtml(source.trustLevel)}</em>
-      `;
-      registryRoot.appendChild(row);
-    }
-  }
-
-  const linksRoot = $("externalLinks");
-  if (linksRoot) {
-    linksRoot.innerHTML = "";
-    for (const link of report.externalSearchLinks || []) {
-      const card = document.createElement("div");
-      card.className = "external-link-card";
-      card.innerHTML = `
-        <strong>${escapeHtml(link.name)}</strong>
-        <span>${escapeHtml(link.status || "رابط مراجعة")}</span>
-        <p>${escapeHtml(link.evidenceStatus || "")}</p>
-        <div>
-          <a class="external-link" href="${escapeHtml(link.url || "#")}" target="_blank" rel="noreferrer">بحث مطابق</a>
-          ${link.directUrl ? `<a class="external-link secondary" href="${escapeHtml(link.directUrl)}" target="_blank" rel="noreferrer">فتح الموقع</a>` : ""}
-        </div>
-      `;
-      linksRoot.appendChild(card);
-    }
-  }
 }
 
 function renderMethod(report) {
@@ -4017,173 +3885,6 @@ function renderOppMeta() {
   }
 }
 
-function renderDailyAgentOfficialSources(status) {
-  // المصادر الرسمية المرجعية (أدلة حية بروابطها) — داخل بطاقة وكيل التحديث
-  const box = $("officialRefStrip");
-  if (!box) return;
-  if (!status || !status.summary) {
-    box.hidden = true;
-    return;
-  }
-  const official = status.summary.officialReferenceSources;
-  if (!official || !official.sources || !official.sources.length) {
-    box.hidden = true;
-    return;
-  }
-  box.hidden = false;
-  box.innerHTML = `<div class="official-reference-strip">
-    <strong>مصادر رسمية مرجعية:</strong>
-    <span>${official.reachable || 0}/${official.count || 0} متاح</span>
-    ${(official.sources || []).slice(0, 4).map((source) => `
-      <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>
-    `).join("")}
-  </div>`;
-}
-
-async function loadMarketAnalytics() {
-  const strip = $("marketAnalyticsStrip");
-  const detail = $("marketAnalyticsDetail");
-  if (!strip && !detail) return;
-  try {
-    const analytics = await getJson("/api/market-analytics");
-    const totals = analytics.totals || {};
-    if (!analytics.tableOk) {
-      if (strip) strip.textContent = `الحصاد: الجدول غير مفعّل بعد — ${analytics.note || "شغّل migration 010 ثم الوكيل اليومي"}`;
-      if (detail) detail.innerHTML = "";
-      return;
-    }
-    if (strip) {
-      const last = String(totals.lastFetched || "").replace("T", " ").slice(0, 16);
-      strip.textContent = totals.rows
-        ? `حصاد السوق: ${totals.rows} إعلانًا من ${totals.sources} مواقع تغطي ${totals.areas} منطقة${last ? ` · آخر جلب ${last}` : ""} — كل إعلان يحمل الرابط الأصلي ووقت الجلب كدليل.`
-        : `حصاد السوق: الجدول جاهز ولا توجد صفوف بعد — شغّل الوكيل اليومي لبدء التراكم.`;
-    }
-    if (detail) {
-      const rows = (analytics.sources || [])
-        .map((s) => {
-          const medianPrice = s.price && s.price.median != null ? s.price.median.toLocaleString("en") : "—";
-          const medianSpace = s.space && s.space.median != null ? s.space.median.toLocaleString("en") : "—";
-          return `<tr><td>${escapeHtml(s.source)}</td><td>${s.count}</td><td>${(s.areas || []).length}</td><td>${medianPrice}</td><td>${medianSpace}</td><td>${s.phones || 0}</td></tr>`;
-        })
-        .join("");
-      detail.innerHTML = rows || '<tr><td colspan="6">لا توجد بيانات بعد.</td></tr>';
-    }
-  } catch (err) {
-    if (strip) strip.textContent = "حصاد السوق: غير متاح في هذا الوضع (يتطلب الباك إند الحي).";
-    if (detail) detail.innerHTML = "";
-  }
-}
-
-function whatsappSendStatusText(status) {
-  const steps = status.steps || [];
-  const step = steps.find((s) => s.name === "send_whatsapp_alerts");
-  if (!step) return "";
-  const r = step.result || {};
-  if (r.status === "not_configured") {
-    return "تنبيهات واتساب: الإرسال التلقائي غير مفعّل — أضف WHATSAPP_TOKEN و WHATSAPP_PHONE_ID في .env (Meta Cloud API) ليتواصل الوكيل اليومي مع العملاء المطابقين تلقائيًا.";
-  }
-  if (r.status === "failed") return `تنبيهات واتساب: فشل الإرسال — ${escapeHtml(r.error || "خطأ غير معروف")}`;
-  const sent = r.sent || 0;
-  const failed = r.failed || 0;
-  const skipped = r.skippedDuplicates || 0;
-  return `تنبيهات واتساب: أُرسلت ${sent} رسالة${failed ? ` · فشل ${failed}` : ""}${skipped ? ` · مكرر اليوم ${skipped}` : ""} (جديد/انخفاض يطابق عملاء مسجلين).`;
-}
-
-async function loadDailyAgentStatus() {
-  const inlineStateEl = $("dailyAgentStateInline");
-  const waStateEl = $("dailyAgentWhatsAppInline");
-  try {
-    const status = await getJson("/api/daily-agent/status");
-    if (inlineStateEl) {
-      const finished = status.finishedAt ? String(status.finishedAt).replace("T", " ").slice(0, 16) : "";
-      inlineStateEl.textContent = `آخر تشغيل: ${finished || "لم يعمل بعد"} · الحالة: ${status.status || "غير معروف"}`;
-    }
-    if (waStateEl) {
-      const text = whatsappSendStatusText(status);
-      waStateEl.textContent = text || "";
-      waStateEl.hidden = !text;
-    }
-    renderDailyAgentOfficialSources(status);
-    loadMarketAnalytics();
-  } catch (err) {
-    if (inlineStateEl) inlineStateEl.textContent = "تعذر قراءة حالة الوكيل من الباك إند.";
-    loadMarketAnalytics();
-  }
-}
-
-async function runDailyAgentNow() {
-  const buttons = ["runDailyAgentBtn", "runDailyAgentBtnInline"].map((id) => $(id)).filter(Boolean);
-  const btn = buttons[0] || null;
-  const inlineStateEl = $("dailyAgentStateInline");
-  const originals = buttons.map((button) => button.textContent);
-  // النسخة المنشورة (GitHub Pages) لا تستضيف خادم API — الوكيل يعمل على الخادم
-  // المباشر فقط؛ هنا نوضح ذلك بدل إرسال طلب لنقطة غير موجودة يعيد صفحة HTML.
-  if (STATIC_SNAPSHOT_MODE) {
-    const msg = "وكيل التحديث يعمل على الخادم المباشر فقط — هذه النسخة المنشورة تعرض أحدث لقطة (تُحدَّث تلقائيًا يوميًا).";
-    if (inlineStateEl) inlineStateEl.textContent = msg;
-    return;
-  }
-  buttons.forEach((button) => {
-    button.disabled = true;
-    button.textContent = "جاري تشغيل الوكيل...";
-  });
-  if (inlineStateEl) inlineStateEl.textContent = "يتم تحديث المصادر والفرص الآن...";
-  try {
-    const response = await fetch(apiUrl("/api/daily-agent/run"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ includeExternal: true }),
-    });
-    const result = await readJsonResponse(response, "/api/daily-agent/run");
-    if (!response.ok) throw new Error(result.error || result.detail || "فشل تشغيل الوكيل");
-    if (inlineStateEl) inlineStateEl.textContent = `اكتمل التشغيل: ${result.status}`;
-    await loadDailyAgentStatus();
-    await loadOpportunities(false);
-  } catch (err) {
-    if (inlineStateEl) inlineStateEl.textContent = `فشل التشغيل: ${err.message}`;
-  } finally {
-    buttons.forEach((button, index) => {
-      button.disabled = false;
-      button.textContent = originals[index];
-    });
-  }
-}
-
-async function importOfficialTransactions() {
-  const input = $("officialImportFile");
-  const status = $("officialImportStatus");
-  const btn = $("officialImportBtn");
-  const file = input && input.files ? input.files[0] : null;
-  if (!file) {
-    if (status) status.textContent = "اختر ملف CSV أو JSON أولًا.";
-    return;
-  }
-  const original = btn ? btn.textContent : "";
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "جاري الاستيراد...";
-  }
-  if (status) status.textContent = "يتم قراءة الملف وحفظه في قاعدة البيانات...";
-  try {
-    const content = await file.text();
-    const result = await postJson("/api/official-transactions/import", {
-      filename: file.name,
-      content,
-    });
-    if (status) {
-      status.textContent = `تم استيراد ${result.imported || 0} صفقة | Supabase: ${result.supabase || "-"} | الإجمالي المحلي: ${result.localTotal || 0}`;
-    }
-    await runDailyAgentNow();
-  } catch (err) {
-    if (status) status.textContent = `فشل الاستيراد: ${err.message}`;
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = original;
-    }
-  }
-}
-
 async function loadOpportunities(forceRefresh = false) {
   const root = $("oppList");
   if (!root) return;
@@ -4210,7 +3911,6 @@ async function loadOpportunities(forceRefresh = false) {
     fillOppSelect("oppTypeFilter", allItems.map((item) => item.propertyType));
 
     renderOppMeta();
-    loadDailyAgentStatus();
     renderOppTier();
     updateOppTabCount();
   } catch (err) {
@@ -4337,8 +4037,6 @@ function bind() {
   on("downloadReportBtnTop", downloadReport);
   on("downloadPdfBtn", () => downloadPdfReport("downloadPdfBtn"));
   on("downloadPdfBtnTop", () => downloadPdfReport("downloadPdfBtnTop"));
-  on("officialImportBtn", importOfficialTransactions);
-  on("runDailyAgentBtnInline", runDailyAgentNow);
   on("toggleCustomSearchBtn", () => {
     switchMainTab("search");
     const panel = $("customSearchPanel");
@@ -4371,11 +4069,6 @@ function bind() {
     boardState.activeMetric = "movement";
     boardState.selectedCell = null;
     loadDashboardBoard();
-  });
-  on("openEvidenceQuick", () => {
-    switchMainTab("sources");
-    const target = document.querySelector(".sources-panel");
-    if (target) setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   });
   ["boardMetricFilter", "boardGovernorateFilter", "boardTransactionFilter", "boardPropertyTypeFilter", "boardListingModeFilter", "boardAreaFilter"].forEach((id) => {
     const el = $(id);
@@ -4668,7 +4361,6 @@ function renderDevelopments() {
   if (!root) return;
   const meta = $("developmentsMeta");
   const stateEl = $("developmentsAgentState");
-  const portalsEl = $("developmentsPortals");
   const sourcesEl = $("developmentsSources");
 
   if (meta) {
@@ -4677,7 +4369,7 @@ function renderDevelopments() {
   }
 
   if (!items.length) {
-    root.innerHTML = '<div class="empty">لا توجد تطورات بعد — شغّل الوكيل اليومي من تبويب المصادر ليجمع وكيل الاكتشاف آخر أخبار السوق والمنصات المفيدة.</div>';
+    root.innerHTML = '<div class="empty">لا توجد تطورات بعد — يعمل وكيل الاكتشاف تلقائيًا مع التحديث اليومي (06:00) لجمع آخر أخبار السوق.</div>';
   } else {
     const byCategory = {};
     for (const item of items) {
@@ -4711,21 +4403,8 @@ function renderDevelopments() {
       stateEl.className = `source-summary-bar ${status === "success" ? "tone-ok" : "tone-warn"}`;
       stateEl.innerHTML = `${DEV_SVG('<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.9.7 3.7 1.9 5.1L12 22l6.1-6.9A8 8 0 0 0 20 10a8 8 0 0 0-8-8Z"/>')} وكيل الاكتشاف: <strong>${escapeHtml(note)}</strong>`;
     } else {
-      stateEl.innerHTML = `${DEV_SVG('<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.9.7 3.7 1.9 5.1L12 22l6.1-6.9A8 8 0 0 0 20 10a8 8 0 0 0-8-8Z"/>')} وكيل الاكتشاف: لم يُشغَّل بعد — شغّل التحديث اليومي من تبويب المصادر والتشغيل.`;
+      stateEl.innerHTML = `${DEV_SVG('<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.9.7 3.7 1.9 5.1L12 22l6.1-6.9A8 8 0 0 0 20 10a8 8 0 0 0-8-8Z"/>')} وكيل الاكتشاف: لم يُشغَّل بعد — يعمل تلقائيًا مع التحديث اليومي (06:00).`;
     }
-  }
-
-  if (portalsEl) {
-    const portals = data.portals || [];
-    portalsEl.innerHTML = portals.length
-      ? `<div class="registry-table"><div class="registry-row registry-head"><span>المنصة</span><span>الدور</span><span>الحالة</span></div>${portals.map((p) => `
-        <div class="registry-row">
-          <span><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.name)}</a></span>
-          <span>${escapeHtml(p.role || "")}</span>
-          <span class="${p.status === "متاحة" ? "portals-ok" : "portals-no"}">${p.status === "متاحة" ? "● متاحة" : "○ غير متاحة"}</span>
-        </div>
-      `).join("")}</div>`
-      : '<div class="empty small">لا توجد بيانات منصات في هذه اللقطة.</div>';
   }
 
   if (sourcesEl) {
@@ -4889,8 +4568,6 @@ async function boot() {
     // الموقع المنشور: محاولة قراءة مباشرة من القاعدة الحية (مفتاح anon + RLS للجداول العامة)
     // ليعرض أرقامًا حية فعلًا — مع السقوط الآمن للقطة إن تعذر الاتصال.
     if (STATIC_SNAPSHOT_MODE) applyLiveDbCounts(statusEl);
-    const tableCount = Object.keys((health.dataSummary && health.dataSummary.tables) || {}).length;
-    setTabCount("tabCountSources", tableCount);
   } catch {
     setStatus("تعذر فحص البيانات");
   }

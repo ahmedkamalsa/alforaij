@@ -129,6 +129,18 @@ SOURCE_MECHANISMS: dict[str, dict[str, str]] = {
         "method": "بيانات ItemList منظمة (JSON-LD) من صفحتي البيع والإيجار",
         "endpoint": "https://yebtah.com/en/for_sale · /en/for_rent",
     },
+    "PropertyFinder": {
+        "method": "بيانات منظمة JSON-LD/حمولة مضمّنة من صفحات البحث؛ غير قابل للوصول من شبكات الخوادم حاليًا (مهلة زمنية) ويُعاد فحصه يوميًا",
+        "endpoint": "https://www.propertyfinder.kw/en/search?l=1&ob=pd&page=… (و property-for-rent)",
+    },
+    "Aqarmap": {
+        "method": "بيانات منظمة JSON-LD من صفحات النتائج؛ النسخة الكويتية متوقفة والمسار /kw/ يعيد بوابة مصر (يُتحقق من هوية الصفحة أولًا)",
+        "endpoint": "https://aqarmap.com/kw/… (يُعاد توجيهه حاليًا إلى مصر)",
+    },
+    "Bayut": {
+        "method": "فحص روابط HTML وبيانات JSON-LD؛ محمي بنظام captcha (hb.captcha.bayut.com) يمنع القراءة البرمجية",
+        "endpoint": "https://www.bayut.com/kuwait/…",
+    },
     "الحسبة العامة": {
         "method": "تغذية رسمية من موقع الحسبة (صفقات موثقة بمواعيد وأرقام قسائم)",
         "endpoint": "https://alhisba.com/…",
@@ -1960,6 +1972,234 @@ def search_alhisba_public_deals(request: PropertyRequest) -> tuple[list[Listing]
     return listings, status
 
 
+# --- المنصات المرشحة (Property Finder / Aqarmap / Bayut) ---
+# منصات عقارية كويتية معروفة لكنها غير متاحة حاليًا للجلب البرمجي من شبكات
+# الخوادم (حجب جغرافي/مهلة، توقف خدمة، أو حماية captcha). الموصلات مكتوبة
+# بنفس نمط بقية المصادر وتُحاول الجلب فعليًا عبر fetch_url وتستخرج عند توفر
+# الوصول، وتسجّل حالتها الحقيقية بشفافية بدل ادعاء نجاح وهمي. سجل الحجب يمنع
+# إعادة المحاولة المتكررة داخل نافذة زمنية حتى لا تُبطئ عمليات البحث المتكررة
+# بانتظار منصات متعثرة، ثم تنتهي النافذة فيُعاد الفحص تلقائيًا.
+_CANDIDATE_MEMO: dict[str, tuple[float, dict[str, Any]]] = {}
+_CANDIDATE_LOCK = threading.Lock()
+CANDIDATE_MEMO_SECONDS = 30 * 60  # نافذة الحجب بين فحصين للمنصة المتعثرة
+
+
+def _candidate_attempt(
+    name: str,
+    url: str,
+    request: PropertyRequest,
+    parse: Callable[[str, PropertyRequest], tuple[list[Listing], int, dict[str, Any] | None]],
+) -> tuple[list[Listing], dict[str, Any]]:
+    """محاولة جلب منصة مرشحة مع سجل حجب قصير العمر.
+
+    - الاستدعاء داخل نافذة الحجب يعيد حالة المسجَّلة فورًا (لا إعادة فحص).
+    - الفشل الفعلي يُسجَّل في الذاكرة بنافذة 30 دقيقة ثم يُعاد الفحص تلقائيًا —
+      فبمجرد توفر الوصول تبدأ النتائج في دخول البحث والتقييم وقاعدة المعرفة
+      دون أي تدخل يدوي.
+    - parse تعيد (قائمة الإعلانات، عدد المرشحين، حالة قسرية أو None). الحالة
+      القسرية (مثل «discontinued» عند عودة بوابة أخرى) تُسجَّل كما هي.
+    """
+    with _CANDIDATE_LOCK:
+        memo = _CANDIDATE_MEMO.get(name)
+        if memo and time.time() - memo[0] < CANDIDATE_MEMO_SECONDS:
+            st = dict(memo[1])
+            st["note"] = st.get("note", "") + " (إعادة فحص أثناء سجل الحجب)"
+            return [], st
+    body, status, ms, error, attempts = fetch_url(url)
+    listings: list[Listing] = []
+    candidates = 0
+    forced: dict[str, Any] | None = None
+    if body:
+        listings, candidates, forced = parse(body, request)
+        if forced is None:
+            lowered = body[:4000].lower()
+            if any(token in lowered for token in ("captcha", "challenge", "access denied")):
+                forced = {
+                    "name": name,
+                    "status": "blocked",
+                    "records": 0,
+                    "candidates": candidates,
+                    "attempts": attempts,
+                    "responseMs": ms,
+                    "url": url,
+                    "note": "حماية captcha/تحدٍ من الموقع تمنع القراءة البرمجية حاليًا.",
+                }
+    if forced is not None:
+        forced.setdefault("name", name)
+        forced.setdefault("attempts", attempts)
+        forced.setdefault("responseMs", ms)
+        forced.setdefault("url", url)
+        with _CANDIDATE_LOCK:
+            _CANDIDATE_MEMO[name] = (time.time(), forced)
+        return [], forced
+    if not body or error:
+        reason = error or f"HTTP {status}"
+        st = {
+            "name": name,
+            "status": "blocked",
+            "records": 0,
+            "candidates": candidates,
+            "attempts": attempts,
+            "responseMs": ms,
+            "url": url,
+            "note": f"غير متاح حاليًا من الشبكة الخادمة ({reason[:110]}). يُعاد الفحص تلقائيًا في التحديث اليومي.",
+        }
+        with _CANDIDATE_LOCK:
+            _CANDIDATE_MEMO[name] = (time.time(), st)
+        return [], st
+    with _CANDIDATE_LOCK:
+        _CANDIDATE_MEMO.pop(name, None)
+    return listings[:50], {
+        "name": name,
+        "status": "success" if listings else "no_results",
+        "records": len(listings),
+        "candidates": candidates,
+        "attempts": attempts,
+        "responseMs": ms,
+        "url": url,
+        "note": (
+            f"تم استخراج {len(listings)} إعلانًا من بيانات الصفحة."
+            if listings
+            else "الصفحة متاحة لكن لا نتائج مطابقة للطلب."
+        ),
+    }
+
+
+def _jsonld_real_estate_nodes(body: str) -> list[dict[str, Any]]:
+    """عقد عقارية منظمة (RealEstateListing/Product/Offer) من حمولات JSON-LD مع إزالة التكرار بالرابط."""
+    nodes: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw_json in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S):
+        try:
+            data = json.loads(raw_json)
+        except json.JSONDecodeError:
+            continue
+        for node in walk_dicts(data):
+            if not isinstance(node, dict):
+                continue
+            node_type = node.get("@type")
+            if isinstance(node_type, list):
+                node_type = node_type[0] if node_type else ""
+            if str(node_type) not in ("RealEstateListing", "Product", "Offer"):
+                continue
+            item_url = str(node.get("url") or "")
+            if not item_url:
+                continue
+            if item_url in seen:
+                continue
+            seen.add(item_url)
+            nodes.append(node)
+    return nodes
+
+
+def _listing_from_jsonld_node(
+    request: PropertyRequest,
+    *,
+    source: str,
+    node: dict[str, Any],
+    code_prefix: str,
+) -> Listing:
+    """Listing من عقدة JSON-LD (RealEstateListing/Product) بنفس قواعد بقية المصادر."""
+    item_url = str(node.get("url") or "")
+    offer = node.get("offers")
+    price_raw = None
+    if isinstance(offer, dict):
+        price_raw = offer.get("price")
+    elif isinstance(offer, list) and offer:
+        first = offer[0]
+        price_raw = first.get("price") if isinstance(first, dict) else None
+    if price_raw is None:
+        price_raw = node.get("price")
+    code = f"{code_prefix}-{item_url.rstrip('/').split('/')[-1]}"
+    return listing_from_text(
+        source=source,
+        code=code,
+        url=item_url,
+        title=str(node.get("name") or ""),
+        description=str(node.get("description") or ""),
+        price=float(price_raw) if price_raw not in (None, "") else None,
+        transaction=transaction_from_request(request),
+        fallback_type=request.property_type,
+    )
+
+
+def search_propertyfinder(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    """Property Finder Kuwait — يحاول صفحات البحث ويستخرج إعلانات JSON-LD عند توفر الوصول."""
+    mode = "rent" if transaction_from_request(request) == "للإيجار" else "buy"
+    query = (" ".join(request.areas) or request.raw_text or "").strip()
+    url = f"https://www.propertyfinder.kw/en/{mode}?l=1&ob=pd&q={urllib.parse.quote(query)}"
+
+    def _parse(body: str, req: PropertyRequest) -> tuple[list[Listing], int, dict[str, Any] | None]:
+        nodes = _jsonld_real_estate_nodes(body)
+        listings: list[Listing] = []
+        seen: set[str] = set()
+        for node in nodes:
+            listing = _listing_from_jsonld_node(req, source="PropertyFinder", node=node, code_prefix="PF")
+            if listing.code in seen:
+                continue
+            seen.add(listing.code)
+            if request_matches_listing(req, listing):
+                listings.append(listing)
+        return listings, len(nodes), None
+
+    return _candidate_attempt("PropertyFinder", url, request, _parse)
+
+
+def search_aqarmap(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    """Aqarmap Kuwait — يتحقق من هوية الصفحة أولًا (النسخة الكويتية متوقفة حاليًا)."""
+    query = (" ".join(request.areas) or request.raw_text or "").strip()
+    url = f"https://aqarmap.com/kw/?q={urllib.parse.quote(query)}"
+
+    def _parse(body: str, req: PropertyRequest) -> tuple[list[Listing], int, dict[str, Any] | None]:
+        # فحص الهوية: /kw/ يعيد حاليًا بوابة مصر — لا تُلتقط بيانات بوابة أخرى كبيانات كويتية
+        if "عقارماب مصر" in body or "aqarmap.com.eg" in body.lower():
+            return [], 0, {
+                "name": "Aqarmap",
+                "status": "discontinued",
+                "records": 0,
+                "candidates": 0,
+                "note": "النسخة الكويتية من عقارماب متوقفة — الموقع يعيد بوابة مصر حاليًا، ولا تُؤخذ بياناتها كبيانات كويتية.",
+            }
+        nodes = _jsonld_real_estate_nodes(body)
+        listings: list[Listing] = []
+        seen: set[str] = set()
+        for node in nodes:
+            listing = _listing_from_jsonld_node(req, source="Aqarmap", node=node, code_prefix="AQ")
+            if listing.code in seen:
+                continue
+            seen.add(listing.code)
+            if request_matches_listing(req, listing):
+                listings.append(listing)
+        return listings, len(nodes), None
+
+    return _candidate_attempt("Aqarmap", url, request, _parse)
+
+
+def search_bayut(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    """Bayut Kuwait — محمي بنظام captcha؛ يُسجَّل الحجب بشفافية ويُعاد الفحص يوميًا."""
+    mode = "to-rent" if transaction_from_request(request) == "للإيجار" else "for-sale"
+    query = (" ".join(request.areas) or request.raw_text or "").strip()
+    if query:
+        url = f"https://www.bayut.com/kuwait/en/property/{mode}/{urllib.parse.quote(query)}"
+    else:
+        url = f"https://www.bayut.com/kuwait/en/property/{mode}"
+
+    def _parse(body: str, req: PropertyRequest) -> tuple[list[Listing], int, dict[str, Any] | None]:
+        nodes = _jsonld_real_estate_nodes(body)
+        listings: list[Listing] = []
+        seen: set[str] = set()
+        for node in nodes:
+            listing = _listing_from_jsonld_node(req, source="Bayut", node=node, code_prefix="BY")
+            if listing.code in seen:
+                continue
+            seen.add(listing.code)
+            if request_matches_listing(req, listing):
+                listings.append(listing)
+        return listings, len(nodes), None
+
+    return _candidate_attempt("Bayut", url, request, _parse)
+
+
 SEARCHERS: list[tuple[str, Any]] = [
     ("OpenSooq", search_opensooq),
     ("Mourjan", search_mourjan),
@@ -1971,6 +2211,9 @@ SEARCHERS: list[tuple[str, Any]] = [
     ("Aqarat", search_aqarat),
     ("4Sale", search_four_sale),
     ("Yebtah", search_yebtah),
+    ("PropertyFinder", search_propertyfinder),
+    ("Aqarmap", search_aqarmap),
+    ("Bayut", search_bayut),
     ("الحسبة", search_alhisba_public_deals),
     ("السوق المباشر", search_market_ads),
     ("مؤشرات رسمية", search_official_indicators),

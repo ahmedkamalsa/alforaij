@@ -49,9 +49,9 @@ def main() -> int:
         check("عنوان الصفحة غير فارغ", bool(page.title()), page.title()[:60])
 
         # 2) كل تبويب يفتح ويمتلئ
-        tabs = ["search", "opportunities", "board", "insights", "developments", "sources"]
+        tabs = ["search", "opportunities", "board", "insights", "developments"]
         tab_names = {"search": "البحث والتقييم", "opportunities": "أفضل الفرص", "board": "لوحة السوق",
-                     "insights": "تحليلات السوق", "developments": "التطورات", "sources": "المصادر والتشغيل"}
+                     "insights": "تحليلات السوق", "developments": "التطورات"}
         for t in tabs:
             page.click(f"[data-main-tab='{t}']")
             page.wait_for_timeout(4000)  # insights والتطورات تحتاج تحميل بيانات
@@ -151,18 +151,12 @@ def main() -> int:
         else:
             check("شريط منصات الفرص يظهر", False, "غير موجود")
 
-        # 6) المصادر
-        page.click("[data-main-tab='sources']")
-        page.wait_for_timeout(2500)
-        src_text = page.locator("[data-main-panel='sources']").first.inner_text()
-        check("تبويب المصادر يعرض محتوى", "مصدر" in src_text or "تشغيل" in src_text, f"{len(src_text)} حرف")
-
-        # 7) لا أخطاء كونسول/صفحات/طلبات
+        # 6) لا أخطاء كونسول/صفحات/طلبات
         check("لا أخطاء كونسول", len(CONSOLE_ERRORS) == 0, "; ".join(CONSOLE_ERRORS[:3]))
         check("لا أخطاء صفحات JS", len(PAGE_ERRORS) == 0, "; ".join(PAGE_ERRORS[:3]))
         check("لا طلبات شبكة فاشلة", len(FAILED_REQUESTS) == 0, "; ".join(FAILED_REQUESTS[:3]))
 
-        # 8) الجوال
+        # 7) الجوال
         page.set_viewport_size({"width": 390, "height": 844})
         page.wait_for_timeout(1500)
         overflow = page.evaluate("document.documentElement.scrollWidth > document.documentElement.clientWidth")

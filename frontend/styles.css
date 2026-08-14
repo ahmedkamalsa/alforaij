@@ -2041,6 +2041,11 @@ button:hover {
   border-right: 5px solid var(--blue);
   padding: 10px;
   background: var(--panel);
+  /* الروابط الطويلة (نقاط النهاية) والملاحظات لا تتجاوز حدود البطاقة */
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .source-card strong,

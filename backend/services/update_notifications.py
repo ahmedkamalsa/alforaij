@@ -36,6 +36,7 @@ def build_update_notifications(
     *,
     official_result: dict[str, Any] | None = None,
     data_summary: dict[str, Any] | None = None,
+    candidate_platforms: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     delta = build_opportunity_delta(previous_snapshot, current_snapshot)
     counts = delta.get("counts") or {}
@@ -43,6 +44,24 @@ def build_update_notifications(
     tables = (data_summary or {}).get("tables") or {}
     official_transactions = tables.get("official_transactions") or {}
     official_indicators = tables.get("official_market_indicators") or {}
+
+    # المنصات المرشحة: ملخص توفر يومي قصير (كل منصة + حالتها) ليظهر في الإشعارات
+    # والحالة اليومية — ويُنبَّه عند تحوّل أي منصة إلى متاحة.
+    candidates = candidate_platforms or {}
+    candidate_sources = candidates.get("sources") or []
+    candidate_summary = [
+        {
+            "id": row.get("id"),
+            "name": row.get("name"),
+            "kind": row.get("kind"),
+            "status": row.get("status"),
+            "detail": row.get("detail") or "",
+        }
+        for row in candidate_sources
+    ]
+    newly_available = [
+        row["name"] for row in candidate_summary if row.get("status") == "reachable"
+    ]
 
     return {
         "generatedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
@@ -61,6 +80,14 @@ def build_update_notifications(
         "officialIndicators": {
             "storedCount": official_indicators.get("count"),
             "status": official_indicators.get("status"),
+        },
+        "candidatePlatforms": {
+            "count": candidates.get("count"),
+            "reachable": candidates.get("reachable"),
+            "blocked": candidates.get("blocked"),
+            "discontinued": candidates.get("discontinued"),
+            "sources": candidate_summary,
+            "newlyAvailable": newly_available,
         },
         "top": {
             "priceDrops": _top_items(delta.get("priceDrops") or [], 3),

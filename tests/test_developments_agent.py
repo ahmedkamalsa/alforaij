@@ -96,7 +96,7 @@ class DevelopmentsParsingTests(unittest.TestCase):
             return "", 0, 0.0, "net down", 2
 
         mock_fetch.side_effect = fake_fetch
-        result = dev.discover_market_developments(max_per_source=3, max_total=10, probe_portals=False)
+        result = dev.discover_market_developments(max_per_source=3, max_total=10)
         # Kuwait Times (HTML): 2 فريدين · TimesKuwait (RSS): 3 بحد المصدر — الإجمالي 5
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["count"], 5)
@@ -117,14 +117,13 @@ class DevelopmentsParsingTests(unittest.TestCase):
                     "note": "جمع 1 تطورًا",
                     "developments": [{"url": "https://x.test/1", "title": "شقة للبيع", "source": "t", "source_name": "T", "category": "سوق عقاري", "published": "", "summary": ""}],
                     "sources": [{"name": "T", "status": "success"}],
-                    "portals": [{"name": "P", "status": "متاحة"}],
                 }
                 saved = dev.save_developments_local(payload)
                 self.assertEqual(saved["status"], "saved")
                 loaded = dev.load_developments_local()
                 self.assertEqual(loaded["count"], 1)
                 self.assertEqual(loaded["developments"][0]["title"], "شقة للبيع")
-                self.assertEqual(loaded["portals"][0]["status"], "متاحة")
+                self.assertNotIn("portals", loaded)
                 self.assertEqual(loaded["generatedAt"], "2026-08-11T10:00:00")
 
     def test_missing_local_file_returns_empty(self) -> None:

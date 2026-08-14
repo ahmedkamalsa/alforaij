@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 from backend.config import load_local_env
 from backend.connectors.alforaij import load_listings
 from backend.services.developments_agent import discover_market_developments, save_developments_local
-from backend.services.official_source_agent import check_official_reference_sources
+from backend.services.official_source_agent import check_candidate_platforms, check_official_reference_sources
 from backend.services.opportunities import build_opportunities
 from backend.services.source_registry import source_registry
 from backend.services.supabase_store import (
@@ -213,6 +213,17 @@ def run_daily_update_agent(
             "reachable": reference_sources.get("reachable"),
         })
 
+        # المنصات المرشحة (Property Finder / Aqarmap / Bayut / بوابة الكويت العقارية /
+        # Kuwait Finder): فحص يومي لتوفرها — بمجرد أن تصبح أي منصة قابلة للقراءة يبدأ
+        # موصلها في إسهام بياناتها بالبحث والتقييم وقاعدة المعرفة، واليوم تُسجَّل
+        # حالتها الحقيقية بشفافية دون إسقاط بقية المصادر.
+        candidate_platforms = check_candidate_platforms(timeout=8)
+        step("check_candidate_platforms", {
+            "count": candidate_platforms.get("count"),
+            "reachable": candidate_platforms.get("reachable"),
+            "blocked": candidate_platforms.get("blocked"),
+        })
+
         listings = load_listings()
         save_listings(listings)
         step("sync_local_listings", {"count": len(listings)})
@@ -277,6 +288,7 @@ def run_daily_update_agent(
             snapshot,
             official_result=official_result,
             data_summary=summary,
+            candidate_platforms=candidate_platforms,
         )
         save_update_notifications(notifications)
         step("build_update_notifications", notifications.get("counts") or {})
@@ -317,6 +329,7 @@ def run_daily_update_agent(
                     "total": whatsapp_result.get("total"),
                 },
                 "officialReferenceSources": reference_sources,
+                "candidatePlatforms": candidate_platforms,
                 "dataSummary": summary,
             },
         })

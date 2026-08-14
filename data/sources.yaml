@@ -47,3 +47,43 @@ sources:
     notes:
       - يتم استخراج روابط تفاصيل فعلية من صفحات المناطق.
       - تدخل كمصدر خارجي، لكن غالبًا تحتاج فتح التفاصيل لتحسين السعر والمساحة.
+  - id: propertyfinder_kw
+    name: Property Finder Kuwait
+    status: blocked_geo
+    url: https://www.propertyfinder.kw/
+    connector: backend.connectors.live_sources.search_propertyfinder
+    notes:
+      - منصة عقارية كويتية نشطة، لكنها لا تستجيب من شبكات الخوادم (مهلة زمنية بعد 4 محاولات) — يرجّح حجب جغرافي/IP للخوادم.
+      - الموصل يحاول صفحات البحث ويستخرج بيانات JSON-LD/الحمولة المضمّنة عند توفرها، ويُسجَّل حالته الحقيقية يوميًا.
+      - بمجرد توفر الوصول تبدأ نتائجها في دخول البحث والتقييم وقاعدة المعرفة تلقائيًا.
+  - id: aqarmap_kw
+    name: Aqarmap Kuwait (عقارماب)
+    status: discontinued
+    url: https://aqarmap.com/kw/
+    connector: backend.connectors.live_sources.search_aqarmap
+    notes:
+      - النسخة الكويتية من عقارماب لم تعد متاحة: المسار /kw/ يعيد حاليًا بوابة مصر (عنوان الصفحة «عقارماب مصر»).
+      - الموصل يتحقق من هوية الصفحة ويعيد حالة discontinued بدل بيانات مغلوطة من بوابة أخرى.
+      - إذا أعادت عقارماب تفعيل نسخة الكويت سيبدأ الموصل باستخراج البيانات تلقائيًا.
+  - id: bayut_kw
+    name: Bayut Kuwait (بيوت)
+    status: bot_protected
+    url: https://www.bayut.com/kuwait/
+    connector: backend.connectors.live_sources.search_bayut
+    notes:
+      - بوابة بيوت تحمي صفحاتها بنظام captcha (hb.captcha.bayut.com) — لا يمكن قراءة الإعلانات برمجيًا دون تجاوز الحماية (غير مسموح).
+      - الموصل يحاول الجلب، يكشف صفحة التحدي، ويُسجَّل حالة blocked بشفافية في السجل اليومي بدل ادعاء نجاح وهمي.
+  - id: e_gov_kw_portal
+    name: بوابة الكويت العقارية (e.gov.kw)
+    status: official_service
+    url: https://www.e.gov.kw/sites/kgoArabic/Pages/ServicesPortal/RealEstateServices.aspx
+    notes:
+      - مرجع حكومي للخدمات العقارية (الاستعلام عن العقار وخدمات التسجيل) وليس سوق إعلانات مفتوحًا — لا يوجد تغذية إعلانات عامة.
+      - يُفحص توفره يوميًا ضمن المصادر الرسمية (يعيد حاليًا HTTP 403 من حماية WAF للخوادم).
+  - id: paci_kuwait_finder
+    name: Kuwait Finder (PACI)
+    status: geo_verification
+    url: https://kuwaitfinder.paci.gov.kw/
+    notes:
+      - التطبيق المكاني الرسمي للهيئة العامة للمعلومات المدنية — دور تأكيد الموقع/المنطقة/القطعة وليس مصدر سعر.
+      - غير قابل للوصول من شبكات الخوادم حاليًا (لا استجابة)؛ يُفحص توفره يوميًا ضمن المصادر الرسمية.

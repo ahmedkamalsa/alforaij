@@ -119,14 +119,6 @@ NEWS_FEEDS: list[dict[str, str]] = [
 
 # ─── منصات عقارية كويتية إضافية (مرشحة للربط مستقبلًا) ────────────────────
 # فحص الوصول فقط: تُسجَّل الحالة وتظهر «المواقع الأخرى المفيدة» في تبويب التطورات.
-CANDIDATE_PORTALS: list[dict[str, str]] = [
-    {"id": "propertyfinder_kw", "name": "Property Finder Kuwait", "url": "https://www.propertyfinder.kw/", "role": "منصة عقارية كويتية"},
-    {"id": "aqarmap_kw", "name": "Aqarmap Kuwait", "url": "https://kuwait.aqarmap.com/", "role": "بوابة بحث عقاري"},
-    {"id": "bayut_kw", "name": "Bayut Kuwait", "url": "https://www.bayut.kw/", "role": "بوابة إعلانات عقارية"},
-    {"id": "realestate_kw_guides", "name": "بوابة الكويت العقارية (e.gov.kw)", "url": "https://e.gov.kw/sites/kgoArabic/Pages/Services/MOJ/RealEstate.aspx", "role": "مرجع حكومي"},
-    {"id": "kuwait_finder", "name": "Kuwait Finder (PACI)", "url": "https://kuwaitfinder.paci.gov.kw/", "role": "مصدر مكاني رسمي"},
-]
-
 # كلمات عقارية عربية قوية: كفيلة وحدها بالتصنيف كتطور عقاري.
 ARABIC_STRONG = [
     "عقار", "عقاري", "عقارية", "شقة", "شقق", "بيت", "فيلا", "فلل", "أرض", "أراضي",
@@ -304,38 +296,11 @@ def _discover_news(max_per_source: int, max_total: int) -> tuple[list[dict[str, 
     return developments, statuses
 
 
-def _probe_portals(timeout: int = 10) -> list[dict[str, Any]]:
-    """فحص وصول منصات عقارية كويتية إضافية (مرشحة للربط مستقبلًا)."""
-    results: list[dict[str, Any]] = []
-    for portal in CANDIDATE_PORTALS:
-        try:
-            body, status, ms, error, attempts = fetch_url(portal["url"])
-            reachable = bool(body) and not error
-            results.append({
-                "id": portal["id"],
-                "name": portal["name"],
-                "url": portal["url"],
-                "role": portal["role"],
-                "status": "متاحة" if reachable else "غير متاحة",
-                "note": (error or f"HTTP {status}")[:120],
-            })
-        except Exception as exc:
-            results.append({
-                "id": portal["id"],
-                "name": portal["name"],
-                "url": portal["url"],
-                "role": portal["role"],
-                "status": "غير متاحة",
-                "note": str(exc)[:120],
-            })
-    return results
-
-
 def save_developments_local(payload: dict[str, Any]) -> dict[str, Any]:
     """حفظ نتيجة الاكتشاف كاملة محليًا (data/market_developments.json).
 
-    تُحفظ التطورات وحالات المصادر والمنصات المرشحة معًا حتى يخدم الملف تبويب
-    «التطورات» كاملًا دون قاعدة بيانات — على الخادم الحي والموقع الثابت معًا.
+    تُحفظ التطورات وحالات المصادر معًا حتى يخدم الملف تبويب «التطورات» كاملًا
+    دون قاعدة بيانات — على الخادم الحي والموقع الثابت معًا.
     """
     LOCAL_FILE.parent.mkdir(parents=True, exist_ok=True)
     count = int(payload.get("count") or len(payload.get("developments") or []))
@@ -346,7 +311,6 @@ def save_developments_local(payload: dict[str, Any]) -> dict[str, Any]:
         "note": payload.get("note", ""),
         "developments": payload.get("developments", []),
         "sources": payload.get("sources", []),
-        "portals": payload.get("portals", []),
     }
     LOCAL_FILE.write_text(json.dumps(stored, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"status": "saved", "count": count, "error": ""}
@@ -354,43 +318,37 @@ def save_developments_local(payload: dict[str, Any]) -> dict[str, Any]:
 
 def load_developments_local() -> dict[str, Any]:
     if not LOCAL_FILE.exists():
-        return {"generatedAt": "", "count": 0, "developments": [], "sources": [], "portals": []}
+        return {"generatedAt": "", "count": 0, "developments": [], "sources": []}
     try:
         return json.loads(LOCAL_FILE.read_text(encoding="utf-8"))
     except Exception:
-        return {"generatedAt": "", "count": 0, "developments": [], "sources": [], "portals": []}
+        return {"generatedAt": "", "count": 0, "developments": [], "sources": []}
 
 
 def discover_market_developments(
     *,
     max_per_source: int = 5,
     max_total: int = 60,
-    probe_portals: bool = True,
 ) -> dict[str, Any]:
-    """تشغيل وكيل اكتشاف التطورات: أخبار عقارية + فحص منصات إضافية.
+    """تشغيل وكيل اكتشاف التطورات: أخبار ومؤشرات عقارية كويتية.
 
-    يعيد بنية كاملة (حالة كل مصدر + التطورات + المنصات المرشحة) تُحفظ في
-    market_developments وتُعرض في تبويب «التطورات». لا يُرمى استثناء أبدًا —
-    أي فشل يُسجَّل في الحالة ويبقى التشغيل ناجحًا ما دام استُخرج شيء أو فُحص.
+    يعيد بنية كاملة (حالة كل مصدر + التطورات) تُحفظ في market_developments
+    وتُعرض في تبويب «التطورات». لا يُرمى استثناء أبدًا — أي فشل يُسجَّل في
+    الحالة ويبقى التشغيل ناجحًا ما دام استُخرج شيء أو فُحص.
     """
     fetched_at = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     developments, news_statuses = _discover_news(max_per_source, max_total)
-    portals = _probe_portals() if probe_portals else []
 
     status = "success" if developments else ("no_data" if not news_statuses else "partial")
     note_parts = [f"جمع {len(developments)} تطورًا"]
     if news_statuses:
         ok = sum(1 for row in news_statuses if row["status"] == "success")
         note_parts.append(f"{ok}/{len(news_statuses)} مصادر عقارية")
-    if portals:
-        reachable = sum(1 for row in portals if row["status"] == "متاحة")
-        note_parts.append(f"{reachable}/{len(portals)} منصات مرشحة متاحة")
     return {
         "status": status,
         "fetchedAt": fetched_at,
         "count": len(developments),
         "developments": developments,
         "sources": news_statuses,
-        "portals": portals,
         "note": "، ".join(note_parts),
     }

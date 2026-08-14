@@ -39,7 +39,6 @@
       <button class="main-tab" data-main-tab="board" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> <span class="tab-full">لوحة السوق</span><span class="tab-short">السوق</span> <b class="main-tab-count" id="tabCountBoard"></b></button>
       <button class="main-tab" data-main-tab="insights" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg> <span class="tab-full">تحليلات السوق</span><span class="tab-short">التحليلات</span> <b class="main-tab-count" id="tabCountInsights"></b></button>
       <button class="main-tab" data-main-tab="developments" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg> <span class="tab-full">التطورات</span><span class="tab-short">التطورات</span> <b class="main-tab-count" id="tabCountDevelopments"></b></button>
-      <button class="main-tab" data-main-tab="sources" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> <span class="tab-full">المصادر والتشغيل</span><span class="tab-short">المصادر</span> <b class="main-tab-count" id="tabCountSources"></b></button>
     </nav>
 
     <section class="action-toolbar" data-main-panel="search">
@@ -236,10 +235,6 @@
         <label class="compact"><input id="includeExternal" type="checkbox" checked> تفعيل مصادر خارجية</label>
       </div>
 
-      <div class="actions compact-actions">
-        <button id="openEvidenceQuick" type="button">المصادر والأدلة</button>
-      </div>
-
       <details class="deal-simulator" id="dealSimulator">
         <summary><svg class="hero-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg> محاكي صفقة الاستثمار</summary>
         <div class="sim-fields">
@@ -420,73 +415,11 @@
         <div id="oppList" class="results"></div>
       </section>
 
-      <section class="sources-panel" data-main-panel="sources">
-        <div class="section-title">
-          <h2>تشغيل المنصة والبيانات</h2>
-          <span>تحديث آلي يومي للمصادر والفرص مع إشعارات تشغيل واضحة</span>
-        </div>
-        <div class="ops-panel">
-          <div class="ops-card ops-card-primary">
-            <h3>وكيل التحديث اليومي</h3>
-            <p>يجلب أحدث المصادر من كل منصة، يحدّث فرص المكسب، ويحفظ لقطات السوق يوميًا 6:00 صباحًا — وكل رقم في المنصة يحمل مصدره ورابطه الأصلي.</p>
-            <div class="ops-actions">
-              <button id="runDailyAgentBtnInline" class="primary" type="button">تشغيل التحديث الآن</button>
-            </div>
-            <p id="dailyAgentStateInline" class="ops-status">سيظهر هنا وقت آخر تشغيل وحالته.</p>
-            <p id="dailyAgentWhatsAppInline" class="ops-status"></p>
-            <div id="officialRefStrip" class="ops-status" hidden></div>
-            <div id="marketAnalyticsStrip" class="ops-status ops-analytics"></div>
-            <details class="collapsible" open>
-              <summary>تحليلات الحصاد لكل موقع (الإعلانات الفعلية من كل منصة)</summary>
-              <div class="table-scroll">
-                <table class="minitable">
-                  <thead>
-                    <tr><th>الموقع</th><th>إعلانات</th><th>مناطق</th><th>وسيط السعر (د.ك)</th><th>وسيط المساحة (م²)</th><th>هواتف معلن</th></tr>
-                  </thead>
-                  <tbody id="marketAnalyticsDetail"></tbody>
-                </table>
-              </div>
-            </details>
-          </div>
-        </div>
-        <details class="collapsible ops-advanced">
-          <summary>استيراد يدوي احتياطي لصفقات وزارة العدل</summary>
-          <p class="scope-note">المسار الأساسي أوتوماتيكي عبر الوكيل اليومي و <code>OFFICIAL_TRANSACTIONS_SOURCE</code>. استخدم هذا فقط عند توفر CSV/JSON موثق وتريد إدخاله فورًا.</p>
-          <input id="officialImportFile" type="file" accept=".csv,.json,text/csv,application/json" aria-label="ملف صفقات وزارة العدل (CSV/JSON)" title="اختر ملف CSV أو JSON لصفقات وزارة العدل">
-          <div class="ops-actions">
-            <button id="officialImportBtn" class="primary" type="button">استيراد الصفقات</button>
-          </div>
-          <p id="officialImportStatus" class="ops-status"></p>
-        </details>
-
-        <div class="section-title">
-          <h2>حالة المصادر</h2>
-          <span>مختصر ما دخل التقييم وما لم يدخل</span>
-        </div>
-        <div id="sourceSummaryBar" class="source-summary-bar"></div>
-        <details class="collapsible">
-          <summary>تفاصيل المصادر</summary>
-          <div id="sourceStatus" class="source-grid"></div>
-        </details>
-        <details class="collapsible">
-          <summary>الخطة المستقبلية للمصادر</summary>
-          <div id="externalSourcePlan" class="source-grid muted-grid"></div>
-        </details>
-        <details class="collapsible">
-          <summary>منصات الاعتماد (تفاصيل)</summary>
-          <div class="registry-wrap">
-            <h3>منصات الاعتماد</h3>
-            <div id="sourceRegistry" class="registry-table"></div>
-          </div>
-        </details>
-        <div id="externalLinks" class="external-links"></div>
-      </section>
-
       <section class="developments-panel" data-main-panel="developments">
         <div class="section-title">
           <div>
             <h2>تطورات السوق العقاري الكويتي</h2>
-            <span>أحدث الأخبار والمؤشرات والمنصات المفيدة — يجمعها وكيل الاكتشاف يوميًا من مصادر متخصصة</span>
+            <span>أحدث الأخبار والمؤشرات العقارية — يجمعها وكيل الاكتشاف يوميًا من مصادر متخصصة</span>
           </div>
           <span id="developmentsMeta" class="filter-summary"></span>
         </div>
@@ -494,10 +427,6 @@
         <div id="developmentsRoot" class="developments-grid">
           <div class="empty">جاري تحميل تطورات السوق...</div>
         </div>
-        <details class="collapsible">
-          <summary>المنصات العقارية المرشحة (مواقع أخرى مفيدة للمجال)</summary>
-          <div id="developmentsPortals" class="registry-wrap"></div>
-        </details>
         <details class="collapsible">
           <summary>حالة مصادر الاكتشاف اليومي</summary>
           <div id="developmentsSources" class="source-grid muted-grid"></div>
