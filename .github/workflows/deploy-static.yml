@@ -82,14 +82,27 @@ jobs:
         with:
           name: netlify-frontend
           path: frontend
-      - name: Deploy to Netlify
+      - name: Deploy to Netlify (with live verification)
         run: |
           if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
-            echo "::warning::Netlify deploy is not configured. Add NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID as GitHub Actions secrets to enable it."
-            echo "GitHub Pages remains the primary deploy path when this repository is public."
+            echo "::warning::Netlify deploy is not configured. Follow docs/NETLIFY_SETUP.md: add NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID as GitHub Actions secrets to enable it."
+            echo "GitHub Pages remains the primary deploy path."
             exit 0
           fi
           npx --yes netlify-cli deploy --prod --dir=frontend --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
+          # فحص آلي: الحصول على رابط الموقع الحي ثم التأكد أنه يعيد HTTP 200
+          SITE_URL=$(npx --yes netlify-cli sites:info --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN" --json 2>/dev/null | jq -r '.ssl_url // .url // empty')
+          if [ -n "$SITE_URL" ]; then
+            echo "Netlify live at: $SITE_URL"
+            sleep 8
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$SITE_URL" || true)
+            echo "Verification HTTP: $code"
+            if [ "$code" = "200" ]; then
+              echo "✅ Netlify deploy verified (HTTP 200)"
+            else
+              echo "::warning::Netlify returned HTTP $code for $SITE_URL"
+            fi
+          fi
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
