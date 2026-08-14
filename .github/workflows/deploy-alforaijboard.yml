@@ -1,0 +1,71 @@
+name: Deploy alforaijboard Pages
+
+# ينشر الواجهة الثابتة (frontend + static-data) إلى فرع gh-pages في مستودع
+# ahmedkamalsa/alforaijboard — الصفحة الحية على:
+#   https://ahmedkamalsa.github.io/alforaijboard/
+# الواجهة الموحدة (بلا صفحة لوحة مستقلة — «لوحة الأرقام والفرص» أُزيلت):
+# النسخة المنشورة تُحدَّث تلقائيًا مع كل تغيير في الواجهة لئلا تبقى نسخة قديمة
+# تعرض أزرارًا/صفحات محذوفة. يتطلب سريًا واحدًا: ALFORAIJBOARD_TOKEN (PAT بنطاق repo).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "data/**"
+      - "frontend/**"
+      - "scripts/export_static_frontend_data.py"
+      - ".github/workflows/deploy-alforaijboard.yml"
+  # إعادة بناء تلقائية يوميًا بعد الحصاد (03:00 UTC) لتبقى اللقطة الثابتة
+  # محدثة من قاعدة البيانات الحية دون أي خطوة يدوية — 04:00 UTC = 07:00 القاهرة.
+  schedule:
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-alforaijboard
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure API base (static mode)
+        run: |
+          cat > frontend/config.js <<'EOF'
+          window.ALFORAIJ_API_BASE = "";
+          EOF
+
+      - name: Generate static data snapshot
+        run: python scripts/export_static_frontend_data.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          AGENT_ROUTER_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
+
+      - name: Push frontend to alforaijboard gh-pages
+        env:
+          TOKEN: ${{ secrets.ALFORAIJBOARD_TOKEN }}
+        run: |
+          set -e
+          if [ -z "$TOKEN" ]; then
+            echo "::error::ALFORAIJBOARD_TOKEN secret is missing. Add a PAT with 'repo' scope for ahmedkamalsa/alforaijboard."
+            exit 1
+          fi
+          rm -rf /tmp/board-deploy
+          mkdir -p /tmp/board-deploy
+          cp -r frontend/. /tmp/board-deploy/
+          cd /tmp/board-deploy
+          git init -q
+          git checkout -q -B gh-pages
+          git add -A
+          git -c user.email="actions@github.com" -c user.name="GitHub Actions" \
+            commit -q -m "Deploy alforaijboard $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/ahmedkamalsa/alforaijboard.git" gh-pages
+          echo "Pushed to https://github.com/ahmedkamalsa/alforaijboard/tree/gh-pages"
