@@ -57,12 +57,41 @@
   /* خطوط المشروع: كوفي للمظاهر (هوية معمارية) + تجوال للنصوص (وضوح كويتي) */
   --font-display: "Noto Kufi Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
   --font-body: "Tajawal", "Segoe UI", Tahoma, Arial, system-ui, -apple-system, sans-serif;
+  /* طبقة العلامة (brand tokens): مقياس الذهب والكحلي الرسمي للفريج — ثابت في الثيمين (الهوية لا تتبدل) */
+  --brand-gold-100: #fff8d9;
+  --brand-gold-200: #f6ecc0;
+  --brand-gold-300: #e2c968;
+  --brand-gold-400: #d9b850;
+  --brand-gold-500: #b7a13a;
+  --brand-gold-600: #a8860f;
+  --brand-gold-700: #928a0b;
+  --brand-gold-800: #8a6c0a;
+  --brand-gold-900: #6b6410;
+  --brand-navy-100: #9cc0ff;
+  --brand-navy-200: #3d6de0;
+  --brand-navy-300: #0a2f91;
+  --brand-navy-400: #052a8d;
+  --brand-navy-500: #022889;
+  --brand-navy-600: #051a4d;
+  /* مقياس الاستدارة والتركيز والحركة */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+  --ring-width: 2px;
+  --ring-color: var(--brand-gold-300);
+  --ring-offset: 2px;
+  --animate-brand-enter: brand-enter 2.2s cubic-bezier(.22, .8, .3, 1) both;
+  --animate-brand-shimmer: brand-shimmer 2.4s ease-out both;
 }
 
 /* ========== الوضع الفاتح (زجاجي فاتح) ==========
    طبقة تجاوز إضافية — الوضع الداكن الافتراضي لا يتأثر */
 [data-theme="light"] {
   color-scheme: light;
+  /* حلقة التركيز بكحلي الهوية لتباين قوي على الخلفية الفاتحة */
+  --ring-color: var(--brand-navy-300);
   --bg: #eef2f9;
   --surface: rgba(255, 255, 255, .60);
   --panel: rgba(255, 255, 255, .55);
@@ -84,6 +113,12 @@
   --shadow: 0 10px 30px rgba(30, 41, 59, .14);
   --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, .78) 0%, rgba(255, 255, 255, .50) 55%, rgba(255, 255, 255, .66) 100%);
   --glass-border: rgba(30, 58, 138, .20);
+}
+
+/* حلقة تركيز موحّدة بهوية المنصة — لا تؤثر على التخطيط، وأي قاعدة أخص تتفوق عليها */
+:focus-visible {
+  outline: var(--ring-width) solid var(--ring-color);
+  outline-offset: var(--ring-offset);
 }
 
 [data-theme="light"] body::before {
@@ -444,9 +479,9 @@ textarea {
   gap: 10px;
   padding: 6px 15px 6px 8px;
   border: 1px solid rgba(216, 189, 94, .6);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   /* الأساس ذهبي (حالة التمرير) — والطبقة الزرقاء فوقه تُظهر نفسها افتراضيًا */
-  background: linear-gradient(135deg, #d9b850 0%, #a8860f 62%, #8a6c0a 100%);
+  background: linear-gradient(135deg, var(--brand-gold-400) 0%, var(--brand-gold-600) 62%, var(--brand-gold-800) 100%);
   box-shadow: 0 10px 26px rgba(2, 40, 137, .42), inset 0 1px 0 rgba(255, 255, 255, .25);
   color: #fff;
   transition: box-shadow 1.4s ease, border-color 1.4s ease, transform .3s ease;
@@ -458,7 +493,7 @@ textarea {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(135deg, #022889 0%, #0a2f91 58%, #052a8d 100%);
+  background: linear-gradient(135deg, var(--brand-navy-500) 0%, var(--brand-navy-300) 58%, var(--brand-navy-400) 100%);
   opacity: 1;
   transition: opacity 1.4s ease;
 }
@@ -498,7 +533,7 @@ textarea {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 32% 26%, #fff8d9 0%, #e2c968 42%, #928a0b 78%, #6b6410 100%);
+  background: radial-gradient(circle at 32% 26%, var(--brand-gold-100) 0%, var(--brand-gold-300) 42%, var(--brand-gold-700) 78%, var(--brand-gold-900) 100%);
   opacity: 1;
   transition: opacity 1.4s ease;
 }
@@ -542,13 +577,13 @@ textarea {
 }
 
 .bn-gold {
-  background-image: linear-gradient(180deg, #f6ecc0 0%, #e2c968 45%, #b7a13a 78%, #928a0b 100%);
+  background-image: linear-gradient(180deg, var(--brand-gold-200) 0%, var(--brand-gold-300) 45%, var(--brand-gold-500) 78%, var(--brand-gold-700) 100%);
 }
 
 .bn-blue {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(180deg, #9cc0ff 0%, #3d6de0 48%, #0a2f91 100%);
+  background-image: linear-gradient(180deg, var(--brand-navy-100) 0%, var(--brand-navy-200) 48%, var(--brand-navy-300) 100%);
   opacity: 0;
 }
 
@@ -576,13 +611,13 @@ textarea {
   width: 16px;
   height: 16px;
   flex: none;
-  color: #e2c968;
+  color: var(--brand-gold-300);
   margin-inline-start: 2px;
   transition: color 1.4s ease, transform .3s ease;
 }
 
 .hero-brand-link:hover .brand-arrow {
-  color: #0a2f91;
+  color: var(--brand-navy-300);
   transform: translate(2px, -2px);
 }
 
@@ -594,7 +629,7 @@ textarea {
 
 /* حركة الظهور: توهج ذهبي يلمع بنبضتين ثم يهدأ ويستقر عند تحميل الصفحة */
 .hero-brand-link {
-  animation: brand-enter 2.2s cubic-bezier(.22, .8, .3, 1) both;
+  animation: var(--animate-brand-enter);
 }
 
 @keyframes brand-enter {
@@ -620,7 +655,7 @@ textarea {
   background: linear-gradient(115deg, transparent 42%, rgba(255, 240, 190, .55) 50%, transparent 58%);
   transform: translateX(-70%);
   opacity: 0;
-  animation: brand-shimmer 2.4s ease-out both;
+  animation: var(--animate-brand-shimmer);
 }
 
 @keyframes brand-shimmer {
