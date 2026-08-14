@@ -3048,6 +3048,31 @@ function staticDownloadPdf() {
   const reasons = top && top.reasons && top.reasons.length
     ? top.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")
     : "";
+  // مؤشر الطلب: طلبات «مطلوب للشراء/للإيجار» المنافسة في نفس المنطقة — بجانب ملخص التقييم
+  const demand = report.demandIndicators;
+  const demandSection = demand && demand.count
+    ? `
+  <h2>مؤشر الطلب — طلبات المنطقة المنافسة</h2>
+  <p class="meta">${escapeHtml(demand.scope || "كل الكويت")} · ${demand.count} طلبًا من «مطلوب للشراء/للإيجار» — من يبحث في نفس المنطقة التي قُيّم فيها العقار</p>
+  <table>
+    <thead><tr><th>النطاق</th><th>إجمالي الطلبات</th><th>طلبات شراء</th><th>طلبات إيجار</th></tr></thead>
+    <tbody><tr><td>${escapeHtml(demand.scope || "كل الكويت")}</td><td>${demand.count}</td><td>${demand.buyRequests || 0}</td><td>${demand.rentRequests || 0}</td></tr></tbody>
+  </table>
+  ${(demand.items && demand.items.length) ? `
+  <table>
+    <thead><tr><th>#</th><th>الكود</th><th>نوع الطلب</th><th>المنطقة</th><th>المحافظة</th><th>نوع العقار</th><th>تاريخ النشر</th></tr></thead>
+    <tbody>${demand.items.map((item, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(item.code || "—")}</td>
+        <td>${escapeHtml(item.transaction || "—")}</td>
+        <td>${escapeHtml(item.area || "—")}</td>
+        <td>${escapeHtml(item.governorate || "—")}</td>
+        <td>${escapeHtml(item.propertyType || "—")}</td>
+        <td>${escapeHtml(String(item.publishedDate || "—").slice(0, 10))}</td>
+      </tr>`).join("")}</tbody>
+  </table>` : ""}`
+    : "";
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
     alert("اسمح بالنوافذ المنبثقة لتوليد تقرير PDF داخل المتصفح.");
@@ -3099,6 +3124,7 @@ function staticDownloadPdf() {
     <thead><tr><th>الكود</th><th>المنطقة</th><th>السعر</th><th>المساحة</th><th>المصدر</th><th>الرابط</th></tr></thead>
     <tbody>${compsRows}</tbody>
   </table>` : ""}
+  ${demandSection}
   <p class="meta">تقرير مولّد داخل المتصفح من أحدث بيانات السوق المنشورة من جميع المصادر.</p>
 </body>
 </html>`);

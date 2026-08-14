@@ -181,6 +181,55 @@ class TestPdfReport(unittest.TestCase):
         self.assertGreater(len(reader.pages), 2)  # صفحة إضافية للتوصيات
         self.assertIn("توصيات العميل", text)
 
+    def test_build_pdf_includes_demand_indicators_page(self) -> None:
+        """صفحة مؤشر الطلب تُضاف عند توفر طلبات المنطقة المنافسة وتُحذف عند غيابها."""
+        import io
+        import unicodedata
+
+        from pypdf import PdfReader
+
+        from backend.services.pdf_report import build_pdf
+
+        report = self._sample_report()
+        report["demandIndicators"] = {
+            "count": 3,
+            "buyRequests": 2,
+            "rentRequests": 1,
+            "scope": "النهضة",
+            "items": [
+                {
+                    "code": "AF-315",
+                    "transaction": "مطلوب للشراء",
+                    "area": "النهضة",
+                    "governorate": "الجهراء",
+                    "propertyType": "بيت",
+                    "summary": "بيت 400م في النهضة — المطلوب شراء.",
+                    "publishedDate": "2026-07-10",
+                },
+                {
+                    "code": "AF-310",
+                    "transaction": "مطلوب للإيجار",
+                    "area": "النهضة",
+                    "governorate": "الجهراء",
+                    "propertyType": "شقة",
+                    "summary": "",
+                    "publishedDate": "2026-06-22",
+                },
+            ],
+        }
+        with_demand = build_pdf(report)
+        base = build_pdf(self._sample_report())
+        self.assertGreater(len(with_demand), len(base))
+        reader = PdfReader(io.BytesIO(with_demand))
+        text = unicodedata.normalize("NFKC", "".join(page.extract_text() or "" for page in reader.pages))
+        self.assertIn("مؤشر الطلب", text)
+        self.assertIn("النهضة", text)
+        self.assertIn("مطلوب للشراء", text)
+        # بدون بيانات طلب لا تُضاف الصفحة
+        reader2 = PdfReader(io.BytesIO(build_pdf(self._sample_report())))
+        text2 = unicodedata.normalize("NFKC", "".join(page.extract_text() or "" for page in reader2.pages))
+        self.assertNotIn("مؤشر الطلب", text2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -524,6 +524,75 @@ def build_pdf(report: dict | None, *, title: str | None = None, client_recommend
         top = results[0]
         _detail_top_result(story, top, styles)
 
+    # ---- مؤشر الطلب: من يبحث عن شراء/إيجار في نفس المنطقة (صفحة مخصصة بجانب ملخص التقييم) ----
+    demand = report.get("demandIndicators") or {}
+    if demand.get("count"):
+        story.append(PageBreak())
+        _heading(story, "مؤشر الطلب — من يبحث في نفس المنطقة")
+        scope = str(demand.get("scope") or "كل الكويت")
+        story.append(
+            Paragraph(
+                ar_rich(
+                    f"طلبات «مطلوب للشراء/للإيجار» المنافسة ضمن نطاق **{scope}** — بجانب ملخص التقييم أعلاه، "
+                    "لترى من يبحث في نفس المنطقة التي قُيّم فيها العقار."
+                ),
+                styles["body"],
+            )
+        )
+        story.append(Spacer(1, 4))
+        story.append(
+            _info_table(
+                [
+                    ("نطاق الطلب", scope),
+                    ("إجمالي الطلبات المنافسة", f"{demand.get('count') or 0}"),
+                    ("طلبات شراء", f"{demand.get('buyRequests') or 0}"),
+                    ("طلبات إيجار", f"{demand.get('rentRequests') or 0}"),
+                ],
+                [60 * mm, 120 * mm],
+            )
+        )
+        story.append(Spacer(1, 6))
+        items = demand.get("items") or []
+        if items:
+            header = [
+                Paragraph(ar("#"), styles["cell_head"]),
+                Paragraph(ar("الكود"), styles["cell_head"]),
+                Paragraph(ar("نوع الطلب"), styles["cell_head"]),
+                Paragraph(ar("المنطقة"), styles["cell_head"]),
+                Paragraph(ar("المحافظة"), styles["cell_head"]),
+                Paragraph(ar("نوع العقار"), styles["cell_head"]),
+                Paragraph(ar("تاريخ النشر"), styles["cell_head"]),
+            ]
+            rows = [header]
+            for index, item in enumerate(items, start=1):
+                published = str(item.get("publishedDate") or "—")[:10]
+                rows.append(
+                    [
+                        Paragraph(ar(str(index)), styles["cell"]),
+                        Paragraph(ar(item.get("code") or "—"), styles["cell"]),
+                        Paragraph(ar(item.get("transaction") or "—"), styles["cell"]),
+                        Paragraph(ar(item.get("area") or "—"), styles["cell"]),
+                        Paragraph(ar(item.get("governorate") or "—"), styles["cell"]),
+                        Paragraph(ar(item.get("propertyType") or "—"), styles["cell"]),
+                        Paragraph(ar(published), styles["cell"]),
+                    ]
+                )
+            table = Table(
+                rows,
+                colWidths=[8 * mm, 22 * mm, 34 * mm, 26 * mm, 24 * mm, 30 * mm, 36 * mm],
+                repeatRows=1,
+                hAlign="RIGHT",
+            )
+            table.setStyle(_data_table_style())
+            story.append(KeepTogether(table))
+            story.append(Spacer(1, 5))
+            for item in items:
+                summary_text = str(item.get("summary") or "").strip()
+                if summary_text:
+                    story.append(Paragraph(ar(f"• {item.get('code') or 'طلب'}: {summary_text[:120]}"), styles["small"]))
+                    story.append(Spacer(1, 1))
+        story.append(Spacer(1, 4))
+
     # ---- توصيات العميل ----
     suggestions = ai.get("suggestions") or ""
     if suggestions:
