@@ -23,6 +23,9 @@
   --glass-border: rgba(255, 255, 255, .16);
   --glass-blur: 18px;
   --cover-image: url("assets/kuwait_glass_cover.webp");
+  /* خطوط المشروع: كوفي للمظاهر (هوية معمارية) + تجوال للنصوص (وضوح كويتي) */
+  --font-display: "Noto Kufi Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
+  --font-body: "Tajawal", "Segoe UI", Tahoma, Arial, system-ui, -apple-system, sans-serif;
 }
 
 /* ========== الوضع الفاتح (زجاجي فاتح) ==========
@@ -263,14 +266,33 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  /* خطوط نظام حديثة: Segoe UI للاتينية/الأرقام مع Tahoma/Arial للعربية */
-  font-family: "Segoe UI", Tahoma, Arial, system-ui, -apple-system, sans-serif;
+  /* خطوط النظام (احتياط) بعد تجوال */
+  font-family: var(--font-body);
   font-size: 17px;
   line-height: 1.55;
   letter-spacing: 0;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* الخط المظهري (الكوفي) للعناوين فقط — بقية الواجهة بخط النصوص */
+h1,
+h2,
+h3,
+.eyebrow,
+.brand-name,
+.board-title {
+  font-family: var(--font-display);
+}
+
+/* لمسة حرفية: تباعد مريح للعين فوق المظهر الكوفي والاسم الإنجليزي */
+.eyebrow {
+  letter-spacing: .03em;
+}
+
+.brand-sub {
+  letter-spacing: .06em;
 }
 
 /* تمييز واضح للتركيز بلوحة المفاتيح (إتاحة واحترافية) دون تغيير مظهر النقر العادي */
