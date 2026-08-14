@@ -361,29 +361,55 @@ textarea {
   font-weight: 900;
 }
 
-/* ── زر الفريج الرسمي: شعار الشركة (أزرق/ذهبي) + الاسم بالهوية الرسمية ── */
+/* ── زر الفريج الرسمي: الهوية الكاملة (أزرق/ذهبي) مع انعكاس الألوان عند التمرير ── */
 /* الأزرق الرسمي #022889→#0a2f91 والذهبي #928a0b→#e2c968 مستخرجان من شعار
    الشركة نفسه (alforaij_logo.png / alforaij-official-symbol.png) ليتطابق
-   الزر مع الهوية الرسمية لمنصة الفريج الأصلية (front.alforaij.com). */
+   الزر مع الهوية الرسمية لمنصة الفريج الأصلية (front.alforaij.com). عند
+   التمرير تنعكس الألوان بسلاسة خلال نحو 1.4 ثانية: الأزرق يصير ذهبيًا
+   والذهبي يصير أزرق (خلفية، نص، ميدالية الشعار، والسهم معًا). */
 .hero-brand-link {
-  gap: 9px;
-  padding: 5px 13px 5px 7px;
+  position: relative;
+  overflow: hidden;
+  gap: 10px;
+  padding: 6px 15px 6px 8px;
   border: 1px solid rgba(216, 189, 94, .6);
   border-radius: 999px;
-  background: linear-gradient(135deg, #022889 0%, #0a2f91 58%, #052a8d 100%);
+  /* الأساس ذهبي (حالة التمرير) — والطبقة الزرقاء فوقه تُظهر نفسها افتراضيًا */
+  background: linear-gradient(135deg, #d9b850 0%, #a8860f 62%, #8a6c0a 100%);
   box-shadow: 0 10px 26px rgba(2, 40, 137, .42), inset 0 1px 0 rgba(255, 255, 255, .25);
   color: #fff;
-  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  transition: box-shadow 1.4s ease, border-color 1.4s ease, transform .3s ease;
+}
+
+/* الطبقة الزرقاء (الحالة الافتراضية) تتلاشى عند التمرير فتكشف الذهبي */
+.hero-brand-link::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #022889 0%, #0a2f91 58%, #052a8d 100%);
+  opacity: 1;
+  transition: opacity 1.4s ease;
+}
+
+.hero-brand-link > * {
+  position: relative;
+  z-index: 1;
 }
 
 .hero-brand-link:hover {
   transform: translateY(-2px);
-  border-color: rgba(243, 231, 176, .85);
-  box-shadow: 0 14px 34px rgba(2, 40, 137, .5), inset 0 1px 0 rgba(255, 255, 255, .3);
+  border-color: rgba(2, 40, 137, .6);
+  box-shadow: 0 14px 38px rgba(146, 138, 11, .5), inset 0 1px 0 rgba(255, 255, 255, .35);
 }
 
-/* ميدالية الشعار: خلفية ذهبية متدرجة تؤطر الرمز الرسمي */
+.hero-brand-link:hover::before {
+  opacity: 0; /* الأزرق → الذهبي */
+}
+
+/* ميدالية الشعار: ذهبية افتراضيًا، وعند التمرير تتحول للفاتح ليبقى الرمز الأزرق بارزًا */
 .brand-badge {
+  position: relative;
   width: 40px;
   height: 40px;
   flex: none;
@@ -392,40 +418,87 @@ textarea {
   justify-content: center;
   padding: 3px;
   border-radius: 50%;
-  background: radial-gradient(circle at 32% 26%, #fff8d9 0%, #e2c968 42%, #928a0b 78%, #6b6410 100%);
+  background: #f4f5f7;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45), 0 2px 6px rgba(20, 30, 60, .35);
 }
 
+.brand-badge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 26%, #fff8d9 0%, #e2c968 42%, #928a0b 78%, #6b6410 100%);
+  opacity: 1;
+  transition: opacity 1.4s ease;
+}
+
 .brand-badge-ic {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   object-fit: contain;
   border-radius: 50%;
 }
 
+.hero-brand-link:hover .brand-badge::before {
+  opacity: 0; /* الميدالية الذهبية → فاتحة */
+}
+
 .brand-text {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  line-height: 1.12;
+  line-height: 1.14;
   white-space: nowrap;
 }
 
+/* اسم الشركة بلوني الهوية: طبقتان فوق بعضهما تتعابران (ذهبي ⇄ أزرق) عند التمرير */
 .brand-name {
-  font-size: 19px;
-  font-weight: 900;
-  letter-spacing: .2px;
-  background: linear-gradient(180deg, #f6ecc0 0%, #e2c968 40%, #b7a13a 72%, #928a0b 100%);
+  position: relative;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .15px;
+}
+
+.brand-name .bn-gold,
+.brand-name .bn-blue {
+  display: block;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  transition: opacity 1.4s ease;
+}
+
+.bn-gold {
+  background-image: linear-gradient(180deg, #f6ecc0 0%, #e2c968 45%, #b7a13a 78%, #928a0b 100%);
+}
+
+.bn-blue {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(180deg, #9cc0ff 0%, #3d6de0 48%, #0a2f91 100%);
+  opacity: 0;
+}
+
+.hero-brand-link:hover .bn-gold {
+  opacity: 0;
+}
+
+.hero-brand-link:hover .bn-blue {
+  opacity: 1; /* الكلمة الذهبية → زرقاء */
 }
 
 .brand-sub {
-  font-size: 10.5px;
+  font-size: 8.5px;
   font-weight: 600;
-  color: rgba(255, 255, 255, .88);
-  letter-spacing: .2px;
+  letter-spacing: .5px;
+  color: rgba(243, 231, 176, .95);
+  transition: color 1.4s ease;
+}
+
+.hero-brand-link:hover .brand-sub {
+  color: rgba(2, 40, 137, .85);
 }
 
 .brand-arrow {
@@ -434,9 +507,15 @@ textarea {
   flex: none;
   color: #e2c968;
   margin-inline-start: 2px;
+  transition: color 1.4s ease, transform .3s ease;
 }
 
-/* الثيم الفاتح: يُبقي حدود الزر الذهبية وظله الأزرق دون فقدان الهوية */
+.hero-brand-link:hover .brand-arrow {
+  color: #0a2f91;
+  transform: translate(2px, -2px);
+}
+
+/* الثيم الفاتح: يُبقي الزر محتفظًا بالهوية (حدود/ظلال ذهبية-زرقاء) */
 [data-theme="light"] .hero-brand-link {
   border-color: rgba(146, 138, 11, .55);
   box-shadow: 0 10px 26px rgba(2, 40, 137, .28), inset 0 1px 0 rgba(255, 255, 255, .3);
