@@ -4327,6 +4327,13 @@ if (openBoardBtn) {
   openBoardBtn.addEventListener("click", () => {
     switchMainTab("board");
     window.scrollTo({ top: 0, behavior: "smooth" });
+    // نبضة توهج ذهبية قصيرة تؤكد أن اللوحة فُتحت
+    openBoardBtn.classList.remove("pulse-gold");
+    void openBoardBtn.offsetWidth; // إعادة تشغيل الحركة مع كل ضغطة
+    openBoardBtn.classList.add("pulse-gold");
+  });
+  openBoardBtn.addEventListener("animationend", () => {
+    openBoardBtn.classList.remove("pulse-gold");
   });
 }
 

@@ -208,6 +208,17 @@
   font: inherit;
 }
 
+/* نبضة تأكيد ذهبية عند فتح اللوحة: حلقة ذهبية تتوسع وتخفت بسرعة */
+.board-link.pulse-gold {
+  animation: board-pulse .9s ease-out;
+}
+
+@keyframes board-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(226, 201, 104, .75); }
+  70%  { box-shadow: 0 0 0 12px rgba(226, 201, 104, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(226, 201, 104, 0); }
+}
+
 [data-theme="light"] .hero-link {
   color: var(--ink);
   border-color: rgba(30, 58, 138, .3);
@@ -571,6 +582,7 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .hero-brand-link { animation: none; }
   .hero-brand-link::after { animation: none; opacity: 0; }
+  .board-link.pulse-gold { animation: none; }
 }
 
 /* تكيّف الشارة مع شاشات الجوال الصغيرة: إخفاء السطر الإنجليزي وتصغير الاسم والميدالية */
