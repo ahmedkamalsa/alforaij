@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import sys
 import time
 import urllib.error
@@ -15,6 +14,7 @@ from typing import Any
 
 from backend.config import SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL
 from backend.models import Listing, PropertyRequest
+from backend.services.source_registry import resolve_source_id
 
 logger = logging.getLogger(__name__)
 
@@ -160,142 +160,13 @@ def save_search_history(request: PropertyRequest, report: dict[str, Any], status
         logger.warning("search_history save skipped: %s", exc)
 
 
-def _match_source_id(source_name: str) -> str:
-    """مطابقة اسم المصدر الحي بمعرف من السجل المحلي (قبل التحقق من القيد الحي)."""
-    try:
-        from backend.services.source_registry import SOURCE_REGISTRY
-
-        target = str(source_name or "")
-        # 1) مطابقة حرفية أولًا (أسرع وأكثر أمانًا)
-        for entry in SOURCE_REGISTRY:
-            if str(entry.get("name") or "") == target:
-                return str(entry["id"])
-        # 2) مطابقة الجذر قبل القوسين: «السوق المباشر (بوشملان)» ← سجل
-        #    «السوق المباشر (Supabase market_ads)» — الأسماء الحية تحمل تفاصيل
-        #    المصدر الداخلي بين قوسين فلا تطابق حرفيًا اسم السجل.
-        target_base = target.split(" (")[0].strip()
-        if len(target_base) >= 4:
-            for entry in SOURCE_REGISTRY:
-                entry_base = str(entry.get("name") or "").split(" (")[0].strip()
-                if entry_base and entry_base == target_base:
-                    return str(entry["id"])
-        # 3) اسم المصدر قد يكون اختصارًا لاسم السجل الطويل
-        #    (مثل «الصفقات الرسمية» مقابل «الصفقات الرسمية / التسجيل العقاري»)
-        #    لكن نمنع الاتجاه العكسي للأسماء القصيرة: اسم طوله 3 أحرف مثل «عقار»
-        #    موجود داخل «بوعقار / بوشملان» و«التسجيل العقاري» فيطابق المصدر الخطأ.
-        #    القاعدة: سجل الأسماء يطابق داخل الاسم المطلوب فقط، والاسم المطلوب
-        #    يطابق داخل السجل بشرط ألا يكون قصيرًا جدًا (<6 أحرف).
-        for entry in SOURCE_REGISTRY:
-            entry_name = str(entry.get("name") or "")
-            if not entry_name:
-                continue
-            if entry_name in target or (len(target) >= 6 and target in entry_name):
-                return str(entry["id"])
-        # 4) تطبيع المسافات وعلامات الترقيم وحالة الأحرف: «PropertyFinder»/«Bayut»
-        #    مقابل «Property Finder Kuwait»/«Bayut Kuwait» في السجل (المتصل لا يطابق
-        #    الاسم المفصول، وحالة الأحرف تختلف) — يُقارن الشكل الطبيعي دون فراغات.
-        def _norm(name: str) -> str:
-            return re.sub(r"[^0-9a-zA-Z\u0600-\u06FF]", "", name).lower()
-
-        target_norm = _norm(target)
-        if len(target_norm) >= 4:
-            for entry in SOURCE_REGISTRY:
-                entry_name_norm = _norm(str(entry.get("name") or ""))
-                if not entry_name_norm:
-                    continue
-                # الاسم الطبيعي يساوي أو يُحتوى داخل سجل أطول — بشرط ألا يكون
-                # السجل بأكمله مجرد جذر من اسم قصير (نفس حارس الاسم القصير أعلاه).
-                if target_norm == entry_name_norm or (
-                    len(target_norm) >= 5 and target_norm in entry_name_norm
-                ):
-                    return str(entry["id"])
-        # 5) تطابق بمجموعة الكلمات (رموز): يعالج الاختلافات الترجمة/الكتابة داخل
-        #    الأسماء المركبة: «Bu3qar / بوشملان» مقابل «بوعقار / بوشملان (Bu3qar)»
-        #    و«الحسبة - صفقات عامة» مقابل «الحسبة - الصفقات المسجلة العامة».
-        #    تُجرَّد «ال» التعريف العربية للطرفين ثم تُقارن الكلمات تساويًا (لا
-        #    احتواء) — فيبقى «عقار» بلا تطابق مع «بوعقار» (حارس الاسم القصير محفوظ).
-        def _tokens(name: str) -> set[str]:
-            out = set()
-            for token in re.split(r"[^0-9a-zA-Z\u0600-\u06FF]+", name):
-                token = token.lower()
-                if token.startswith("ال") and len(token) > 2:
-                    token = token[2:]
-                if len(token) >= 2:
-                    out.add(token)
-            return out
-
-        target_tokens = _tokens(target)
-        if len(target_tokens) >= 2:
-            for entry in SOURCE_REGISTRY:
-                entry_tokens = _tokens(str(entry.get("name") or ""))
-                if entry_tokens and target_tokens.issubset(entry_tokens):
-                    return str(entry["id"])
-    except Exception:
-        pass
-    # سقوط آمن لا يكسر قيد المفتاح الأجنبي في source_runs: لا نُرسل معرفًا غير موجود
-    # في source_registry (يُفضي إرساله إلى HTTP 409 يوقف حفظ الدفعة كاملة). نبحث عن
-    # أقرب معرف سجل معرف؛ وإلا «other_marketplaces» الموجود دائمًا في السجل.
-    known_ids = {str(e.get("id") or "") for e in SOURCE_REGISTRY}
-    candidate = str(source_name or "").lower().strip() or "unknown"
-    if candidate in known_ids:
-        return candidate
-    return "other_marketplaces"
-
-
-_remote_registry_ids_cache: set[str] | None = None
-_remote_registry_ids_fetched_at: float = 0.0
-
-
-def _remote_registry_ids() -> set[str] | None:
-    """معرفات source_registry الحية في Supabase — سلطة قيد المفتاح الأجنبي.
-
-    السجل المحلي في source_registry.py يضم مصادر مخططة لم تُسجَّل في القاعدة بعد
-    (PropertyFinder وBayut وAqarmap وبوابة الحكومة الإلكترونية). إرسالها إلى
-    source_runs يكسر القيد الأجنبي (HTTP 409) فيتوقف حفظ الدفعة كاملة ويظهر
-    «فشل الحفظ» رغم سلامة باقي الصفوف. نقرأ المعرفات الفعلية من الجدول الحي
-    (بكاش 60 ثانية لأن الدفعة الواحدة تستدعي المطابقة عدة مرات)؛ عند التعذر
-    (غير مضبوط/اختبارات/فشل شبكة) نعيد None فيتخطى المتصل التحقق ولا نغير
-    سلوكًا غير مضمون.
-    """
-    global _remote_registry_ids_cache, _remote_registry_ids_fetched_at
-    if _remote_registry_ids_cache is not None and time.time() - _remote_registry_ids_fetched_at < 60:
-        return _remote_registry_ids_cache
-    if not remote_reads_enabled():
-        return None
-    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/source_registry?select=id&limit=1000")
-    ids = {str(row.get("id") or "") for row in rows if row.get("id")}
-    if not ids:
-        return None
-    _remote_registry_ids_cache = ids
-    _remote_registry_ids_fetched_at = time.time()
-    return ids
-
-
-def _source_id_for(source_name: str) -> str:
-    """معرف المصدر موثقًا بقيد FK الحي: المعرف المحلي لا يكفي، الجدول الحي هو السلطة.
-
-    المطابقة تُحسب من السجل المحلي (_match_source_id)، لكن source_runs مرتبط
-    بمفتاح أجنبي على source_registry في Supabase، والجدول الحي قد يتخلف عن
-    الملف المحلي حتى تُشغَّل مزامنة السجل. عند توفر القراءة نتحقق من المعرف
-    مقابل الجدول الحي؛ المصادر غير المسجلة تُسقط إلى other_marketplaces
-    (سلة معروفة موجودة دائمًا) بدل إيقاف حفظ الدفعة كاملة.
-    """
-    candidate = _match_source_id(source_name)
-    remote_ids = _remote_registry_ids()
-    if remote_ids is None:
-        return candidate
-    if candidate in remote_ids:
-        return candidate
-    return "other_marketplaces"
-
-
 def save_source_runs(request: PropertyRequest, statuses: list[dict[str, Any]]) -> None:
     rows = []
     for status in statuses:
         source_name = str(status.get("name") or "")
         rows.append(
             {
-                "source_id": _source_id_for(source_name),
+                "source_id": resolve_source_id(source_name),
                 "request_text": request.raw_text,
                 "request_json": asdict(request),
                 "status": status.get("status") or "unknown",
@@ -313,7 +184,7 @@ def save_source_runs(request: PropertyRequest, statuses: list[dict[str, Any]]) -
 def save_listing_evidence(report: dict[str, Any]) -> None:
     rows: list[dict[str, Any]] = []
     for item in report.get("results", []):
-        source_id = _source_id_for(str(item.get("source") or ""))
+        source_id = resolve_source_id(str(item.get("source") or ""))
         number_sources = item.get("numberSources") or {}
         for field_name, source in number_sources.items():
             if not isinstance(source, dict):

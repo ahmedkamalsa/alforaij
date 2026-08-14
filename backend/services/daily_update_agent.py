@@ -16,7 +16,7 @@ from backend.connectors.alforaij import load_listings
 from backend.services.developments_agent import discover_market_developments, save_developments_local
 from backend.services.official_source_agent import check_candidate_platforms, check_official_reference_sources
 from backend.services.opportunities import build_opportunities
-from backend.services.source_registry import source_registry
+from backend.services.source_registry import source_registry, sync_remote_registry as sync_source_registry
 from backend.services.supabase_store import (
     fetch_latest_opportunities,
     is_configured,
@@ -30,7 +30,6 @@ from backend.services.supabase_store import (
 )
 from backend.services.update_notifications import build_update_notifications, save_update_notifications
 from scripts.import_official_transactions import normalize, read_file
-from scripts.sync_source_registry_supabase import main as sync_source_registry
 
 ROOT = Path(__file__).resolve().parents[2]
 STATUS_FILE = ROOT / "data" / "daily_agent_status.json"
@@ -204,8 +203,11 @@ def run_daily_update_agent(
             raise RuntimeError("Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to .env.")
 
         source_count = len(source_registry())
-        sync_source_registry()
-        step("sync_source_registry", {"count": source_count})
+        sync_result = sync_source_registry()
+        # المزامنة تعيد ملخصًا بالعدد وتقرير الانجراف (مصادر محلية غير مسجلة في
+        # الجدول الحي) — يظهر في حالة الوكيل اليومي بدل أن يتحول لاحقًا إلى
+        # فشل صامت عند حفظ source_runs (قيد المفتاح الأجنبي يوقف الدفعة كاملة).
+        step("sync_source_registry", sync_result if isinstance(sync_result, dict) else {"count": source_count})
 
         reference_sources = check_official_reference_sources(timeout=8)
         step("check_official_reference_sources", {
