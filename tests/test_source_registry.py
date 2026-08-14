@@ -101,10 +101,13 @@ class SourceRegistryResolutionTests(unittest.TestCase):
             report = registry_module.drift_report()
         self.assertFalse(report["available"])
 
+    # مزامنة حقيقية في بيئة نظيفة (بلا SUPABASE_URL) تحتاج عنوانًا قابلًا للتحليل —
+    # نُلحقه في الاختبار ليكون متسقًا مع بيئة التطوير والـ CI على السواء.
     def test_sync_remote_registry_upserts_every_local_source(self) -> None:
         """المزامنة ترفع كل إدخال محلي (upsert على id) وتعيد ملخصًا بالانجراف."""
-        with mock.patch.object(registry_module, "_remote_reads_enabled", return_value=True), \
-            mock.patch.object(registry_module.urllib.request, "urlopen") as urlopen:
+        with mock.patch.object(registry_module.urllib.request, "urlopen") as urlopen, \
+            mock.patch.object(registry_module, "_remote_reads_enabled", return_value=True), \
+            mock.patch.object(registry_module, "SUPABASE_URL", "https://example.supabase.co"):
             urlopen.return_value.__enter__.return_value.status = 204
             result = registry_module.sync_remote_registry()
         self.assertEqual(result["status"], "synced")
@@ -113,8 +116,9 @@ class SourceRegistryResolutionTests(unittest.TestCase):
 
     def test_sync_remote_registry_failed_reports_error(self) -> None:
         """فشل الشبكة أثناء المزامنة يُسجَّل كفشل ولا يُرمى استثناء."""
-        with mock.patch.object(registry_module, "_remote_reads_enabled", return_value=True), \
-            mock.patch.object(registry_module.urllib.request, "urlopen", side_effect=OSError("offline")):
+        with mock.patch.object(registry_module.urllib.request, "urlopen", side_effect=OSError("offline")), \
+            mock.patch.object(registry_module, "_remote_reads_enabled", return_value=True), \
+            mock.patch.object(registry_module, "SUPABASE_URL", "https://example.supabase.co"):
             result = registry_module.sync_remote_registry()
         self.assertEqual(result["status"], "failed")
         self.assertIn("offline", result["error"])
@@ -132,8 +136,9 @@ class SourceRegistryResolutionTests(unittest.TestCase):
         registry_module._remote_ids_fetched_at = time.time()
         body = json.dumps([{"id": e["id"]} for e in SOURCE_REGISTRY]).encode("utf-8")
         try:
-            with mock.patch.object(registry_module, "_remote_reads_enabled", return_value=True), \
-                mock.patch.object(registry_module.urllib.request, "urlopen") as urlopen:
+            with mock.patch.object(registry_module.urllib.request, "urlopen") as urlopen, \
+                mock.patch.object(registry_module, "_remote_reads_enabled", return_value=True), \
+                mock.patch.object(registry_module, "SUPABASE_URL", "https://example.supabase.co"):
                 urlopen.return_value.__enter__.return_value.status = 200
                 urlopen.return_value.__enter__.return_value.read.return_value = body
                 result = registry_module.sync_remote_registry()
