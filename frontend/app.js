@@ -4355,11 +4355,14 @@ if (chatFab) {
 const openBoardBtn = document.getElementById("openBoardBtn");
 if (openBoardBtn) {
   openBoardBtn.addEventListener("click", () => {
-    // نبضة توهج ذهبية قصيرة ثم الانتقال للصفحة المستقلة
+    // نبضة توهج ذهبية قصيرة ثم الانتقال للصفحة المستقلة — تُظهر أن اللوحة فُتحت
     openBoardBtn.classList.remove("pulse-gold");
     void openBoardBtn.offsetWidth; // إعادة تشغيل الحركة مع كل ضغطة
     openBoardBtn.classList.add("pulse-gold");
-    window.location.href = "board.html";
+    // الانتقال بعد بدء النبضة (نصف مدة الحركة) بدل فوري حتى تظهر قبل مغادرة الصفحة؛
+    // ومع reduced-motion تُعطَّل الحركة فلا داعي للتأخير.
+    const delay = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 450;
+    setTimeout(() => { window.location.href = "board.html"; }, delay);
   });
   openBoardBtn.addEventListener("animationend", () => {
     openBoardBtn.classList.remove("pulse-gold");
@@ -4612,7 +4615,80 @@ function initStandaloneBoard() {
   if (printBtn) printBtn.addEventListener("click", () => window.print());
 }
 
-// تصدير السجلات الحالية بعد الفلاتر إلى ملف Excel فعلي (.xlsx عبر Blob)
+// بناء ملف Excel حقيقي (.xlsx) بدون أي مكتبات: أرشيف ZIP مخزَّن (بدون ضغط)
+// يحوي SpreadsheetML بسيطًا — يفتح في Excel وLibreOffice وGoogle Sheets.
+function buildXlsxBlob(headers, rows) {
+  const enc = new TextEncoder();
+  const crcTable = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  const crc32 = (bytes) => {
+    let c = 0xffffffff;
+    for (let i = 0; i < bytes.length; i++) c = crcTable[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const now = new Date();
+  const dosTime = () => ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1));
+  const dosDate = () => (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate());
+  const xmlText = (v) => String(v == null ? "" : v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  const xmlCell = (v) => `<c t="inlineStr"><is><t xml:space="preserve">${xmlText(v)}</t></is></c>`;
+  const headerRow = `<row>${headers.map(xmlCell).join("")}</row>`;
+  const sheetRows = rows.map((r) => `<row>${r.map(xmlCell).join("")}</row>`).join("");
+  const files = {
+    "[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`,
+    "_rels/.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+    "xl/workbook.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="لوحة الفريج" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+    "xl/_rels/workbook.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+    "xl/worksheets/sheet1.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${headerRow}${sheetRows}</sheetData></worksheet>`,
+  };
+  const chunks = [];
+  const locals = [];
+  let offset = 0;
+  for (const name of Object.keys(files)) {
+    const data = enc.encode(files[name]);
+    const nameBytes = enc.encode(name);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, dosTime(), true); h.setUint16(12, dosDate(), true);
+    h.setUint32(14, crc32(data), true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true);
+    h.setUint16(26, nameBytes.length, true); h.setUint16(28, 0, true);
+    chunks.push(h.buffer, nameBytes, data);
+    locals.push({ nameBytes, crc: crc32(data), size: data.length, offset });
+    offset += 30 + nameBytes.length + data.length;
+  }
+  let cdSize = 0;
+  const cd = [];
+  for (const l of locals) {
+    const e = new DataView(new ArrayBuffer(46));
+    e.setUint32(0, 0x02014b50, true); e.setUint16(4, 20, true); e.setUint16(6, 20, true); e.setUint16(8, 0x0800, true);
+    e.setUint16(10, 0, true); e.setUint16(12, dosTime(), true); e.setUint16(14, dosDate(), true);
+    e.setUint32(16, l.crc, true); e.setUint32(20, l.size, true); e.setUint32(24, l.size, true);
+    e.setUint16(28, l.nameBytes.length, true); e.setUint16(30, 0, true); e.setUint16(32, 0, true); e.setUint16(34, 0, true); e.setUint16(36, 0, true);
+    e.setUint32(38, 0, true); e.setUint32(42, l.offset, true);
+    cd.push(e.buffer, l.nameBytes);
+    cdSize += 46 + l.nameBytes.length;
+  }
+  const eocd = new DataView(new ArrayBuffer(22));
+  eocd.setUint32(0, 0x06054b50, true); eocd.setUint16(4, 0, true); eocd.setUint16(6, 0, true);
+  eocd.setUint16(8, locals.length, true); eocd.setUint16(10, locals.length, true);
+  eocd.setUint32(12, cdSize, true); eocd.setUint32(16, offset, true); eocd.setUint16(20, 0, true);
+  const parts = [...chunks, ...cd, eocd.buffer];
+  const total = parts.reduce((s, b) => s + b.byteLength, 0);
+  const out = new Uint8Array(total);
+  let pos = 0;
+  for (const b of parts) { out.set(new Uint8Array(b), pos); pos += b.byteLength; }
+  return new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+// تصدير السجلات الحالية بعد الفلاتر إلى ملف Excel فعلي (.xlsx — يفتح مباشرة)
 function exportBoardExcel() {
   const rows = sortBoardRows(filteredBoardRows());
   if (!rows.length) {
@@ -4620,24 +4696,19 @@ function exportBoardExcel() {
     return;
   }
   const headers = ["الكود", "المحافظة", "المنطقة", "نوع العقار", "نوع المعاملة", "نمط الإدراج", "السعر", "المساحة (م²)", "تاريخ النشر", "المصدر", "درجة الفرصة", "الرابط الأصلي"];
-  const esc = (v) => {
-    const s = String(v == null ? "" : v).replace(/"/g, '""');
-    return '"' + s + '"';
-  };
   const body = rows.map((r) => [
     r.code, r.governorate, r.area, r.propertyType, r.transaction, r.listingMode,
     r.priceText || (r.price ? formatMoney(r.price) : "غير معلن"),
     r.space || "", r.publishedDate, r.source,
     r.opportunityScore != null ? Math.round(Number(r.opportunityScore)) : "",
     r.originalUrl,
-  ].map(esc).join(","));
-  const csv = "\ufeff" + headers.join(",") + "\n" + body.join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  ]);
+  const blob = buildXlsxBlob(headers, body);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "alforaij-board.xlsx";
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
 // تصدير CSV بصيغة تفصلها الفواصل — يفتح في Excel والجداول الأخرى
