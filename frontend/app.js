@@ -2324,6 +2324,47 @@ function renderResultsSources(report) {
   });
 }
 
+function renderDemandIndicator(report) {
+  // مؤشر الطلب بجانب النتائج: من يبحث عن شراء/إيجار في نفس منطقة التقييم
+  const root = $("demandIndicatorBox");
+  if (!root) return;
+  const demand = report.demandIndicators;
+  if (!demand || !demand.count) {
+    root.hidden = true;
+    root.innerHTML = "";
+    return;
+  }
+  const scope = demand.scope ? `: ${demand.scope}` : "";
+  const parts = [];
+  if (demand.buyRequests) parts.push(`<b>${demand.buyRequests}</b> طلب شراء`);
+  if (demand.rentRequests) parts.push(`<b>${demand.rentRequests}</b> طلب إيجار`);
+  const cards = (demand.items || []).map((d) => {
+    const isBuy = String(d.transaction || "").includes("شراء");
+    return `
+      <article class="demand-card">
+        <div class="demand-card-head">
+          <span class="pill tx-pill ${isBuy ? "tx-buy" : "tx-rent"}">${escapeHtml(d.transaction || "طلب")}</span>
+          <span class="demand-card-area">${escapeHtml(d.area || "")}${d.governorate ? ` · ${escapeHtml(d.governorate)}` : ""}</span>
+        </div>
+        <p class="demand-card-summary">${escapeHtml(d.summary || "")}</p>
+        <div class="demand-card-foot">
+          ${d.phone ? `<span class="demand-card-phone">📞 ${escapeHtml(d.phone)}</span>` : ""}
+          ${d.publishedDate ? `<span>${escapeHtml(d.publishedDate)}</span>` : ""}
+          ${d.originalUrl ? `<a href="${escapeHtml(d.originalUrl)}" target="_blank" rel="noreferrer">فتح الإعلان الأصلي ←</a>` : ""}
+        </div>
+      </article>`;
+  }).join("");
+  root.innerHTML = `
+    <div class="demand-indicator">
+      <div class="demand-indicator-head">
+        <strong>مؤشر الطلب في المنطقة${escapeHtml(scope)}</strong>
+        <span>${parts.join(" · ") || "لا طلبات"} — من إعلانات «مطلوب» المحلية، كل رقم عميل محتمل.</span>
+      </div>
+      <div class="demand-cards">${cards}</div>
+    </div>`;
+  root.hidden = false;
+}
+
 // تلميح «ثقة المصدر» المخصص عند التمرير على شريحة مصدر (أخضر/كهرماني/أحمر)
 function bindSourceTrustTip(scope) {
   const tip = $("sourceTrustTip");
@@ -2678,6 +2719,7 @@ function renderReport(report) {
   }
   renderSources(report);
   renderResultsSources(report);
+  renderDemandIndicator(report);
   renderProfitOpportunities(report);
   renderSimilarExternal(report);
   renderMethod(report);    const results = report.results || [];

@@ -508,6 +508,63 @@ def _flat_dashboard_opportunities(selected: set[str], include_local: bool, area_
     return list(by_code.values()), by_code, snapshot
 
 
+def _demand_indicator_payload(listings, request, top_area: str = "") -> dict:
+    """سجلات «مطلوب للشراء/للإيجار» في نطاق الطلب كمؤشر طلب بجانب النتائج.
+
+    النطاق: مناطق الطلب أولًا، ثم محافظاته، ثم منطقة أقرب نتيجة — حتى يرى
+    العميل من يبحث في نفس المنطقة التي قيّم عقاره فيها. لا يكسر التحليل أبدًا.
+    """
+    from backend.services.market_analysis import is_demand_transaction
+    from backend.services.request_parser import normalize_text
+
+    demand = [item for item in listings if is_demand_transaction(str(item.transaction or ""))]
+    empty = {"count": 0, "buyRequests": 0, "rentRequests": 0, "scope": "", "items": []}
+    if not demand:
+        return empty
+    wanted_areas = [normalize_text(area) for area in request.areas]
+    wanted_govs = {normalize_text(g) for g in request.governorates}
+
+    def _in_scope(item) -> bool:
+        area = normalize_text(item.area)
+        if wanted_areas:
+            return area in wanted_areas
+        if wanted_govs:
+            return normalize_text(item.governorate) in wanted_govs
+        if top_area:
+            return area == normalize_text(top_area)
+        return True
+
+    matched = [item for item in demand if _in_scope(item)]
+    if not matched:
+        return empty
+    matched.sort(key=lambda item: str(item.published_date or ""), reverse=True)
+    items = []
+    for item in matched[:12]:
+        raw = item.raw if isinstance(item.raw, dict) else {}
+        items.append({
+            "transaction": item.transaction,
+            "area": item.area,
+            "governorate": item.governorate,
+            "propertyType": item.property_type or item.detail_class or "",
+            "summary": str(item.summary or "").strip()[:160],
+            "phone": str(raw.get("phone") or ""),
+            "originalUrl": item.original_url,
+            "publishedDate": item.published_date,
+            "code": item.code,
+        })
+    buy = sum(1 for item in matched if "شراء" in str(item.transaction))
+    rent = sum(1 for item in matched if "إيجار" in str(item.transaction))
+    if wanted_areas:
+        scope = "، ".join(request.areas[:3])
+    elif wanted_govs:
+        scope = "، ".join(request.governorates[:3])
+    elif top_area:
+        scope = top_area
+    else:
+        scope = "كل الكويت"
+    return {"count": len(matched), "buyRequests": buy, "rentRequests": rent, "scope": scope, "items": items}
+
+
 def _dashboard_summary(listings, selected_platforms: set[str] | None = None, include_local: bool = True) -> dict:
     selected_platforms = selected_platforms or set()
     area_map = _area_governorate_map(listings)
@@ -1027,7 +1084,10 @@ class Handler(BaseHTTPRequestHandler):
                 ]
                 use_local = bool(payload.get("includeLocal", source_mode in {"local", "all"}))
                 use_external = source_mode in {"all", "source", "custom"} and bool(payload.get("includeExternal", True))
-                listings = load_listings() if use_local else []
+                # الفريج المحلي يُحمَّل دائمًا (رخيص من الملف) لأن مؤشر الطلب بجانب
+                # النتائج يعتمد على سجلات «مطلوب» المحلية حتى لو كان المصدر المختار خارجيًا.
+                local_demand_source = load_listings()
+                listings = local_demand_source if use_local else []
                 local_count = len(listings)
                 _progress_push(job_id, "local", f"تحميل {local_count} إعلانًا محليًا من قاعدة الفريج")
                 external_statuses = []
@@ -1147,6 +1207,16 @@ class Handler(BaseHTTPRequestHandler):
                         )
                 except Exception as ve:
                     logger.warning("Could not save valuation request: %s", ve)
+
+                # مؤشر الطلب بجانب النتائج: من يبحث عن شراء/إيجار في نفس المنطقة
+                # (سجلات «مطلوب» المحلية) — يُعرض كقسم في صفحة النتائج.
+                try:
+                    # RankedListing يحمل العقار في .listing (لا .area مباشرة)
+                    top_area = deduped[0].listing.area if deduped else ""
+                    report["demandIndicators"] = _demand_indicator_payload(local_demand_source, request, top_area)
+                except Exception as demand_error:
+                    logger.warning("Demand indicators failed: %s", demand_error)
+                    report["demandIndicators"] = {"count": 0, "buyRequests": 0, "rentRequests": 0, "scope": "", "items": []}
 
                 _progress_push(job_id, "done", f"اكتمل التقرير — {len(deduped)} نتيجة", results=len(deduped))
                 json_response(self, report)

@@ -2825,6 +2825,101 @@ button.results-source-chip:hover {
   color: #fff;
 }
 
+.results-demand {
+  margin-bottom: 12px;
+}
+
+.demand-indicator {
+  border: 1px solid var(--amber);
+  border-radius: 14px;
+  background: var(--amber-soft);
+  padding: 12px 14px;
+}
+
+.demand-indicator-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+
+.demand-indicator-head strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.demand-indicator-head > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.demand-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.demand-card {
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass-bg);
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.demand-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.demand-card-area {
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.demand-card-summary {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.demand-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.demand-card-foot a {
+  color: var(--blue);
+  font-weight: 700;
+  margin-inline-start: auto;
+}
+
+.tx-buy {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.tx-rent {
+  color: var(--blue);
+  border-color: var(--blue);
+}
+
 .results {
   display: grid;
   /* minmax(0, 1fr) — يمنع أي طفل بعرض أدنى كبير (جداول/صفوف عريضة) من
