@@ -1,9 +1,12 @@
 """فحص سريع لتبويبات الموقع على شاشة جوال (عرض 390px).
 
-- هل التبويبات الأربعة ظاهرة وقابلة للنقر؟
+- هل التبويبات الخمسة ظاهرة وقابلة للنقر؟
 - هل كل تبويب يظهر قسمه الصحيح؟
 - هل يوجد تجاوز أفقي (horizontal scroll)؟
 - حجم أهداف اللمس (ارتفاع الأزرار).
+
+ملاحظة: التبويب السادس «المصادر والتشغيل» حُذف نهائيًا بقرار المنتج —
+القائمة الحالية: search / opportunities / board / insights / developments.
 """
 from __future__ import annotations
 
@@ -36,8 +39,8 @@ with sync_playwright() as p:
     # 2) لا تجاوز أفقي
     results["horizontalOverflow"] = page.evaluate("document.documentElement.scrollWidth > document.documentElement.clientWidth")
 
-    # 3) التنقل بين التبويبات الستة
-    names = ["search", "opportunities", "board", "insights", "developments", "sources"]
+    # 3) التنقل بين التبويبات الخمسة
+    names = ["search", "opportunities", "board", "insights", "developments"]
     panels = {}
     for i, name in enumerate(names):
         tabs.nth(i).click()
@@ -50,7 +53,7 @@ with sync_playwright() as p:
         results[f"tab_{name}_active"] = active_tab
         results[f"tab_{name}_panels"] = visible
 
-    # 4) لقطة للتبويب النشط (لوحة السوق في النهاية)
+    # 4) لقطة للتبويب النشط (آخر التبويبات — التطورات)
     page.screenshot(path="tests/playwright/mobile_board_tab.png", full_page=False)
 
     # 5) أهداف اللمس: كل تبويب مرئي وارتفاعه >= 40px
@@ -74,7 +77,7 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 # تبويب البحث يضم عدة أقسام متراصة تحمل نفس data-main-panel (شريط الأدوات،
 # الشات، منطقة النتائج، لوحة النتائج) — نكشّف التكرار ونقارن المجموعة الفريدة.
 ok = (
-    results["tabCount"] == 6
+    results["tabCount"] == 5
     and not results["horizontalOverflow"]
     and results["minTabHeightPx"] >= 40
     and not errors
