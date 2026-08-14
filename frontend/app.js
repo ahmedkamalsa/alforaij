@@ -900,10 +900,10 @@ function renderCompanionAds(rows) {
     return;
   }
   root.innerHTML = items.map((item) => `
-    <article class="companion-ad">
+    <article class="companion-ad" data-board-listing>
       <div class="companion-head">
         <strong>${escapeHtml(item.code || "إعلان")}</strong>
-        <span>${escapeHtml(item.source || "مصدر غير محدد")}</span>
+        <button type="button" class="source-badge" data-board-source="${escapeHtml(item.source || "مصدر غير محدد")}" title="عرض كل إعلانات هذا المصدر">${escapeHtml(item.source || "مصدر غير محدد")}</button>
       </div>
       ${item.opportunityScore ? `<div class="companion-score">فرصة ${escapeHtml(Math.round(Number(item.opportunityScore)))} / 100 · ${escapeHtml(item.opportunityComparablesCount || 0)} مقارنة · ${escapeHtml(item.opportunityEvidenceCount || 0)} دليل</div>` : ""}
       <h4>${escapeHtml([item.area, item.propertyType].filter(Boolean).join(" - ") || "عقار")}</h4>
@@ -919,8 +919,12 @@ function renderCompanionAds(rows) {
         ${item.originalUrl ? `<a href="${escapeHtml(item.originalUrl)}" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>` : ""}
         ${item.phone ? `<a class="wa-contact" href="${escapeHtml(waLink(item.phone))}?text=${encodeURIComponent(`السلام عليكم، أستفسر عن الإعلان: ${item.code || ""} (${item.area || ""}) ${item.priceText || ""} — وجدته عبر منصة الفريج العقارية`)}" target="_blank" rel="noreferrer">تواصل واتساب</a>` : ""}
       </div>
+      <span class="card-detail-hint">اضغط البطاقة للتفاصيل الكاملة ←</span>
     </article>
   `).join("");
+  root.querySelectorAll("[data-board-listing]").forEach((el, index) => {
+    el._row = items[index];
+  });
 }
 
 // بطاقة ملخص «فرص الربط» في اللوحة — البيانات الكاملة تعيش في تبويب «العرض والطلب» داخل أفضل الفرص،
@@ -985,73 +989,86 @@ function metricCells(rows, governorate = "", area = "") {
   }));
 }
 
-function renderGovernorateTable(rows) {
-  const body = $("governorateTableBody");
-  if (!body) return;
+function renderGovernorateCards(rows) {
+  const root = $("governorateCards");
+  if (!root) return;
   const governorates = uniqueValues(rows.map((row) => canonicalGovernorate(row.governorate) || "غير محددة"));
   const activeMetric = boardState.activeMetric || "movement";
   const axisPill = $("govAxisPill");
   if (axisPill) axisPill.textContent = `المحور: ${boardMetricLabels[activeMetric] || "حركة الدلال"}`;
-  // تمييز عمود المحور النشط في رأس الجدول
-  const head = $("govTableHead");
-  if (head) {
-    head.querySelectorAll("th").forEach((th) => th.classList.toggle("col-active", th.dataset.govCol === activeMetric));
-  }
   if (!governorates.length) {
-    body.innerHTML = '<tr><td colspan="7">لا توجد بيانات حسب الفلاتر الحالية.</td></tr>';
+    root.innerHTML = '<div class="gov-empty">لا توجد بيانات حسب الفلاتر الحالية.</div>';
     return;
   }
-  const totals = ["movement", "opportunities", "saleOffers", "buyRequests", "rentOffers", "rentRequests"]
-    .map((metric) => ({ metric, count: countMetric(rows, metric) }));
+  const metrics = ["movement", "opportunities", "saleOffers", "buyRequests", "rentOffers", "rentRequests"];
+  const totals = metrics.map((metric) => ({ metric, count: countMetric(rows, metric) }));
+  const metricPill = (cell, extraCls) => `
+    <button class="metric-pill${extraCls}" type="button" data-board-gov="${escapeHtml(cell.gov)}" ${cell.area ? `data-board-area-run="${escapeHtml(cell.area)}"` : ""} data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"} title="${escapeHtml(boardMetricLabels[cell.metric] || "")}">
+      <span>${escapeHtml(boardMetricLabels[cell.metric] || "")}</span>
+      <b>${cell.count.toLocaleString("en-US")}</b>
+    </button>`;
   const html = [];
   for (const governorate of governorates) {
     const govRows = rows.filter((row) => (canonicalGovernorate(row.governorate) || "غير محددة") === governorate);
     const cells = metricCells(rows, governorate);
     const expanded = boardState.expandedGovernorates.has(governorate);
     const sel = boardState.selectedCell;
-    const govCellCls = (cell) => (sel && sel.governorate === governorate && !sel.area && sel.metric === cell.metric) ? " selected" : "";
     const areaCount = uniqueValues(govRows.map((row) => row.area).filter(Boolean)).length;
+    const axisCell = cells.find((c) => c.metric === activeMetric) || cells[0] || { metric: "movement", count: 0 };
     html.push(`
-      <tr class="gov-row${expanded ? " expanded" : ""}" data-board-governorate="${escapeHtml(governorate)}">
-        <td class="gov-name-cell">
+      <section class="gov-card${expanded ? " expanded" : ""}" data-board-governorate="${escapeHtml(governorate)}">
+        <header class="gov-card-head">
           <button class="gov-toggle" type="button" data-board-toggle-gov="${escapeHtml(governorate)}" aria-label="${expanded ? "طي" : "فتح"} مناطق ${escapeHtml(governorate)}">${expanded ? "▲" : "▼"}</button>
-          <strong>${escapeHtml(governorate)}</strong>
-          <span class="gov-areas-btn" role="button" tabindex="0" data-board-toggle-gov="${escapeHtml(governorate)}" title="${areaCount} منطقة">${areaCount} مناطق</span>
-        </td>
-        ${cells.map((cell) => `
-          <td class="${govCellCls(cell)}"><button class="count-button${activeMetric === cell.metric ? " axis" : ""}" type="button" data-board-gov="${escapeHtml(governorate)}" data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"}>${cell.count.toLocaleString("en-US")}</button></td>
-        `).join("")}
-      </tr>
+          <strong class="gov-card-name">${escapeHtml(governorate)}</strong>
+          <button class="gov-areas-badge" type="button" data-board-toggle-gov="${escapeHtml(governorate)}" title="${areaCount} منطقة — ${govRows.length} إعلان">
+            <b>${areaCount}</b>
+            <b>${govRows.length.toLocaleString("en-US")}</b>
+            <small>مناطق</small>
+          </button>
+          <button class="count-button gov-axis-total${activeMetric ? " axis" : ""}" type="button" data-board-gov="${escapeHtml(governorate)}" data-board-metric-run="${escapeHtml(activeMetric)}" ${axisCell.count ? "" : "disabled"} title="المحور: ${escapeHtml(boardMetricLabels[activeMetric] || "")}">${axisCell.count.toLocaleString("en-US")}</button>
+        </header>
+        <div class="gov-card-metrics">
+          ${cells.map((cell) => metricPill({ ...cell, gov: governorate }, `${activeMetric === cell.metric ? " axis" : ""}${sel && sel.governorate === governorate && !sel.area && sel.metric === cell.metric ? " selected" : ""}`)).join("")}
+        </div>
+        ${expanded ? renderGovAreaCards(rows, governorate, govRows, sel, activeMetric, metricPill) : ""}
+      </section>
     `);
-    if (expanded) {
-      const areaGroups = {};
-      for (const row of govRows) {
-        if (!row.area) continue;
-        const key = normalizeArabic(row.area);
-        if (!(key in areaGroups)) areaGroups[key] = row.area;
-      }
-      for (const area of Object.values(areaGroups).sort((a, b) => String(a).localeCompare(String(b), "ar"))) {
-        const areaCells = metricCells(rows, governorate, area);
-        const areaCellCls = (cell) => (sel && sel.governorate === governorate && sel.area === area && sel.metric === cell.metric) ? " selected" : "";
-        html.push(`
-          <tr class="area-row" data-board-area="${escapeHtml(area)}">
-            <td><span class="area-indent">${escapeHtml(area)}</span></td>
-            ${areaCells.map((cell) => `
-              <td class="${areaCellCls(cell)}"><button class="count-button area-count${activeMetric === cell.metric ? " axis" : ""}" type="button" data-board-gov="${escapeHtml(governorate)}" data-board-area-run="${escapeHtml(area)}" data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"}>${cell.count.toLocaleString("en-US")}</button></td>
-            `).join("")}
-          </tr>
-        `);
-      }
-    }
   }
-  // صف الإجمالي أسفل الجدول
+  // كارت الإجمالي
   html.push(`
-    <tr class="gov-total-row">
-      <td><strong>الإجمالي</strong></td>
-      ${totals.map((cell) => `<td><button class="count-button total-count${activeMetric === cell.metric ? " axis" : ""}" type="button" data-board-total-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"}>${cell.count.toLocaleString("en-US")}</button></td>`).join("")}
-    </tr>
+    <section class="gov-card gov-total-card">
+      <header class="gov-card-head">
+        <strong class="gov-card-name">الإجمالي</strong>
+        <button class="count-button gov-axis-total${activeMetric ? " axis" : ""}" type="button" data-board-total-run="${escapeHtml(activeMetric)}" ${(totals.find((t) => t.metric === activeMetric) || { count: 0 }).count ? "" : "disabled"}>${(totals.find((t) => t.metric === activeMetric) || { count: 0 }).count.toLocaleString("en-US")}</button>
+      </header>
+      <div class="gov-card-metrics">
+        ${totals.map((cell) => `<button class="metric-pill total-count${activeMetric === cell.metric ? " axis" : ""}" type="button" data-board-total-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"} title="${escapeHtml(boardMetricLabels[cell.metric] || "")}"><span>${escapeHtml(boardMetricLabels[cell.metric] || "")}</span><b>${cell.count.toLocaleString("en-US")}</b></button>`).join("")}
+      </div>
+    </section>
   `);
-  body.innerHTML = html.join("");
+  root.innerHTML = html.join("");
+}
+
+function renderGovAreaCards(rows, governorate, govRows, sel, activeMetric, metricPill) {
+  const areaGroups = {};
+  for (const row of govRows) {
+    if (!row.area) continue;
+    const key = normalizeArabic(row.area);
+    if (!(key in areaGroups)) areaGroups[key] = row.area;
+  }
+  return `
+    <div class="gov-card-areas">
+      ${Object.values(areaGroups).sort((a, b) => String(a).localeCompare(String(b), "ar")).map((area) => {
+        const areaCells = metricCells(rows, governorate, area);
+        return `
+          <div class="area-card" data-board-area="${escapeHtml(area)}">
+            <span class="area-name">${escapeHtml(area)}</span>
+            <div class="area-pills">
+              ${areaCells.map((cell) => metricPill({ ...cell, gov: governorate, area }, `${activeMetric === cell.metric ? " axis" : ""}${sel && sel.governorate === governorate && sel.area === area && sel.metric === cell.metric ? " selected" : ""}`)).join("")}
+            </div>
+          </div>`;
+      }).join("")}
+    </div>`;
 }
 
 // ─── درج التفاصيل: أي رقم في اللوحة يفتح الإعلانات الفعلية خلفه بالأدلة والمصادر ───
@@ -1080,6 +1097,138 @@ function closeBoardDrilldown() {
   boardDrilldown = null;
 }
 
+// ─── بوكس تفاصيل الإعلان: أي بطاقة إعلان في اللوحة تفتح تفاصيلها داخل نفس الصفحة ───
+// يحمل كل عنصر [data-board-listing] بيانات صفه كاملًا في `_row` (لا بحث ولا حالة عامة)،
+// والنقر على جسم البطاقة (لا على أزرارها الداخلية) يفتح التفاصيل الكاملة.
+let listingDetails = null;
+
+function openListingDetails(item) {
+  const overlay = $("boardListingModal");
+  if (!overlay) return;
+  const titleEl = $("listingTitle");
+  const subEl = $("listingSub");
+  if (titleEl) titleEl.textContent = (item && item.code) ? String(item.code) : "تفاصيل الإعلان";
+  if (subEl) subEl.textContent = item ? [item.area, item.propertyType].filter(Boolean).join(" · ") : "";
+  renderListingDetails(item);
+  overlay.hidden = false;
+  document.body.classList.add("drill-open");
+  const closeBtn = overlay.querySelector("[data-listing-close]");
+  if (closeBtn) closeBtn.focus();
+}
+
+function closeListingDetails() {
+  const overlay = $("boardListingModal");
+  if (!overlay) return;
+  overlay.hidden = true;
+  document.body.classList.remove("drill-open");
+  listingDetails = null;
+}
+
+function renderListingDetails(item) {
+  const body = $("listingBody");
+  if (!body) return;
+  listingDetails = item || null;
+  if (!item) {
+    body.innerHTML = '<div class="empty">تعذر تحميل تفاصيل الإعلان.</div>';
+    return;
+  }
+  const score = Number(item.opportunityScore) > 0 ? Math.round(Number(item.opportunityScore)) : null;
+  const tx = item.transaction || "";
+  const facts = [
+    ["السعر", item.priceText || (item.price ? formatMoney(item.price) : "غير معلن")],
+    ["المساحة", item.space ? `${item.space} م²` : "غير مذكورة"],
+    ["نوع العقار", item.propertyType || "غير محدد"],
+    ["المحافظة", item.governorate || "غير محددة"],
+    ["المنطقة", item.area || "غير محددة"],
+    ["نمط الإدراج", item.listingMode || "غير محدد"],
+    ["تاريخ الإعلان", item.publishedDate || "غير متاح"],
+    ["رمز الإعلان", item.code || "—"],
+  ];
+  const sections = [];
+  if (item.summary || item.features) {
+    sections.push(`
+      <section class="listing-section">
+        <h5>الوصف</h5>
+        ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ""}
+        ${item.features ? `<p class="listing-features">${escapeHtml(item.features)}</p>` : ""}
+      </section>`);
+  }
+  if (item.opportunityReason) {
+    sections.push(`
+      <section class="listing-section">
+        <h5>سبب الفرصة</h5>
+        <p>${escapeHtml(item.opportunityReason)}</p>
+      </section>`);
+  }
+  const evidence = [];
+  if (Number(item.opportunityComparablesCount) > 0) evidence.push(`${item.opportunityComparablesCount} مقارنة`);
+  if (Number(item.opportunityEvidenceCount) > 0) evidence.push(`${item.opportunityEvidenceCount} دليل`);
+  if (Number(item.opportunityClientsCount) > 0) evidence.push(`${item.opportunityClientsCount} عميل مطابق`);
+  body.innerHTML = `
+    <div class="listing-hero">
+      ${score ? `<span class="drill-score">فرصة ${score} / 100</span>` : ""}
+      ${tx ? `<span class="drill-tx">${escapeHtml(tx)}</span>` : ""}
+      <button type="button" class="source-badge" data-board-source="${escapeHtml(item.source || "")}" title="عرض كل إعلانات هذا المصدر">${escapeHtml(item.source || "مصدر غير محدد")}</button>
+    </div>
+    <h3 class="listing-title">${escapeHtml([item.area, item.propertyType].filter(Boolean).join(" - ") || "عقار")}</h3>
+    <div class="listing-facts">
+      ${facts.map(([label, value]) => `<div><b>${escapeHtml(label)}</b><span>${escapeHtml(String(value))}</span></div>`).join("")}
+    </div>
+    ${evidence.length ? `<div class="listing-evidence">${evidence.map((e) => `<span>${escapeHtml(e)}</span>`).join("")}</div>` : ""}
+    ${sections.join("")}
+    <div class="listing-actions">
+      ${item.originalUrl ? `<a class="primary" href="${escapeHtml(item.originalUrl)}" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>` : ""}
+      ${item.phone ? `<a class="wa-contact" href="${escapeHtml(waLink(item.phone))}?text=${encodeURIComponent(`السلام عليكم، أستفسر عن الإعلان: ${item.code || ""} (${item.area || ""}) ${item.priceText || ""} — وجدته عبر منصة الفريج العقارية`)}" target="_blank" rel="noreferrer">تواصل واتساب</a>` : ""}
+      ${item.area ? `<button type="button" data-listing-similar="${escapeHtml(item.area)}|${escapeHtml(item.propertyType || "")}">عرض مشابهات في اللوحة</button>` : ""}
+    </div>`;
+}
+
+// كل إعلانات مصدر واحد ضمن فلاتر اللوحة الحالية — بدل صندوق الإعلان، افتح درجًا مركّزًا
+function openSourceDrilldown(sourceName) {
+  const source = String(sourceName || "").trim();
+  if (!source) return;
+  closeListingDetails();
+  closeBoardDrilldown();
+  const rows = boardState.records.filter((row) => rowMatchesBoardFilters(row) && (row.source || "").trim() === source);
+  openBoardDrilldown({
+    title: `كل إعلانات ${source}`,
+    sub: `${rows.length} إعلان من هذا المصدر ضمن فلاتر اللوحة الحالية — كل إعلان يحمل رابطه وأدلته.`,
+    rows,
+    run: boardDrillRunFromFilters(),
+  });
+}
+
+// مسح اختيارات اللوحة كاملًا: كل الفلاتر + المحور + الخلية المحددة + المحافظات المفتوحة
+function clearBoardSelections() {
+  const resetFields = [
+    ["boardMetricFilter", "movement"],
+    ["boardGovernorateFilter", ""],
+    ["boardTransactionFilter", ""],
+    ["boardPropertyTypeFilter", ""],
+    ["boardListingModeFilter", ""],
+    ["boardAreaFilter", ""],
+    ["boardPriceFilter", "all"],
+    ["boardSortFilter", "newest"],
+  ];
+  for (const [id, fallback] of resetFields) {
+    const el = $(id);
+    if (!el) continue;
+    el.value = fallback;
+  }
+  const searchBox = $("boardSearchBox");
+  if (searchBox) searchBox.value = "";
+  const platformInputs = [...document.querySelectorAll('input[name="boardPlatform"]')];
+  if (platformInputs.length) {
+    for (const input of platformInputs) input.checked = input.value === "__all";
+  }
+  boardState.activeMetric = "movement";
+  boardState.selectedCell = null;
+  if (boardState.expandedGovernorates && boardState.expandedGovernorates.clear) boardState.expandedGovernorates.clear();
+  closeBoardDrilldown();
+  closeListingDetails();
+  loadDashboardBoard();
+}
+
 function renderDrillRows(rows) {
   const body = $("drillBody");
   if (!body) return;
@@ -1094,7 +1243,7 @@ function renderDrillRows(rows) {
     const txBadge = tx ? `<span class="drill-tx">${escapeHtml(tx)}</span>` : "";
     const sourceLabel = item.source || "مصدر غير محدد";
     return `
-      <article class="drill-card">
+      <article class="drill-card" data-board-listing>
         <div class="drill-head">
           <strong>${escapeHtml(item.code || "إعلان")}</strong>
           ${score ? `<span class="drill-score">فرصة ${score} / 100</span>` : ""}
@@ -1104,7 +1253,7 @@ function renderDrillRows(rows) {
         <div class="drill-facts">
           <span><b>السعر</b>${escapeHtml(item.priceText || (item.price ? formatMoney(item.price) : "غير معلن"))}</span>
           <span><b>المساحة</b>${item.space ? `${escapeHtml(item.space)} م²` : "غير مذكورة"}</span>
-          <span><b>المصدر</b>${escapeHtml(sourceLabel)}</span>
+          <span><b>المصدر</b><button type="button" class="source-badge" data-board-source="${escapeHtml(sourceLabel)}">${escapeHtml(sourceLabel)}</button></span>
         </div>
         ${item.opportunityReason ? `<p class="drill-reason">${escapeHtml(item.opportunityReason)}</p>` : ""}
         <div class="drill-evidence">
@@ -1115,10 +1264,14 @@ function renderDrillRows(rows) {
         <div class="drill-actions">
           ${item.originalUrl ? `<a href="${escapeHtml(item.originalUrl)}" target="_blank" rel="noreferrer">فتح على ${escapeHtml(sourceLabel)}</a>` : ""}
           ${item.phone ? `<a class="wa-contact" href="${escapeHtml(waLink(item.phone))}?text=${encodeURIComponent(`السلام عليكم، أستفسر عن الإعلان: ${item.code || ""} (${item.area || ""}) ${item.priceText || ""} — وجدته عبر منصة الفريج العقارية`)}" target="_blank" rel="noreferrer">تواصل واتساب</a>` : ""}
+          <span class="card-detail-hint">اضغط البطاقة للتفاصيل الكاملة ←</span>
         </div>
       </article>
     `;
   }).join("");
+  body.querySelectorAll("[data-board-listing]").forEach((el, index) => {
+    el._row = visible[index];
+  });
   if (rows.length > visible.length) {
     const more = document.createElement("div");
     more.className = "empty compact-empty";
@@ -1511,7 +1664,7 @@ function renderBoard() {
   renderBoardStats(rows);
   renderCompanionAds(rows);
   renderBoardMatchingLink(rows);
-  renderGovernorateTable(rows);
+  renderGovernorateCards(rows);
 }
 
 async function loadDashboardBoard() {
@@ -1560,8 +1713,8 @@ async function loadDashboardBoard() {
     if (governorates[0]) boardState.expandedGovernorates.add(governorates[0]);
     renderBoard();
   } catch (err) {
-    const body = $("governorateTableBody");
-    if (body) body.innerHTML = `<tr><td colspan="7">تعذر تحميل لوحة المحافظات: ${escapeHtml(err.message)}</td></tr>`;
+    const root = $("governorateCards");
+    if (root) root.innerHTML = `<div class="gov-empty">تعذر تحميل لوحة المحافظات: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -4082,24 +4235,17 @@ function bind() {
   });
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Escape") {
+      const listing = $("boardListingModal");
+      if (listing && !listing.hidden) {
+        closeListingDetails();
+        return;
+      }
       const overlay = $("boardDrilldown");
       if (overlay && !overlay.hidden) closeBoardDrilldown();
     }
   });
-  on("boardClearFiltersBtn", () => {
-    ["boardMetricFilter", "boardGovernorateFilter", "boardTransactionFilter", "boardPropertyTypeFilter", "boardListingModeFilter", "boardAreaFilter"].forEach((id) => {
-      const el = $(id);
-      if (!el) return;
-      el.value = id === "boardMetricFilter" ? "movement" : "";
-    });
-    const platformInputs = [...document.querySelectorAll('input[name="boardPlatform"]')];
-    if (platformInputs.length) {
-      for (const input of platformInputs) input.checked = input.value === "__all";
-    }
-    boardState.activeMetric = "movement";
-    boardState.selectedCell = null;
-    loadDashboardBoard();
-  });
+  on("boardClearFiltersBtn", clearBoardSelections);
+  on("govClearSelectionsBtn", clearBoardSelections);
   ["boardMetricFilter", "boardGovernorateFilter", "boardTransactionFilter", "boardPropertyTypeFilter", "boardListingModeFilter", "boardAreaFilter"].forEach((id) => {
     const el = $(id);
     if (!el) return;
@@ -4254,6 +4400,41 @@ function bind() {
         rows,
         run: { metric },
       });
+      return;
+    }
+    const listingSource = ev.target.closest?.("[data-board-source]");
+    if (listingSource) {
+      ev.preventDefault();
+      openSourceDrilldown(listingSource.dataset.boardSource || "");
+      return;
+    }
+    const listingClose = ev.target.closest?.("[data-listing-close]");
+    if (listingClose) {
+      closeListingDetails();
+      return;
+    }
+    const similarBtn = ev.target.closest?.("[data-listing-similar]");
+    if (similarBtn) {
+      const [area, propertyType] = String(similarBtn.dataset.listingSimilar || "|").split("|");
+      const areaFilter = $("boardAreaFilter");
+      const typeFilter = $("boardPropertyTypeFilter");
+      if (areaFilter) areaFilter.value = area || "";
+      if (typeFilter) typeFilter.value = propertyType || "";
+      closeListingDetails();
+      renderBoard();
+      const rows = filteredBoardRows().filter((row) => (!area || row.area === area) && (!propertyType || row.propertyType === propertyType));
+      openBoardDrilldown({
+        title: `مشابهات: ${[area, propertyType].filter(Boolean).join(" · ")}`,
+        sub: `${rows.length} إعلان بنفس المنطقة والنوع — كل إعلان يحمل مصدره ورابطه.`,
+        rows,
+        run: boardDrillRunFromFilters(),
+      });
+      return;
+    }
+    // أخيرًا: أي بطاقة إعلان (بدون أزرار داخلية) تفتح تفاصيل الإعلان في بوكس داخل الصفحة
+    const listingCard = ev.target.closest?.("[data-board-listing]");
+    if (listingCard && !ev.target.closest("a, button")) {
+      openListingDetails(listingCard._row || null);
       return;
     }
   });

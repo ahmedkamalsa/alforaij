@@ -10,7 +10,7 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>لوحة الأرقام والعروض الفعلية — منصة الفريج</title>
-  <link rel="stylesheet" href="styles.css?v=20260817-dead-code">
+  <link rel="stylesheet" href="styles.css?v=20260814-gov-cards">
   <script src="config.js?v=20260811-trends"></script>
 </head>
 <body data-standalone="board">
@@ -164,27 +164,15 @@
           <div class="section-title compact-title gov-title-row">
             <div>
               <h3>الأرقام حسب المحافظات</h3>
-              <span>اضغط المحافظة لفتح مناطقها، أو اضغط أي رقم لعرض الإعلانات الفعلية خلفه بأدلتها ومصادرها.</span>
+              <span>اضغط المحافظة لفتح مناطقها، أو اضغط أي رقم لعرض الإعلانات الفعلية خلفه بأدلتها ومصادرها، أو أي إعلان لفتح تفاصيله الكاملة.</span>
             </div>
-            <span id="govAxisPill" class="axis-pill">المحور: حركة الدلال</span>
+            <div class="gov-title-actions">
+              <span id="govAxisPill" class="axis-pill">المحور: حركة الدلال</span>
+              <button id="govClearSelectionsBtn" class="board-mini-btn" type="button">مسح اختيارات اللوحة</button>
+            </div>
           </div>
-          <div class="table-scroll">
-            <table class="governorate-table">
-              <thead>
-                <tr id="govTableHead">
-                  <th data-gov-col="name">المحافظة / المنطقة</th>
-                  <th data-gov-col="movement">الحركة</th>
-                  <th data-gov-col="opportunities">الفرص</th>
-                  <th data-gov-col="saleOffers">للبيع</th>
-                  <th data-gov-col="buyRequests">شراء</th>
-                  <th data-gov-col="rentOffers">إيجار</th>
-                  <th data-gov-col="rentRequests">طلب إيجار</th>
-                </tr>
-              </thead>
-              <tbody id="governorateTableBody">
-                <tr><td colspan="7">جاري تحميل بيانات اللوحة...</td></tr>
-              </tbody>
-            </table>
+          <div id="governorateCards" class="governorate-cards">
+            <div class="gov-empty">جاري تحميل بيانات اللوحة...</div>
           </div>
         </section>
       </div>
@@ -205,6 +193,20 @@
     </aside>
   </div>
 
-  <script src="app.js?v=20260817-dead-code"></script>
+  <div id="boardListingModal" class="listing-overlay" hidden>
+    <div class="listing-backdrop" data-listing-close></div>
+    <aside class="listing-panel" role="dialog" aria-modal="true" aria-labelledby="listingTitle">
+      <header class="listing-head">
+        <div>
+          <h4 id="listingTitle"></h4>
+          <span id="listingSub"></span>
+        </div>
+        <button type="button" class="icon-btn" data-listing-close aria-label="إغلاق">✕</button>
+      </header>
+      <div id="listingBody" class="listing-body"></div>
+    </aside>
+  </div>
+
+  <script src="app.js?v=20260814-gov-cards"></script>
 </body>
 </html>

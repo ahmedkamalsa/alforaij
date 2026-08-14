@@ -115,12 +115,6 @@
   --glass-border: rgba(30, 58, 138, .20);
 }
 
-/* حلقة تركيز موحّدة بهوية المنصة — لا تؤثر على التخطيط، وأي قاعدة أخص تتفوق عليها */
-:focus-visible {
-  outline: var(--ring-width) solid var(--ring-color);
-  outline-offset: var(--ring-offset);
-}
-
 [data-theme="light"] body::before {
   background:
     radial-gradient(1100px 520px at 12% -8%, rgba(37, 99, 235, .16), transparent 60%),
@@ -215,15 +209,22 @@
 }
 
 /* رؤوس الجداول — أزرق ثابت مقروء على الفاتح */
-[data-theme="light"] .governorate-table th,
 [data-theme="light"] .minitable th {
   background: linear-gradient(120deg, #1d4ed8, #2563eb);
   color: #fff;
 }
 
-[data-theme="light"] .governorate-table th.col-active {
-  border-bottom: 3px solid #f59e0b;
-  background: linear-gradient(120deg, #1e40af, #2563eb);
+/* كروت المحافظات على الفاتح: حدود ناعمة ومحور ذهبي واضح */
+[data-theme="light"] .gov-card {
+  background: rgba(37, 99, 235, .06);
+}
+
+[data-theme="light"] .gov-card.expanded {
+  background: rgba(37, 99, 235, .10);
+}
+
+[data-theme="light"] .metric-pill.axis {
+  box-shadow: 0 0 0 2px #f59e0b;
 }
 
 /* بطاقات النتائج على الفاتح: خلفية بيضاء وإطارات ناعمة */
@@ -361,10 +362,13 @@ h3,
   letter-spacing: .06em;
 }
 
-/* تمييز واضح للتركيز بلوحة المفاتيح (إتاحة واحترافية) دون تغيير مظهر النقر العادي */
+/* تمييز واضح للتركيز بلوحة المفاتيح بألوان الهوية (ذهبي داكنًا، كحلي فاتحًا)
+   عبر توكينات الحلقة من طبقة الهوية — دون تغيير مظهر النقر العادي.
+   هذه هي القاعدة الوحيدة لـ :focus-visible في الملف؛ أي قاعدة جديدة موحّدة
+   يجب أن تحل محلها هنا (آخر مصدر يفوز في الشلال). */
 :focus-visible {
-  outline: 2px solid var(--accent, #4d9fff);
-  outline-offset: 2px;
+  outline: var(--ring-width) solid var(--ring-color);
+  outline-offset: var(--ring-offset);
   border-radius: 6px;
 }
 
@@ -1377,66 +1381,43 @@ textarea {
   color: #fff;
 }
 
-.table-scroll {
-  overflow-x: auto;
+/* كروت المحافظات: كل محافظة كارت مكدس عموديًا ومناطقها تحته */
+.governorate-cards {
+  display: grid;
+  gap: 12px;
 }
 
-.governorate-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 720px;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.governorate-table th,
-.governorate-table td {
-  padding: 9px;
-  border-bottom: 1px solid var(--line);
-  text-align: center;
-  vertical-align: middle;
-}
-
-/* رأس الجدول: شريط داكن كامل مع تمييز عمود المحور النشط */
-.governorate-table th {
-  background: linear-gradient(120deg, #0f172a, #1e3a8a);
-  color: #fff;
-  font-size: 12.5px;
-  font-weight: 900;
-  border-bottom: 3px solid transparent;
-}
-
-.governorate-table th.col-active {
-  border-bottom: 3px solid #f59e0b;
-  background: linear-gradient(120deg, #172554, #1e40af);
-}
-
-.governorate-table td:first-child,
-.governorate-table th:first-child {
-  text-align: right;
-}
-
-/* صف المحافظة: كارت ملخص بخلفية فاتحة وزر المناطق */
-.gov-row {
+.gov-card {
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
   background: rgba(91, 140, 255, .07);
   border-top: 2px solid rgba(91, 140, 255, .35);
 }
 
-.gov-row.expanded {
+.gov-card.expanded {
   background: rgba(56, 120, 255, .12);
 }
 
-.gov-name-cell {
+.gov-card-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.gov-areas-btn {
+.gov-card-name {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+/* شارة المناطق: عدد المناطق فوق عدد الإعلانات مع كلمة مناطق */
+.gov-areas-badge {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  margin-inline-start: 8px;
-  padding: 10px 14px;
+  margin-inline-start: auto;
+  padding: 6px 14px;
   min-height: 44px;
   border-radius: 999px;
   border: 1px solid rgba(91, 140, 255, .5);
@@ -1444,72 +1425,149 @@ textarea {
   color: var(--blue);
   font-size: 11px;
   font-weight: 800;
+  line-height: 1.2;
   cursor: pointer;
 }
 
-.gov-areas-btn:hover {
-  background: var(--blue-deep);
-  color: #fff;
+.gov-areas-badge b {
+  font-size: 13px;
 }
 
-.area-row {
-  background: rgba(255, 255, 255, .02);
+.gov-areas-badge small {
+  font-size: 10px;
+  opacity: .8;
+}
+
+.gov-areas-badge:hover {
+  background: var(--blue-deep);
+  color: #fff;
 }
 
 .gov-toggle {
   min-width: 44px;
   min-height: 44px;
   padding: 0;
-  margin-left: 8px;
   border-radius: 7px;
   color: var(--blue);
 }
 
-.area-indent {
-  display: inline-block;
-  padding-right: 40px;
-  color: var(--muted);
-  font-weight: 900;
-}
-
-.count-button {
+/* كبسولة إجمالي المحور في رأس الكارت */
+.gov-axis-total {
   min-width: 58px;
-  min-height: 36px;
-  padding: 6px 10px;
-  border-color: rgba(91, 140, 255, .4);
-  color: var(--blue);
-  background: var(--blue-soft);
-  border-radius: 9px;
-  font-weight: 800;
+  font-size: 14px;
 }
 
-.count-button:not(:disabled):hover {
+/* حبوب المقاييس الستة */
+.gov-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.metric-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  min-height: 44px;
+  border: 1px solid rgba(91, 140, 255, .4);
+  background: var(--blue-soft);
+  color: var(--blue);
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.metric-pill span {
+  font-size: 10.5px;
+  opacity: .85;
+}
+
+.metric-pill b {
+  font-size: 16px;
+}
+
+.metric-pill:not(:disabled):hover {
   background: var(--blue-deep);
   color: #fff;
 }
 
-.count-button:disabled {
+.metric-pill:disabled {
   opacity: .5;
   cursor: default;
 }
 
-.count-button.axis {
+.metric-pill.axis {
   box-shadow: 0 0 0 1.5px #f59e0b;
 }
 
-/* الخلية المختارة: خلفية زرقاء + إطار سفلي برتقالي (نفس الشكل المرجعي) */
-.governorate-table td.selected {
-  background: rgba(37, 99, 235, .16);
+.metric-pill.selected {
+  background: var(--blue-deep);
+  color: #fff;
   box-shadow: inset 0 0 0 1.5px rgba(37, 99, 235, .65);
 }
 
-.governorate-table td.selected .count-button {
-  background: var(--blue-deep);
-  color: #fff;
+/* مناطق المحافظة: صفوف مكدسة تحت الكارت */
+.gov-card-areas {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(91, 140, 255, .35);
 }
 
-.area-count {
+.area-card {
+  display: grid;
+  grid-template-columns: minmax(96px, 130px) 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   background: var(--panel);
+}
+
+.area-name {
+  font-weight: 900;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.area-pills {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.area-pill {
+  min-height: 36px;
+  font-size: 13px;
+  background: var(--panel);
+}
+
+/* كارت الإجمالي */
+.gov-total-card {
+  border-top-color: rgba(245, 158, 11, .5);
+  background: rgba(245, 158, 11, .08);
+}
+
+.gov-total-card .metric-pill {
+  border-color: rgba(245, 158, 11, .5);
+  color: var(--amber);
+  background: rgba(245, 158, 11, .12);
+}
+
+.total-count {
+  color: var(--amber);
+}
+
+.gov-empty {
+  padding: 18px;
+  text-align: center;
+  color: var(--muted);
+  font-weight: 800;
 }
 
 /* كبسولة المحور النشط */
@@ -4967,22 +5025,243 @@ body.drill-open {
   overflow: hidden;
 }
 
-/* صف الإجمالي في جدول المحافظات */
-.gov-total-row {
-  background: rgba(245, 158, 11, .08);
-  border-top: 2px solid rgba(245, 158, 11, .45);
+/* ─── بوكس تفاصيل الإعلان: تفاصيل كاملة داخل نفس الصفحة (فوق درج اللوحة) ─── */
+.listing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 450;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.gov-total-row td {
+.listing-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, .6);
+  backdrop-filter: blur(3px);
+}
+
+.listing-panel {
+  position: relative;
+  width: min(620px, 94vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(2, 6, 23, .55);
+  animation: listing-in .2s ease;
+}
+
+@keyframes listing-in {
+  from { transform: translateY(14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.listing-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.listing-head h4 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.listing-head span {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.listing-head .icon-btn {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.listing-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+}
+
+.listing-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.listing-title {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.listing-facts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.listing-facts > div {
+  padding: 9px 11px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .05);
+}
+
+.listing-facts b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.listing-facts span {
+  font-size: 13px;
   font-weight: 900;
 }
 
-.total-count {
-  background: rgba(245, 158, 11, .14);
-  color: var(--amber);
-  border-color: rgba(245, 158, 11, .5);
+.listing-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
 }
 
+.listing-evidence span {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.listing-section {
+  margin-top: 14px;
+}
+
+.listing-section h5 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.listing-section p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: pre-line;
+}
+
+.listing-features {
+  color: var(--muted);
+  margin-top: 8px !important;
+}
+
+.listing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.listing-actions a,
+.listing-actions button {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, .06);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.listing-actions .primary {
+  border: none;
+  background: var(--blue);
+  color: #fff;
+}
+
+/* شارة المصدر القابلة للنقر: تفتح كل إعلانات المصدر داخل اللوحة */
+.source-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(147, 197, 253, .4);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.source-badge:hover {
+  border-color: var(--blue);
+  background: rgba(37, 99, 235, .18);
+}
+
+/* تلميح «اضغط البطاقة للتفاصيل الكاملة» ووضعية النقر على بطاقات الإعلان */
+.card-detail-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--blue);
+  font-weight: 800;
+}
+
+[data-board-listing] {
+  cursor: pointer;
+}
+
+[data-board-listing]:hover {
+  border-color: rgba(147, 197, 253, .5);
+}
+
+/* أزرار القسم الصغيرة: «مسح اختيارات اللوحة» داخل لوحة المحافظات */
+.gov-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.board-mini-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, .05);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.board-mini-btn:hover {
+  color: var(--ink);
+  border-color: rgba(147, 197, 253, .5);
+}
+
+/* كروت المحافظات على الشاشات المتوسطة: ثلاث حبات لكل صف */
 @media (min-width: 900px) {
   .advanced-fields .fields {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5021,6 +5300,17 @@ body.drill-open {
 
   .board-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* كروت المحافظات: ثلاث حبات لكل صف والمنطقة تتراص فوق حبوبها */
+  .gov-card-metrics,
+  .area-pills {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .area-card {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .request-panel {
@@ -5119,6 +5409,20 @@ body.drill-open {
   .gov-toggle {
     width: 44px;
     min-height: 44px;
+  }
+
+  /* كروت المحافظات على الجوال: حبتان لكل صف */
+  .gov-card-metrics,
+  .area-pills {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gov-card-head {
+    gap: 6px;
+  }
+
+  .gov-areas-badge {
+    margin-inline-start: 0;
   }
 
   .companion-actions button,
