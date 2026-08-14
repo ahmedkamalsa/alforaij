@@ -6,7 +6,10 @@ on:
     - cron: "0 3 * * *" # 06:00 Africa/Cairo
 
 permissions:
-  contents: read
+  # contents: write -> يسمح للوكيل بالتزام بيانات data/ ودفعها تلقائيًا بعد الحصاد.
+  # actions: write  -> يسمح بتشغيل عمليات النشر عبر gh workflow run من GITHUB_TOKEN.
+  contents: write
+  actions: write
 
 jobs:
   update:
@@ -31,15 +34,30 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           AGENT_ROUTER_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
           OFFICIAL_TRANSACTIONS_SOURCE: ${{ vars.OFFICIAL_TRANSACTIONS_SOURCE }}
-      - name: Trigger static redeploy with fresh data
-        env:
-          TOKEN: ${{ secrets.ALFORAIJBOARD_TOKEN }}
+      - name: Commit and push harvested data
         run: |
-          if [ -z "$TOKEN" ]; then
-            echo "ALFORAIJBOARD_TOKEN not configured; relying on the scheduled redeploy instead."
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No data changes after harvest; nothing to commit."
             exit 0
           fi
-          # إعادة بناء فورية بعد الحصاد حتى يصل الحصاد الجديد للموقع المرفوع خلال دقائق
-          # (الجدول اليومي 04:00 UTC احتياط إن فشل هذا التشغيل).
+          git commit -m "تحديث البيانات اليومي $(date -u +%Y-%m-%d): التزام تلقائي بعد الحصاد"
+          git push
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Trigger static redeploy with fresh data
+        env:
+          # gh يرفض العمل داخل Actions بدون GH_TOKEN صريح، لذا نمرره دائمًا:
+          # الـ PAT إن كان مضبوطًا، وإلا GITHUB_TOKEN (بصلاحية actions: write).
+          GH_TOKEN: ${{ secrets.ALFORAIJBOARD_TOKEN || github.token }}
+        run: |
+          # الدفع في الخطوة السابقة يتم بالـ GITHUB_TOKEN، وغيت هاب لا يشغّل
+          # عمليات النشر تلقائيًا عند الدفع بمثل هذا التوكن (حماية من التكرار)،
+          # لذلك نشغّل النشر صراحةً هنا ليصل الحصاد الجديد للمواقع خلال دقائق.
+          # الجدول اليومي 04:00 UTC يبقى احتياطًا إضافيًا.
           gh workflow run deploy-alforaijboard.yml
           gh workflow run deploy-static.yml
+          gh workflow run deploy-cloudflare-pages.yml
