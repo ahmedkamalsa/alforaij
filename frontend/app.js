@@ -1342,9 +1342,17 @@ function renderInsights() {
       <small class="src-share">${s.sharePct}%</small>
     </div>`).join("");
 
+  const demandHtml = renderDemandIndicators(insightsState.demand);
   root.innerHTML = `
     ${kpis}
     <p class="scope-note insights-note">${escapeHtml(data.note || "")}</p>
+    <div class="insights-section">
+      <div class="section-title compact-title">
+        <h3>مؤشرات الطلب</h3>
+        <span>طلبات الشراء والإيجار من إعلانات «مطلوب» المحلية — عدّ لكل منطقة ومحافظة مع الاتجاه الشهري. كل طلب عميل محتمل، وميزانيته لا تدخل وسيطات أسعار العرض.</span>
+      </div>
+      ${demandHtml}
+    </div>
     <div class="insights-section">
       <div class="section-title compact-title">
         <h3>أعلى عائد إيجار</h3>
@@ -1375,6 +1383,100 @@ function renderInsights() {
     </div>
   `;
   setTabCount("tabCountInsights", withYield.length || priced.length);
+}
+
+function renderDemandIndicators(data) {
+  if (!data || !data.tableOk) {
+    return '<div class="empty">لا توجد طلبات شراء/إيجار محلية بعد — تظهر طلبات الفريج («مطلوب للشراء/للإيجار») عند توفرها.</div>';
+  }
+  const totals = data.totals || {};
+  const chips = `
+    <div class="insight-kpis">
+      <div class="kpi-card kpi-demand"><span class="kpi-label">إجمالي الطلبات</span><strong>${totals.total || 0}</strong><small>شراء + إيجار معًا</small></div>
+      <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات شراء</span><strong>${totals.buyRequests || 0}</strong><small>أشخاص يبحثون عن شراء</small></div>
+      <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات إيجار</span><strong>${totals.rentRequests || 0}</strong><small>أشخاص يبحثون عن إيجار</small></div>
+    </div>`;
+  const areas = (data.areas || []).slice(0, 15);
+  const areaTable = areas.length ? `
+    <div style="overflow-x:auto">
+      <table class="minitable">
+        <thead><tr><th>المنطقة</th><th>المحافظة</th><th>طلبات شراء</th><th>طلبات إيجار</th><th>الإجمالي</th></tr></thead>
+        <tbody>${areas.map((a) => `<tr>
+          <td>${escapeHtml(a.area)}</td>
+          <td>${escapeHtml(a.governorate)}</td>
+          <td>${a.buy || 0}</td>
+          <td>${a.rent || 0}</td>
+          <td><b>${a.total || 0}</b></td>
+        </tr>`).join("")}</tbody>
+      </table>
+    </div>` : '<div class="empty">لا توجد مناطق بطلبات بعد.</div>';
+  const govs = data.governorates || [];
+  const govMax = Math.max(...govs.map((g) => g.total || 0), 1);
+  const govRows = govs.slice(0, 8).map((g) => `
+    <div class="gov-row">
+      <span class="gov-name">${escapeHtml(g.governorate)}</span>
+      <div class="gov-bar"><i style="width:${(((g.total || 0) / govMax) * 100).toFixed(1)}%"></i></div>
+      <b class="gov-val">${g.buy || 0} ش / ${g.rent || 0} إج</b>
+    </div>`).join("") || '<div class="empty">لا توجد محافظات بطلبات بعد.</div>';
+  return `${chips}
+    <div class="demand-trend-block">
+      <h4 class="demand-subhead">اتجاه الطلب شهريًا</h4>
+      ${renderDemandTrendSvg(data.series || [])}
+    </div>
+    <div class="demand-cols">
+      <div>
+        <h4 class="demand-subhead">أعلى مناطق طلبًا</h4>
+        ${areaTable}
+      </div>
+      <div>
+        <h4 class="demand-subhead">حسب المحافظة</h4>
+        <div class="gov-list">${govRows}</div>
+      </div>
+    </div>`;
+}
+
+function renderDemandTrendSvg(series) {
+  if (!series.length) return '<div class="empty">الاتجاه يُبنى مع تراكم الأشهر — عدّ بعد التحديث التالي.</div>';
+  const width = 760;
+  const height = 200;
+  const padL = 40;
+  const padR = 12;
+  const padT = 12;
+  const padB = 26;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+  const maxV = Math.max(...series.flatMap((s) => [s.buy, s.rent]), 1);
+  const slot = innerW / series.length;
+  const barW = Math.min(26, slot * 0.32);
+  const yFor = (v) => padT + innerH - (v / maxV) * innerH;
+  const grid = [];
+  for (let t = 0; t <= 4; t++) {
+    const v = Math.round((maxV * t) / 4);
+    const y = yFor(v);
+    grid.push(`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${width - padR}" y2="${y.toFixed(1)}" class="grid-line"/>`);
+    grid.push(`<text x="${padL - 8}" y="${(y + 3).toFixed(1)}" text-anchor="end" class="axis-label">${v}</text>`);
+  }
+  const bars = series.map((s, i) => {
+    const cx = padL + slot * i + slot / 2;
+    const buyH = (s.buy / maxV) * innerH;
+    const rentH = (s.rent / maxV) * innerH;
+    return `
+      <rect x="${(cx - barW - 1.5).toFixed(1)}" y="${yFor(s.buy).toFixed(1)}" width="${barW}" height="${Math.max(buyH, 1).toFixed(1)}" rx="3" fill="#e2c968"><title>${escapeHtml(s.month)} · طلبات شراء: ${s.buy}</title></rect>
+      <rect x="${(cx + 1.5).toFixed(1)}" y="${yFor(s.rent).toFixed(1)}" width="${barW}" height="${Math.max(rentH, 1).toFixed(1)}" rx="3" fill="#2b6cb0"><title>${escapeHtml(s.month)} · طلبات إيجار: ${s.rent}</title></rect>`;
+  }).join("");
+  const labels = series.map((s, i) => `<text x="${(padL + slot * i + slot / 2).toFixed(1)}" y="${height - 6}" text-anchor="middle" class="hist-date">${escapeHtml(s.month.slice(5))}</text>`).join("");
+  return `
+    <div class="trends-block">
+      <div class="hist-chart">
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="اتجاه طلبات الشراء والإيجار عبر الأشهر">
+          ${grid.join("")}${bars}${labels}
+        </svg>
+      </div>
+      <div class="hist-legend">
+        <span class="hist-legend-item"><i style="background:#e2c968"></i>طلبات شراء</span>
+        <span class="hist-legend-item"><i style="background:#2b6cb0"></i>طلبات إيجار</span>
+      </div>
+    </div>`;
 }
 
 function renderInsightsTrendSvg(data) {
@@ -1458,6 +1560,7 @@ async function loadInsights() {
     if (oppState.priceTrends == null) {
       oppState.priceTrends = await getJson("/api/price-trends").catch(() => null);
     }
+    insightsState.demand = await getJson("/api/market-demand").catch(() => null);
     renderInsights();
   } catch (err) {
     console.error(err);

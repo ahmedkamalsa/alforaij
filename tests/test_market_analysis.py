@@ -4,6 +4,7 @@ import unittest
 
 from backend.models import Listing
 from backend.services.market_analysis import (
+    build_demand_indicators,
     build_market_analytics,
     build_market_insights,
     clean_outliers,
@@ -196,6 +197,49 @@ class DemandInAnalyticsTests(unittest.TestCase):
         self.assertEqual(result["totals"]["demand"], {"buyRequests": 1, "rentRequests": 1})
         by_name = {s["source"]: s for s in result["sources"]}
         self.assertEqual(by_name["الفريج"]["count"], 2)
+
+
+class DemandIndicatorsTests(unittest.TestCase):
+    def _rows(self):
+        return [
+            {"area": "المطلاع", "governorate": "محافظة الجهراء", "transaction": "مطلوب للشراء", "fetched_at": "2026-07-20T00:00:00"},
+            {"area": "المطلاع", "governorate": "محافظة الجهراء", "transaction": "مطلوب للشراء", "fetched_at": "2026-08-01T00:00:00"},
+            {"area": "الجهراء القديمة", "governorate": "محافظة الجهراء", "transaction": "مطلوب للإيجار", "fetched_at": "2026-08-05T00:00:00"},
+            {"area": "العيون", "governorate": "محافظة الجهراء", "transaction": "مطلوب للشراء", "fetched_at": "2026-08-02T00:00:00"},
+            {"transaction": "للبيع", "area": "حولي", "governorate": "محافظة حولي", "fetched_at": "2026-08-01T00:00:00"},
+            {"area": "", "transaction": "مطلوب للشراء", "fetched_at": "2026-08-03T00:00:00"},
+        ]
+
+    def test_counts_per_area_and_governorate(self) -> None:
+        result = build_demand_indicators(self._rows())
+        self.assertEqual(result["totals"], {"buyRequests": 4, "rentRequests": 1, "total": 5})
+        by_area = {a["area"]: a for a in result["areas"]}
+        self.assertEqual(by_area["المطلاع"], {"area": "المطلاع", "governorate": "محافظة الجهراء", "buy": 2, "rent": 0, "total": 2})
+        self.assertEqual(by_area["الجهراء القديمة"]["rent"], 1)
+        self.assertIn("غير محددة", by_area)  # منطقة فارغة تُجمَّع تحت «غير محددة»
+        by_gov = {g["governorate"]: g for g in result["governorates"]}
+        self.assertEqual(by_gov["محافظة الجهراء"]["buy"], 3)
+        self.assertEqual(by_gov["محافظة الجهراء"]["rent"], 1)
+
+    def test_areas_sorted_by_total_desc(self) -> None:
+        result = build_demand_indicators(self._rows())
+        totals = [a["total"] for a in result["areas"]]
+        self.assertEqual(totals, sorted(totals, reverse=True))
+        self.assertEqual(result["areas"][0]["area"], "المطلاع")
+
+    def test_monthly_series(self) -> None:
+        result = build_demand_indicators(self._rows())
+        by_month = {s["month"]: s for s in result["series"]}
+        self.assertEqual(by_month["2026-07"], {"month": "2026-07", "buy": 1, "rent": 0})
+        self.assertEqual(by_month["2026-08"]["buy"], 3)
+        self.assertEqual(by_month["2026-08"]["rent"], 1)
+
+    def test_supply_rows_ignored_and_empty_tolerant(self) -> None:
+        result = build_demand_indicators([{"area": "حولي", "transaction": "للبيع", "fetched_at": "2026-08-01T00:00:00"}])
+        self.assertEqual(result["totals"]["total"], 0)
+        self.assertEqual(result["areas"], [])
+        empty = build_demand_indicators([])
+        self.assertEqual(empty["totals"], {"buyRequests": 0, "rentRequests": 0, "total": 0})
 
 
 class LocalRowsConversionTests(unittest.TestCase):

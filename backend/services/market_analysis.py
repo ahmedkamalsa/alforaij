@@ -63,6 +63,62 @@ def _demand_breakdown(rows: list[dict[str, Any]]) -> dict[str, int]:
     return {"buyRequests": buy, "rentRequests": rent}
 
 
+def build_demand_indicators(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """مؤشرات الطلب من سجلات «مطلوب» (شراء/إيجار) — عدّ + اتجاه شهري (نقية).
+
+    - لكل منطقة ومحافظة: عدّ طلبات الشراء والإيجار (من إعلانات الفريج المحلية).
+    - سلسلة شهرية لعدد الطلبات (من fetched_at) لرسم الاتجاه.
+    متسامح: بلا صفوف طلب تعيد عدّادات صفرية بدل كسر المتصل.
+    """
+    by_area: dict[str, dict[str, Any]] = {}
+    by_gov: dict[str, dict[str, Any]] = {}
+    monthly: dict[str, dict[str, int]] = {}
+    for row in rows:
+        transaction = str(row.get("transaction") or "").strip()
+        if not is_demand_transaction(transaction):
+            continue
+        is_buy = is_sale_transaction(transaction)
+        is_rent = is_rent_transaction(transaction)
+        if not (is_buy or is_rent):
+            continue
+        area = str(row.get("area") or "").strip() or "غير محددة"
+        gov = str(row.get("governorate") or "").strip() or "غير محددة"
+        month = str(row.get("fetched_at") or "")[:7]
+
+        area_bucket = by_area.setdefault(area, {"area": area, "governorate": gov, "buy": 0, "rent": 0})
+        gov_bucket = by_gov.setdefault(gov, {"governorate": gov, "buy": 0, "rent": 0})
+        if is_buy:
+            area_bucket["buy"] += 1
+            gov_bucket["buy"] += 1
+        elif is_rent:
+            area_bucket["rent"] += 1
+            gov_bucket["rent"] += 1
+        if len(month) == 7:
+            month_bucket = monthly.setdefault(month, {"month": month, "buy": 0, "rent": 0})
+            if is_buy:
+                month_bucket["buy"] += 1
+            elif is_rent:
+                month_bucket["rent"] += 1
+
+    def _finalize(bucket: dict[str, Any]) -> dict[str, Any]:
+        return {**bucket, "total": int(bucket["buy"]) + int(bucket["rent"])}
+
+    areas = sorted((_finalize(b) for b in by_area.values()), key=lambda a: (-a["total"], a["area"]))
+    governorates = sorted((_finalize(b) for b in by_gov.values()), key=lambda g: (-g["total"], g["governorate"]))
+    series = [monthly[m] for m in sorted(monthly)]
+    totals = {
+        "buyRequests": sum(b["buy"] for b in by_area.values()),
+        "rentRequests": sum(b["rent"] for b in by_area.values()),
+    }
+    totals["total"] = totals["buyRequests"] + totals["rentRequests"]
+    return {
+        "totals": totals,
+        "areas": areas,
+        "governorates": governorates,
+        "series": series,
+    }
+
+
 def median(values: list[float]) -> float | None:
     if not values:
         return None

@@ -603,6 +603,22 @@ def fetch_market_listings(
     return _fetch_rows(endpoint)
 
 
+def fetch_demand_indicators(limit: int = 8000) -> dict[str, Any]:
+    """مؤشرات الطلب: عدّ طلبات الشراء/الإيجار (من الفريج المحلي) لكل منطقة + اتجاه.
+
+    غلاف رفيع فوق build_demand_indicators — متسامح: بلا طلبات يعيد عدّادات
+    صفرية مع tableOk: False حتى تُعرض الواجهة رسالة واضحة.
+    """
+    rows = _analysis_rows(limit, "market_listings")
+    built = market_analysis.build_demand_indicators(rows)
+    return {
+        "tableOk": built["totals"]["total"] > 0,
+        "fetchedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "note": "طلبات الشراء والإيجار من إعلانات «مطلوب» المحلية (الفريج) — ميزانية الطلب ليست سعر عرض، لذا تُعدّ هنا ولا تدخل وسيطات السوق.",
+        **built,
+    }
+
+
 def fetch_market_listing_source_counts(limit: int = 5000) -> list[dict[str, Any]]:
     """عدّاد لكل موقع من market_listings (العمود source فقط — استعلام خفيف).
 

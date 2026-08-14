@@ -763,6 +763,15 @@ class Handler(BaseHTTPRequestHandler):
                 logger.exception("Market insights failed")
                 json_response(self, {"error": "Market insights failed", "detail": str(exc)}, status=500)
             return
+        if path == "/api/market-demand":
+            # مؤشرات الطلب: عدّ طلبات الشراء/الإيجار لكل منطقة ومحافظة + اتجاه شهري
+            from backend.services.supabase_store import fetch_demand_indicators
+            try:
+                json_response(self, _ttl_cached("market-demand", 300, fetch_demand_indicators))
+            except Exception as exc:
+                logger.exception("Market demand failed")
+                json_response(self, {"error": "Market demand failed", "detail": str(exc)}, status=500)
+            return
         if path == "/api/dashboard/summary":
             params = parse_qs(urlparse(self.path).query)
             selected = {
