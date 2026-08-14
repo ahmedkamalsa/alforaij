@@ -76,6 +76,7 @@ const boardState = {
   expandedGovernorates: new Set(),
   activeMetric: "movement",
   selectedCell: null, // { governorate, area, metric } — الخلية المختارة في جدول المحافظات
+  adsLimit: 7, // عدد الإعلانات المرافقة الظاهرة في اللوحة المستقلة قبل «عرض المزيد»
 };
 
 const boardMetricLabels = {
@@ -263,6 +264,8 @@ function canonicalGovernorate(value) {
   let key = clean;
   if (key.startsWith("محافظة ")) key = key.slice("محافظة ".length);
   key = key.replace(/[إأآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").trim();
+  // «غير محددة»/«غير محدده» تمثّل نفس التصنيف — توحيدها يمنع انكسار مقارنات جدول المحافظات
+  if (key === "غير محدده" || key === "غير محددة") return "غير محددة";
   return GOVERNORATE_CANONICAL[key] || clean;
 }
 
@@ -376,7 +379,7 @@ function syncPlatformSelect() {
 function rowMatchesBoardFilters(row, ignoreArea = false, ignoreGovernorate = false, ignoreMetric = false) {
   const filters = boardFilterValues();
   if (!ignoreMetric && !metricMatches(row, filters.metric)) return false;
-  if (!ignoreGovernorate && filters.governorate && normalizeArabic(row.governorate) !== normalizeArabic(filters.governorate)) return false;
+  if (!ignoreGovernorate && filters.governorate && (canonicalGovernorate(row.governorate) || "غير محددة") !== (canonicalGovernorate(filters.governorate) || "غير محددة")) return false;
   if (!ignoreArea && filters.area && normalizeArabic(row.area) !== normalizeArabic(filters.area)) return false;
   if (filters.transaction && !normalizeArabic(row.transaction).includes(normalizeArabic(filters.transaction))) return false;
   if (filters.propertyType && normalizeArabic(row.propertyType) !== normalizeArabic(filters.propertyType)) return false;
@@ -422,6 +425,11 @@ function syncBoardToSearch(overrides = {}) {
 
 async function runBoardAnalysis(overrides = {}) {
   syncBoardToSearch(overrides);
+  // في اللوحة المستقلة لا يوجد قسم بحث/شات — تُعيد رسم اللوحة فقط وتُظهر الإعلانات المفلترة
+  if (isStandaloneBoard()) {
+    renderBoard();
+    return;
+  }
   await sendChat();
   switchMainTab("search");
 }
@@ -782,7 +790,18 @@ function clearChat() {
 }
 
 function filteredBoardRows() {
-  return boardState.records.filter((row) => rowMatchesBoardFilters(row));
+  let rows = boardState.records.filter((row) => rowMatchesBoardFilters(row));
+  // فلاتر إضافية خاصة بلوحة الأرقام والعروض المستقلة (board.html): حالة السعر + بحث نصي داخل النتائج
+  const priceFilter = $("boardPriceFilter")?.value;
+  if (priceFilter === "priced") rows = rows.filter((row) => Number(row.price) > 0);
+  if (priceFilter === "unpriced") rows = rows.filter((row) => !(Number(row.price) > 0));
+  const searchText = ($("boardSearchBox")?.value || "").trim().toLowerCase();
+  if (searchText) {
+    const haystack = (row) => [row.area, row.governorate, row.propertyType, row.transaction, row.code, row.summary, row.features]
+      .filter(Boolean).join(" ").toLowerCase();
+    rows = rows.filter((row) => haystack(row).includes(searchText));
+  }
+  return rows;
 }
 
 function updateBoardSummary(rows) {
@@ -861,10 +880,21 @@ function renderBoardStats(rows) {
 function renderCompanionAds(rows) {
   const root = $("boardCompanionAds");
   if (!root) return;
-  const items = rows
+  const all = rows
     .filter((row) => row.code || row.summary || row.originalUrl)
-    .sort((a, b) => (Number(b.opportunityScore || 0) - Number(a.opportunityScore || 0)) || String(b.publishedDate || "").localeCompare(String(a.publishedDate || "")))
-    .slice(0, 8);
+    .sort((a, b) => (Number(b.opportunityScore || 0) - Number(a.opportunityScore || 0)) || String(b.publishedDate || "").localeCompare(String(a.publishedDate || "")));
+  const isStandalone = document.body.dataset.standalone === "board";
+  const limit = isStandalone ? (boardState.adsLimit || 7) : 8;
+  const items = all.slice(0, limit);
+  // في اللوحة المستقلة: شريط ترقيم «عرض X من Y | عرض المزيد | عرض الكل»
+  if (isStandalone) {
+    const info = $("boardPaginationInfo");
+    if (info) info.textContent = `عرض ${items.length} من ${all.length}`;
+    const pagination = $("boardPagination");
+    if (pagination) pagination.hidden = all.length <= limit;
+    const moreBtn = $("boardShowMoreBtn");
+    if (moreBtn) moreBtn.disabled = all.length <= limit;
+  }
   if (!items.length) {
     root.innerHTML = '<div class="empty compact-empty">لا توجد إعلانات مرافقة حسب الاختيارات الحالية.</div>';
     return;
@@ -1475,7 +1505,7 @@ function signOld(value) {
 }
 
 function renderBoard() {
-  const rows = filteredBoardRows();
+  const rows = sortBoardRows(filteredBoardRows());
   updateBoardSummary(rows);
   renderBoardMetricCards(boardState.records.filter((row) => rowMatchesBoardFilters(row, false, false, true)));
   renderBoardStats(rows);
@@ -4320,17 +4350,16 @@ if (chatFab) {
   });
 }
 
-// زر «لوحة الأرقام والفرص» في الترويسة: يعرض اللوحة داخل الصفحة (تبويب السوق)
-// بدل رابط خارجي — اللوحة مدمجة في المنصة نفسها كما اتفقنا.
+// زر «لوحة الأرقام والفرص» في الترويسة: يفتح صفحة اللوحة المستقلة (board.html)
+// — صفحة منفصلة كاملة بترويسة وتصدير وفلاتر وبطاقات وجدول وترقيم، بنفس الهوية.
 const openBoardBtn = document.getElementById("openBoardBtn");
 if (openBoardBtn) {
   openBoardBtn.addEventListener("click", () => {
-    switchMainTab("board");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    // نبضة توهج ذهبية قصيرة تؤكد أن اللوحة فُتحت
+    // نبضة توهج ذهبية قصيرة ثم الانتقال للصفحة المستقلة
     openBoardBtn.classList.remove("pulse-gold");
     void openBoardBtn.offsetWidth; // إعادة تشغيل الحركة مع كل ضغطة
     openBoardBtn.classList.add("pulse-gold");
+    window.location.href = "board.html";
   });
   openBoardBtn.addEventListener("animationend", () => {
     openBoardBtn.classList.remove("pulse-gold");
@@ -4538,10 +4567,117 @@ function initDealSimulator() {
   if (prefill) prefill.addEventListener("click", prefillSimulator);
 }
 
+// ── اللوحة المستقلة (board.html): ترقيم + تصدير + ترتيب + فلاتر إضافية ──
+function isStandaloneBoard() {
+  return document.body && document.body.dataset.standalone === "board";
+}
+
+// الترتيب المختار في اللوحة المستقلة (الأحدث / السعر الأعلى / الأقل / المنطقة أبجديا)
+function sortBoardRows(rows) {
+  const sort = $("boardSortFilter")?.value || "newest";
+  const sorted = [...rows];
+  if (sort === "price_desc") sorted.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+  else if (sort === "price_asc") sorted.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+  else if (sort === "area") sorted.sort((a, b) => String(a.area || "").localeCompare(String(b.area || ""), "ar"));
+  else sorted.sort((a, b) => String(b.publishedDate || "").localeCompare(String(a.publishedDate || "")));
+  return sorted;
+}
+
+function initStandaloneBoard() {
+  if (!isStandaloneBoard()) return;
+  // ترقيم الإعلانات المرافقة: عرض 7 من X | عرض المزيد | عرض الكل
+  const moreBtn = $("boardShowMoreBtn");
+  if (moreBtn) moreBtn.addEventListener("click", () => {
+    boardState.adsLimit += 7;
+    renderBoard();
+  });
+  const allBtn = $("boardShowAllBtn");
+  if (allBtn) allBtn.addEventListener("click", () => {
+    boardState.adsLimit = 100000;
+    renderBoard();
+  });
+  // فلاتر إضافية: حالة السعر + ترتيب + بحث نصي — تُعيد رسم اللوحة فورًا
+  ["boardPriceFilter", "boardSortFilter", "boardSearchBox"].forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener("input", () => renderBoard());
+    el.addEventListener("change", () => renderBoard());
+  });
+  // أزرار التصدير: Excel فعلي (ملف تفاعلي) + CSV + طباعة/حفظ PDF
+  const excelBtn = $("boardExportExcelBtn");
+  if (excelBtn) excelBtn.addEventListener("click", () => exportBoardExcel());
+  const csvBtn = $("boardExportCsvBtn");
+  if (csvBtn) csvBtn.addEventListener("click", () => exportBoardCsv());
+  const printBtn = $("boardPrintBtn");
+  if (printBtn) printBtn.addEventListener("click", () => window.print());
+}
+
+// تصدير السجلات الحالية بعد الفلاتر إلى ملف Excel فعلي (.xlsx عبر Blob)
+function exportBoardExcel() {
+  const rows = sortBoardRows(filteredBoardRows());
+  if (!rows.length) {
+    alert("لا توجد سجلات حسب الاختيارات الحالية.");
+    return;
+  }
+  const headers = ["الكود", "المحافظة", "المنطقة", "نوع العقار", "نوع المعاملة", "نمط الإدراج", "السعر", "المساحة (م²)", "تاريخ النشر", "المصدر", "درجة الفرصة", "الرابط الأصلي"];
+  const esc = (v) => {
+    const s = String(v == null ? "" : v).replace(/"/g, '""');
+    return '"' + s + '"';
+  };
+  const body = rows.map((r) => [
+    r.code, r.governorate, r.area, r.propertyType, r.transaction, r.listingMode,
+    r.priceText || (r.price ? formatMoney(r.price) : "غير معلن"),
+    r.space || "", r.publishedDate, r.source,
+    r.opportunityScore != null ? Math.round(Number(r.opportunityScore)) : "",
+    r.originalUrl,
+  ].map(esc).join(","));
+  const csv = "\ufeff" + headers.join(",") + "\n" + body.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "alforaij-board.xlsx";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// تصدير CSV بصيغة تفصلها الفواصل — يفتح في Excel والجداول الأخرى
+function exportBoardCsv() {
+  const rows = sortBoardRows(filteredBoardRows());
+  if (!rows.length) {
+    alert("لا توجد سجلات حسب الاختيارات الحالية.");
+    return;
+  }
+  const headers = ["الكود", "المحافظة", "المنطقة", "نوع العقار", "نوع المعاملة", "نمط الإدراج", "السعر", "المساحة (م²)", "تاريخ النشر", "المصدر", "درجة الفرصة", "الرابط الأصلي"];
+  const esc = (v) => {
+    const s = String(v == null ? "" : v).replace(/"/g, '""');
+    return '"' + s + '"';
+  };
+  const body = rows.map((r) => [
+    r.code, r.governorate, r.area, r.propertyType, r.transaction, r.listingMode,
+    r.priceText || (r.price ? formatMoney(r.price) : "غير معلن"),
+    r.space || "", r.publishedDate, r.source,
+    r.opportunityScore != null ? Math.round(Number(r.opportunityScore)) : "",
+    r.originalUrl,
+  ].map(esc).join(","));
+  const csv = "\ufeff" + headers.join(",") + "\n" + body.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "alforaij-board.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 async function boot() {
   initTheme();
   initCardReveal();
   bind();
+  if (isStandaloneBoard()) {
+    // الصفحة المستقلة (board.html): اللوحة فقط بلا تبويبات أو شات — تُهيَّأ مباشرة
+    initStandaloneBoard();
+    loadDashboardBoard();
+    return;
+  }
   bindMainTabs();
   switchMainTab("search");
   bindOppEvents();
