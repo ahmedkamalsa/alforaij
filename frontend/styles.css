@@ -272,23 +272,6 @@
   font: inherit;
 }
 
-.board-link {
-  cursor: pointer;
-  background: transparent;
-  font: inherit;
-}
-
-/* نبضة تأكيد ذهبية عند فتح اللوحة: حلقة ذهبية تتوسع وتخفت بسرعة */
-.board-link.pulse-gold {
-  animation: board-pulse .9s ease-out;
-}
-
-@keyframes board-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(226, 201, 104, .75); }
-  70%  { box-shadow: 0 0 0 12px rgba(226, 201, 104, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(226, 201, 104, 0); }
-}
-
 [data-theme="light"] .hero-link {
   color: var(--ink);
   border-color: rgba(30, 58, 138, .3);
@@ -675,7 +658,6 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .hero-brand-link { animation: none; }
   .hero-brand-link::after { animation: none; opacity: 0; }
-  .board-link.pulse-gold { animation: none; }
 }
 
 /* تكيّف الشارة مع شاشات الجوال الصغيرة: إخفاء السطر الإنجليزي وتصغير الاسم والميدالية */
@@ -965,76 +947,6 @@ textarea {
   margin-top: 12px;
 }
 
-/* ترقيم نتائج اللوحة المستقلة (board.html): «عرض 7 من 605» + عرض المزيد/الكل */
-.board-pagination {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, .05);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  font-size: 13.5px;
-  font-weight: 800;
-  color: var(--muted);
-}
-
-.board-pagination-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.board-pagination-actions button {
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, .08);
-  color: var(--ink);
-}
-
-.board-pagination-actions button:hover {
-  border-color: var(--amber);
-  color: var(--amber);
-}
-
-/* شريط تصدير اللوحة المستقلة — هوية زرقاء/ذهبية موحدة مع بقية المنصة */
-.standalone-export-bar .action-buttons button {
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, .08);
-  color: var(--ink);
-}
-
-.standalone-export-bar .action-buttons button:hover {
-  border-color: var(--amber);
-  color: var(--amber);
-}
-
-.standalone-export-bar .action-buttons button.primary {
-  background: var(--blue-deep);
-  border-color: var(--blue-deep);
-  color: #fff;
-}
-
-.standalone-export-bar .action-buttons button.primary:hover {
-  color: #fff;
-  border-color: var(--amber);
-  box-shadow: 0 0 0 3px rgba(226, 201, 104, .22);
-}
-
-/* زر «العودة للمنصة» في ترويسة اللوحة المستقلة */
-.back-main-link {
-  border-color: rgba(226, 201, 104, .55) !important;
-  color: var(--amber) !important;
-}
-
-.back-main-link:hover {
-  background: var(--amber) !important;
-  border-color: var(--amber) !important;
-  color: #0F172A !important;
-}
-
 .board-platform-field {
   /* يمتد عبر كل الأعمدة بغض النظر عن عددها — «span 2» كان يخلق عمودًا ضمنيًا
      ثانيًا على الجوال (عندما تصبح الشبكة عمودًا واحدًا) فيتفجر عرض اللوحة */
@@ -1169,7 +1081,6 @@ textarea {
 .board-stat:focus-visible {
   border-color: var(--blue);
   background: rgba(56, 120, 255, .08);
-  outline: none;
   transform: translateY(-1px);
 }
 
@@ -2788,7 +2699,6 @@ button:hover {
   background: var(--blue-deep);
   color: #fff;
   border-color: var(--blue-deep);
-  outline: none;
 }
 
 /* تلميح «ثقة المصدر» عند التمرير على شريحة المصدر */
@@ -5646,7 +5556,6 @@ body.drill-open {
   border-color: var(--accent);
   background: rgba(255, 255, 255, .08);
   transform: translateY(-2px);
-  outline: none;
 }
 
 .development-card-top {
