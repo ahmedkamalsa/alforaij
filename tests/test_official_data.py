@@ -259,6 +259,63 @@ class OfficialDataTests(unittest.TestCase):
         self.assertNotEqual(short_id, "bu3qar")
         self.assertNotEqual(short_id, "official_transactions")
 
+    def test_source_id_matches_live_connector_names(self) -> None:
+        """أسماء الموصلات الحية تُسجَّل بمعرفات سجل صحيحة — لا كسر للمفتاح الأجنبي.
+
+        الانحدار: كانت 4 أسماء حية (PropertyFinder/Bayut/Bu3qar/الحسبة) تسقط
+        لمعرفات غير موجودة في source_registry فيفشل قيد FK ويوقف حفظ الدفعة كاملة
+        (كل بحث = «فشل الحفظ»).
+        """
+        from backend.services.source_registry import SOURCE_REGISTRY
+        from backend.services.supabase_store import _source_id_for
+
+        registry_ids = {str(e["id"]) for e in SOURCE_REGISTRY}
+        live_names = [
+            "الفريج", "OpenSooq", "Mourjan", "Q8Aqar", "Sakan", "Waseet",
+            "NabdAqar", "Bu3qar / بوشملان", "Aqarat", "4Sale", "Yebtah",
+            "PropertyFinder", "Aqarmap", "Bayut", "الحسبة - صفقات عامة",
+            "السوق المباشر", "مؤشرات رسمية", "الصفقات الرسمية",
+        ]
+        for name in live_names:
+            with self.subTest(name=name):
+                self.assertIn(_source_id_for(name), registry_ids)
+
+    def test_source_id_unregistered_remotely_buckets_safely(self) -> None:
+        """المصدر غير المسجل في الجدول الحي يُسقط لسلة آمنة لا تكسر قيد FK.
+
+        الانحدار: PropertyFinder/Bayut/Aqarmap تُطابق معرفات محلية
+        (propertyfinder_kw/bayut_kw/aqarmap_kw) غير موجودة في جدول
+        source_registry الحي في Supabase (الجدول يتخلف عن الملف المحلي حتى
+        تُشغَّل مزامنة السجل). إرسالها إلى source_runs يفشل القيد الأجنبي
+        (HTTP 409) فيتوقف حفظ الدفعة كاملة — كل بحث = «فشل الحفظ».
+        التحقق من الجدول الحي يبقي الدفعة صالحة ويحفظ السجلات في سلة
+        other_marketplaces المعروفة.
+        """
+        from unittest import mock
+
+        from backend.services import supabase_store
+        from backend.services.source_registry import SOURCE_REGISTRY
+
+        # جدول حي "تخلف": كل المعرفات المحلية عدا الثلاثة غير المسجلة
+        remote_ids = {
+            str(e["id"]) for e in SOURCE_REGISTRY if e["id"] not in {"propertyfinder_kw", "bayut_kw", "aqarmap_kw"}
+        }
+        with mock.patch.object(supabase_store, "_remote_registry_ids", return_value=remote_ids):
+            self.assertEqual(supabase_store._source_id_for("PropertyFinder"), "other_marketplaces")
+            self.assertEqual(supabase_store._source_id_for("Bayut"), "other_marketplaces")
+            self.assertEqual(supabase_store._source_id_for("Aqarmap"), "other_marketplaces")
+            # المصدر المسجل يبقى على معرفه الصحيح
+            self.assertEqual(supabase_store._source_id_for("Mourjan"), "mourjan_kw")
+            self.assertEqual(supabase_store._source_id_for("Bu3qar / بوشملان"), "bu3qar")
+
+    def test_source_id_unknown_falls_back_to_registry_entry(self) -> None:
+        """مصدر غير معروف لا يُرسل معرفًا خارج السجل — يسقط لسلة توسعة معروفة."""
+        from backend.services.source_registry import SOURCE_REGISTRY
+        from backend.services.supabase_store import _source_id_for
+
+        registry_ids = {str(e["id"]) for e in SOURCE_REGISTRY}
+        self.assertIn(_source_id_for("منصة مستقبلية غير موجودة بعد"), registry_ids)
+
     def test_number_sources_does_not_crash_with_official_transactions_kind(self) -> None:
         """انحدار ثانٍ: kind=official_transactions بلا وسيط إعلانات (market_median=None)."""
         from backend.models import Listing
