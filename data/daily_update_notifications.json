@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-14T06:03:10",
+  "generatedAt": "2026-08-14T07:37:42",
   "hasPrevious": true,
   "counts": {
-    "added": 14,
-    "removed": 13,
+    "added": 6,
+    "removed": 7,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -20,18 +20,46 @@
     "priceDrops": [],
     "added": [
       {
-        "code": "AF-142",
-        "area": "المطلاع",
+        "code": "OS-285566114",
+        "area": "الجهراء",
         "propertyType": "عقارات",
-        "price": 260000.0,
-        "priceText": "260 ألف د.ك",
+        "price": 20000.0,
+        "priceText": "20,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة (أقل من السوق بوضوح)",
-        "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/142",
+        "valuationLabel": "لقطة ممتازة",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/285566114",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       },
+      {
+        "code": "OS-284691916",
+        "area": "القبلة",
+        "propertyType": "بيت",
+        "price": 360.0,
+        "priceText": "360 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "إيجار ممتاز",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/284691916",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
+        "code": "OS-285431740",
+        "area": "",
+        "propertyType": "عقارات",
+        "price": 100000.0,
+        "priceText": "100,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/285431740",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      }
+    ],
+    "removed": [
       {
         "code": "BU3-6196",
         "area": "العدان",
@@ -43,7 +71,7 @@
         "valuationLabel": "لقطة ممتازة",
         "source": "بوعقار / بوشملان (Bu3qar)",
         "url": "https://www.bu3qar.com/product-details/6196/%D9%82%D8%B3%D9%8A%D9%85%D9%87-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%89-%D8%A7%D9%84%D8%B9%D8%AF%D8%A7%D9%86-%D9%85%D9%82%D8%A7%D8%A8%D9%84-%D8%AC%D8%B2%D9%8A%D8%B1%D9%87",
-        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       },
       {
         "code": "MJ-30046320",
@@ -56,47 +84,19 @@
         "valuationLabel": "لقطة ممتازة",
         "source": "Mourjan",
         "url": "https://www.mourjan.com/kw/kuwait/villas-and-houses/for-sale/30046320/",
-        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
-      }
-    ],
-    "removed": [
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
       {
-        "code": "MJ-30040938",
+        "code": "OS-283608688",
         "area": "حولي",
-        "propertyType": "عمارة",
-        "price": 300000.0,
-        "priceText": "300,000 د.ك",
+        "propertyType": "بيت",
+        "price": 250.0,
+        "priceText": "250 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "Mourjan",
-        "url": "https://www.mourjan.com/kw/kuwait/buildings/for-sale/30040938/",
-        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
-      },
-      {
-        "code": "MJ-30040542",
-        "area": "الأندلس",
-        "propertyType": "أرض",
-        "price": 275000.0,
-        "priceText": "275,000 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "Mourjan",
-        "url": "https://www.mourjan.com/kw/kuwait/lands/for-sale/30040542/",
-        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
-      },
-      {
-        "code": "MJ-30039033",
-        "area": "اليرموك",
-        "propertyType": "أرض",
-        "price": 150000.0,
-        "priceText": "150,000 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "Mourjan",
-        "url": "https://www.mourjan.com/kw/kuwait/lands/for-sale/30039033/",
+        "valuationLabel": "إيجار ممتاز",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/283608688",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       }
     ]

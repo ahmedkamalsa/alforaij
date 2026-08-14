@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-14T06:01:26",
+  "generatedAt": "2026-08-14T07:36:32",
   "count": 8,
   "status": "success",
   "note": "جمع 8 تطورًا، 3/11 مصادر عقارية، 0/5 منصات مرشحة متاحة",
@@ -174,7 +174,7 @@
       "url": "https://www.propertyfinder.kw/",
       "role": "منصة عقارية كويتية",
       "status": "غير متاحة",
-      "note": "<urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+      "note": "<urlopen error [Errno 111] Connection refused>"
     },
     {
       "id": "aqarmap_kw",
@@ -182,7 +182,7 @@
       "url": "https://kuwait.aqarmap.com/",
       "role": "بوابة بحث عقاري",
       "status": "غير متاحة",
-      "note": "<urlopen error [Errno 11001] getaddrinfo failed>"
+      "note": "<urlopen error [Errno -2] Name or service not known>"
     },
     {
       "id": "bayut_kw",
@@ -190,7 +190,7 @@
       "url": "https://www.bayut.kw/",
       "role": "بوابة إعلانات عقارية",
       "status": "غير متاحة",
-      "note": "<urlopen error [Errno 11001] getaddrinfo failed>"
+      "note": "<urlopen error [Errno -2] Name or service not known>"
     },
     {
       "id": "realestate_kw_guides",
@@ -206,7 +206,7 @@
       "url": "https://kuwaitfinder.paci.gov.kw/",
       "role": "مصدر مكاني رسمي",
       "status": "غير متاحة",
-      "note": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1028)>"
+      "note": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1032)>"
     }
   ]
 }

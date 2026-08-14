@@ -1,8 +1,8 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-14T06:00:02",
-  "finishedAt": "2026-08-14T06:03:10",
+  "startedAt": "2026-08-14T07:35:36",
+  "finishedAt": "2026-08-14T07:37:42",
   "steps": [
     {
       "name": "sync_source_registry",
@@ -16,7 +16,7 @@
       "status": "ok",
       "result": {
         "count": 6,
-        "reachable": 3
+        "reachable": 2
       }
     },
     {
@@ -39,7 +39,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 410,
+        "totalScored": 409,
         "includeExternal": true
       }
     },
@@ -48,7 +48,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 494,
+        "count": 470,
         "error": ""
       }
     },
@@ -57,7 +57,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 247,
+        "count": 242,
         "error": ""
       }
     },
@@ -76,8 +76,8 @@
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 14,
-        "removed": 13,
+        "added": 6,
+        "removed": 7,
         "priceDrops": 0
       }
     },
@@ -96,11 +96,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "marketListingsHarvested": 494,
-    "opportunitiesScored": 410,
+    "marketListingsHarvested": 470,
+    "opportunitiesScored": 409,
     "notificationCounts": {
-      "added": 14,
-      "removed": 13,
+      "added": 6,
+      "removed": 7,
       "priceDrops": 0
     },
     "whatsappAlerts": {
@@ -111,7 +111,7 @@
     },
     "officialReferenceSources": {
       "count": 6,
-      "reachable": 3,
+      "reachable": 2,
       "sources": [
         {
           "id": "nbk_housing_loan",
@@ -128,15 +128,6 @@
           "url": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports.html",
           "role": "مؤشرات سوقية مرجعية عند غياب صفقات كافية.",
           "dataUse": "market_indicators",
-          "status": "reachable",
-          "detail": ""
-        },
-        {
-          "id": "moj_sale_deals",
-          "name": "وزارة العدل - صفقات التسجيل العقاري",
-          "url": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx",
-          "role": "مصدر الصفقات الرسمية عند توفر ملف/جدول قابل للاستيراد.",
-          "dataUse": "official_transactions",
           "status": "reachable",
           "detail": ""
         },
@@ -166,6 +157,15 @@
           "dataUse": "legal_verification",
           "status": "unreachable",
           "detail": "HTTP Error 403: Forbidden"
+        },
+        {
+          "id": "moj_sale_deals",
+          "name": "وزارة العدل - صفقات التسجيل العقاري",
+          "url": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx",
+          "role": "مصدر الصفقات الرسمية عند توفر ملف/جدول قابل للاستيراد.",
+          "dataUse": "official_transactions",
+          "status": "unreachable",
+          "detail": "The read operation timed out"
         }
       ],
       "note": "هذه مصادر مرجعية مجانية. لا تدخل أرقامها في التقييم إلا عند استخراج بيانات منظمة أو إدخال CSV/JSON موثق."
@@ -183,13 +183,13 @@
         "market_listings": {
           "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
           "available": true,
-          "count": 1086,
+          "count": 1130,
           "status": "ok"
         },
         "price_trends": {
           "label": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
           "available": true,
-          "count": 310,
+          "count": 313,
           "status": "ok"
         },
         "market_ads": {
@@ -243,7 +243,7 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 374,
+          "count": 376,
           "status": "ok"
         },
         "search_history": {
