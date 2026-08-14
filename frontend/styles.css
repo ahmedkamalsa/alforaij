@@ -5202,7 +5202,10 @@ body.drill-open {
 
 /* شارة المصدر القابلة للنقر: تفتح كل إعلانات المصدر داخل اللوحة */
 .source-badge {
+  display: inline-flex;
+  align-items: center;
   padding: 3px 9px;
+  min-height: 44px;
   border-radius: 999px;
   border: 1px solid rgba(147, 197, 253, .4);
   background: var(--blue-soft);
@@ -5244,8 +5247,12 @@ body.drill-open {
   flex-shrink: 0;
 }
 
+.gov-title-row {
+  flex-wrap: wrap;
+}
+
 .board-mini-btn {
-  min-height: 34px;
+  min-height: 44px;
   padding: 0 12px;
   border-radius: 8px;
   border: 1px solid var(--glass-border);
