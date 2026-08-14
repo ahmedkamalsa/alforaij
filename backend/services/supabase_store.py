@@ -13,6 +13,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from backend.config import SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL
+from backend.connectors.alforaij import load_listings
 from backend.models import Listing, PropertyRequest
 from backend.services import market_analysis
 from backend.services.source_registry import resolve_source_id
@@ -625,35 +626,46 @@ def fetch_market_listing_source_counts(limit: int = 5000) -> list[dict[str, Any]
     ]
 
 
-def fetch_market_analytics(limit: int = 5000) -> dict[str, Any]:
-    """تحليلات الحصاد المتراكم من market_listings لكل موقع على حدة.
+def _analysis_rows(limit: int, table: str) -> list[dict[str, Any]]:
+    """صفوف التحليل = حصاد القاعدة (إن توفرت) + الفريج المحلي — عرضًا وطلبًا.
 
-    غلاف رفيع: يتحقق من توفر الجدول ويجلب الصفوف، ثم يفوض التجميع للوحدة
-    النقية market_analysis.build_market_analytics (تُختبر بقوائم عادية).
-    متسامح تمامًا: غياب الجدول أو تعذر القراءة يعيد حالة واضحة بدل كسر الطلب.
+    الفريج المحلي (لوحة الإعلانات المحلية) يحمل طلبات الشراء والإيجار التي لا
+    توجد في حصاد المواقع الخارجية؛ دمجهما في لقطة واحدة يجعل التحليل يرى كامل
+    السوق. متسامح: فشل أي من المصدرين لا يمنع الآخر.
     """
-    if not market_listings_table_available():
-        return {
-            "tableOk": False,
-            "note": "جدول market_listings غير موجود بعد — شغّل migration 010 ثم الوكيل اليومي.",
-            "totals": {"rows": 0, "sources": 0, "areas": 0, "governorates": 0, "transactions": 0, "propertyTypes": 0},
-            "sources": [],
-            "areas": [],
-        }
-    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_listings?select=*&order=fetched_at.desc&limit={int(limit)}")
+    rows: list[dict[str, Any]] = []
+    if market_listings_table_available():
+        endpoint = f"{SUPABASE_URL}/rest/v1/{table}?select=*&order=fetched_at.desc&limit={int(limit)}"
+        rows = _fetch_rows(endpoint) or []
+    try:
+        rows.extend(market_analysis.local_listings_to_rows(load_listings()))
+    except Exception as exc:
+        logger.warning("Market analysis local rows failed: %s", exc)
+    return rows
+
+
+def fetch_market_analytics(limit: int = 5000) -> dict[str, Any]:
+    """تحليلات الحصاد المتراكم من market_listings + الفريج المحلي لكل موقع.
+
+    غلاف رفيع: يجلب الصفوف من القاعدة والفريج المحلي، ثم يفوض التجميع للوحدة
+    النقية market_analysis.build_market_analytics (تُختبر بقوائم عادية).
+    متسامح تمامًا: غياب كلا المصدرين يعيد حالة واضحة بدل كسر الطلب.
+    """
+    empty = {
+        "tableOk": False,
+        "note": "لا توجد بيانات بعد — شغّل الوكيل اليومي (حصاد المواقع) أو انتظر لوحة الفريج المحلية.",
+        "totals": {"rows": 0, "sources": 0, "areas": 0, "governorates": 0, "transactions": 0, "propertyTypes": 0, "demand": {"buyRequests": 0, "rentRequests": 0}},
+        "sources": [],
+        "areas": [],
+    }
+    rows = _analysis_rows(limit, "market_listings")
     if not rows:
-        return {
-            "tableOk": True,
-            "note": "الجدول جاهز ولا توجد صفوف بعد — شغّل الوكيل اليومي (حصاد المواقع) لبدء التراكم.",
-            "totals": {"rows": 0, "sources": 0, "areas": 0, "governorates": 0, "transactions": 0, "propertyTypes": 0},
-            "sources": [],
-            "areas": [],
-        }
+        return empty
     built = market_analysis.build_market_analytics(rows)
     return {
         "tableOk": True,
         "fetchedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "note": "تحليلات الحصاد المتراكم من market_listings — كل إعلان يحمل original_url وfetched_at كدليل قابل للفتح.",
+        "note": "تحليلات الحصاد المتراكم من market_listings + الفريج المحلي (عرضًا وطلبًا) — كل إعلان يحمل original_url كدليل قابل للفتح.",
         **built,
     }
 
@@ -661,27 +673,25 @@ def fetch_market_analytics(limit: int = 5000) -> dict[str, Any]:
 def fetch_market_insights(limit: int = 8000) -> dict[str, Any]:
     """تحليلات السوق الموجة 1: عائد الإيجار واتجاه سعر المتر لكل منطقة.
 
-    غلاف رفيع: يتحقق من توفر الجدول ويجلب الصفوف، ثم يفوض التجميع للوحدة
+    غلاف رفيع: يجلب الصفوف من القاعدة والفريج المحلي، ثم يفوض التجميع للوحدة
     النقية market_analysis.build_market_insights (تُختبر بقوائم عادية).
-    متسامح تمامًا: غياب الجدول أو فشل القراءة يعيد حالة واضحة بدل كسر الطلب.
+    متسامح تمامًا: غياب كلا المصدرين يعيد حالة واضحة بدل كسر الطلب.
     """
     empty = {
         "tableOk": False,
-        "note": "جدول market_listings غير متاح — شغّل migration 010 ثم الوكيل اليومي.",
+        "note": "لا توجد بيانات بعد — شغّل الوكيل اليومي (حصاد المواقع) أو انتظر لوحة الفريج المحلية.",
         "areas": [],
         "series": [],
         "governorates": [],
     }
-    if not market_listings_table_available():
-        return empty
-    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_listings?select=*&order=fetched_at.desc&limit={int(limit)}")
+    rows = _analysis_rows(limit, "market_listings")
     if not rows:
-        return {**empty, "tableOk": True, "note": "لا توجد صفوف بعد — شغّل الوكيل اليومي."}
+        return empty
     built = market_analysis.build_market_insights(rows)
     return {
         "tableOk": True,
         "fetchedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "note": "عائد الإيجار = (وسيط الإيجار × 12) ÷ وسيط سعر البيع من إعلانات الحصاد المتراكم (بيع وإيجار معًا) بعد استبعاد القيم الشاذة (3×IQR).",
+        "note": "عائد الإيجار = (وسيط الإيجار × 12) ÷ وسيط سعر البيع من الحصاد المتراكم + الفريج المحلي (عرضًا وطلبًا) بعد استبعاد القيم الشاذة (3×IQR).",
         **built,
     }
 

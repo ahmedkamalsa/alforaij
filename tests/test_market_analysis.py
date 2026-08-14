@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import unittest
 
+from backend.models import Listing
 from backend.services.market_analysis import (
     build_market_analytics,
     build_market_insights,
     clean_outliers,
+    is_demand_transaction,
+    is_rent_transaction,
+    is_sale_transaction,
+    local_listing_to_row,
+    local_listings_to_rows,
     median,
 )
 
@@ -101,7 +107,7 @@ class MarketInsightsTests(unittest.TestCase):
         self.assertEqual(hawally["governorate"], "حولي")  # مستنتجة من خريطة المحلل
         self.assertIsNone(areas["الفروانية"]["rentalYield"])
         self.assertIsNone(areas["المنقف"]["rentalYield"])  # إيجار واحد → حارس الموثوقية
-        self.assertEqual(result["sampleTotals"], {"sale": 7, "rent": 3})
+        self.assertEqual(result["sampleTotals"], {"sale": 7, "rent": 3, "buyRequests": 0, "rentRequests": 0})
         self.assertEqual(len(areas), 3)
 
     def test_series_needs_two_months(self) -> None:
@@ -125,6 +131,113 @@ class MarketInsightsTests(unittest.TestCase):
         self.assertEqual(result["areas"], [])
         self.assertEqual(result["series"], [])
         self.assertEqual(result["sources"], [])
+
+
+class TransactionClassificationTests(unittest.TestCase):
+    def test_sale_helpers_cover_buy_requests(self) -> None:
+        # «مطلوب للشراء» لا تحتوي «بيع» — هذا كان العيب الخفي (تُسقط من جانب البيع)
+        self.assertTrue(is_sale_transaction("مطلوب للشراء"))
+        self.assertTrue(is_sale_transaction("للبيع"))
+        self.assertFalse(is_rent_transaction("مطلوب للشراء"))
+
+    def test_rent_helpers_cover_rent_requests(self) -> None:
+        self.assertTrue(is_rent_transaction("مطلوب للإيجار"))
+        self.assertTrue(is_rent_transaction("للإيجار"))
+        self.assertFalse(is_sale_transaction("مطلوب للإيجار"))
+
+    def test_demand_flag_distinguishes_requests(self) -> None:
+        self.assertTrue(is_demand_transaction("مطلوب للشراء"))
+        self.assertTrue(is_demand_transaction("مطلوب للإيجار"))
+        self.assertFalse(is_demand_transaction("للبيع"))
+        self.assertFalse(is_demand_transaction("للإيجار"))
+
+
+class DemandInInsightsTests(unittest.TestCase):
+    def test_requests_counted_in_sample_totals(self) -> None:
+        rows = [
+            {"area": "حولي", "transaction": "مطلوب للشراء", "price": 500000, "space": 300, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "حولي", "transaction": "مطلوب للإيجار", "price": 800, "space": None, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "حولي", "transaction": "للبيع", "price": 600000, "space": 300, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "حولي", "transaction": "للإيجار", "price": 2500, "space": None, "fetched_at": "2026-08-10T08:00:00"},
+        ]
+        result = build_market_insights(rows)
+        self.assertEqual(
+            result["sampleTotals"],
+            {"sale": 1, "rent": 1, "buyRequests": 1, "rentRequests": 1},
+        )
+
+    def test_demand_budgets_do_not_pollute_supply_medians(self) -> None:
+        # ميزانية طلب شراء (500,000) لا تدخل وسيط البيع، وميزانية طلب إيجار لا تدخل وسيط الإيجار
+        rows = [
+            {"area": "السالمية", "transaction": "للبيع", "price": 120000, "space": 200, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "السالمية", "transaction": "مطلوب للشراء", "price": 500000, "space": 200, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "السالمية", "transaction": "للإيجار", "price": 250, "space": None, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "السالمية", "transaction": "للإيجار", "price": 350, "space": None, "fetched_at": "2026-08-10T08:00:00"},
+            {"area": "السالمية", "transaction": "مطلوب للإيجار", "price": 5000, "space": None, "fetched_at": "2026-08-10T08:00:00"},
+        ]
+        result = build_market_insights(rows)
+        area = next(a for a in result["areas"] if a["area"] == "السالمية")
+        self.assertEqual(area["saleCount"], 1)
+        self.assertEqual(area["medianSalePrice"], 120000.0)
+        self.assertEqual(area["rentCount"], 2)
+        self.assertEqual(area["medianRent"], 300.0)
+
+
+class DemandInAnalyticsTests(unittest.TestCase):
+    def test_analytics_transactions_and_demand_breakdown(self) -> None:
+        rows = [
+            {"source": "4Sale", "transaction": "للبيع", "area": "حولي", "governorate": "", "property_type": "بيت", "price": 100, "space": None, "fetched_at": ""},
+            {"source": "الفريج", "transaction": "مطلوب للشراء", "area": "المطلاع", "governorate": "الجهراء", "property_type": "بيت", "price": None, "space": None, "fetched_at": ""},
+            {"source": "الفريج", "transaction": "مطلوب للإيجار", "area": "الجهراء القديمة", "governorate": "الجهراء", "property_type": "سكن", "price": None, "space": None, "fetched_at": ""},
+        ]
+        result = build_market_analytics(rows)
+        self.assertEqual(result["totals"]["transactions"]["مطلوب للشراء"], 1)
+        self.assertEqual(result["totals"]["transactions"]["مطلوب للإيجار"], 1)
+        self.assertEqual(result["totals"]["demand"], {"buyRequests": 1, "rentRequests": 1})
+        by_name = {s["source"]: s for s in result["sources"]}
+        self.assertEqual(by_name["الفريج"]["count"], 2)
+
+
+class LocalRowsConversionTests(unittest.TestCase):
+    def _listing(self, transaction: str = "مطلوب للشراء") -> Listing:
+        return Listing(
+            code="AF-315",
+            transaction=transaction,
+            governorate="محافظة الجهراء",
+            area="المطلاع",
+            property_type="بيت",
+            detail_class="طلب بيت/فيلا",
+            price=None,
+            price_text="",
+            space=None,
+            listing_mode="مباشر",
+            summary="",
+            features="",
+            published_date="2026-08-01",
+            original_url="https://front.alforaij.com/Listing/Detail/315",
+            source="الفريج",
+            raw={"phone": "55559950", "publishedDate": "2026-08-01"},
+        )
+
+    def test_listing_to_row_shape(self) -> None:
+        row = local_listing_to_row(self._listing())
+        self.assertEqual(row["transaction"], "مطلوب للشراء")
+        self.assertEqual(row["area"], "المطلاع")
+        self.assertEqual(row["source"], "الفريج")
+        self.assertEqual(row["phone"], "55559950")
+        self.assertEqual(row["fetched_at"], "2026-08-01")
+        self.assertEqual(row["original_url"], "https://front.alforaij.com/Listing/Detail/315")
+
+    def test_merged_local_and_external_rows(self) -> None:
+        local = local_listings_to_rows([self._listing(), self._listing("مطلوب للإيجار")])
+        external = [{"source": "4Sale", "transaction": "للبيع", "area": "المطلاع", "governorate": "محافظة الجهراء", "property_type": "بيت", "price": 120000, "space": 300, "fetched_at": "2026-08-01T00:00:00"}]
+        result = build_market_insights(local + external)
+        self.assertEqual(result["sampleTotals"]["buyRequests"], 1)
+        self.assertEqual(result["sampleTotals"]["rentRequests"], 1)
+        self.assertEqual(result["sampleTotals"]["sale"], 1)
+        by_name = {s["source"]: s for s in result["sources"]}
+        self.assertEqual(by_name["الفريج"]["count"], 2)
+        self.assertEqual(by_name["4Sale"]["count"], 1)
 
 
 if __name__ == "__main__":

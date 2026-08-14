@@ -1935,6 +1935,10 @@ button:hover {
   color: var(--muted);
 }
 
+.kpi-demand {
+  background: var(--amber-soft);
+}
+
 .kpi-up {
   color: var(--green);
 }

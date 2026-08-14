@@ -1278,7 +1278,7 @@ function renderInsights() {
   const priced = areas.filter((a) => a.medianSalePerM2 != null);
   const samples = data.sampleTotals || {};
   const fetched = data.fetchedAt ? String(data.fetchedAt).replace("T", " ").slice(0, 16) : "";
-  if (meta) meta.textContent = `آخر تحديث: ${fetched} · ${areas.length} منطقة · ${samples.sale || 0} بيع + ${samples.rent || 0} إيجار · ${withYield.length} بعائد محسوب`;
+  if (meta) meta.textContent = `آخر تحديث: ${fetched} · ${areas.length} منطقة · ${samples.sale || 0} بيع + ${samples.rent || 0} إيجار · ${samples.buyRequests || 0} طلب شراء + ${samples.rentRequests || 0} طلب إيجار · ${withYield.length} بعائد محسوب`;
 
   // 0) بطاقات المؤشرات الرئيسية (KPI)
   const market = data.market || {};
@@ -1288,6 +1288,8 @@ function renderInsights() {
       <div class="kpi-card"><span class="kpi-label">مناطق محللة</span><strong>${areas.length}</strong><small>من الحصاد المتراكم</small></div>
       <div class="kpi-card"><span class="kpi-label">عينات بيع</span><strong>${samples.sale || 0}</strong><small>إعلان بيع</small></div>
       <div class="kpi-card"><span class="kpi-label">عينات إيجار</span><strong>${samples.rent || 0}</strong><small>إعلان إيجار</small></div>
+      <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات شراء</span><strong>${samples.buyRequests || 0}</strong><small>مطلوب للشراء — من الفريج المحلي</small></div>
+      <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات إيجار</span><strong>${samples.rentRequests || 0}</strong><small>مطلوب للإيجار — من الفريج المحلي</small></div>
       <div class="kpi-card"><span class="kpi-label">عائد محسوب</span><strong>${withYield.length}</strong><small>منطقة بيع + إيجار معًا</small></div>
       <div class="kpi-card"><span class="kpi-label">اتجاه السوق</span><strong class="${dirClass}">${escapeHtml(market.direction || "—")}</strong><small>${market.changePct != null ? `${market.changePct > 0 ? "+" : ""}${market.changePct}% سعر المتر العام` : "يُبنى مع تراكم الأشهر"}</small></div>
     </div>`;

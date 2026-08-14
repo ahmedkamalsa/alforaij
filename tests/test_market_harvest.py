@@ -130,8 +130,11 @@ class TestMarketHarvest(unittest.TestCase):
 
         from backend.services import supabase_store
 
+        # عزل الفريج المحلي: هذا الاختبار يختبر مسار القاعدة فقط (الدمج يُختبر
+        # في test_fetch_market_insights_merges_local_demand)
         with mock.patch.object(supabase_store, "market_listings_table_available", return_value=True), \
-             mock.patch.object(supabase_store, "_fetch_rows", return_value=self._insights_rows()):
+             mock.patch.object(supabase_store, "_fetch_rows", return_value=self._insights_rows()), \
+             mock.patch.object(supabase_store, "load_listings", return_value=[]):
             result = supabase_store.fetch_market_insights()
         self.assertTrue(result["tableOk"])
         areas = {a["area"]: a for a in result["areas"]}
@@ -144,7 +147,7 @@ class TestMarketHarvest(unittest.TestCase):
         # المنقف: عينتا بيع لكن إيجار واحد → العائد غير محسوب (حارس الموثوقية)
         self.assertIsNone(areas["المنقف"]["rentalYield"])
         # sampleTotals يعدّ كل الصفوف (حتى عديمة المنطقة/السعر) — التصفية داخل المناطق
-        self.assertEqual(result["sampleTotals"], {"sale": 7, "rent": 3})
+        self.assertEqual(result["sampleTotals"], {"sale": 7, "rent": 3, "buyRequests": 0, "rentRequests": 0})
         self.assertEqual(len(areas), 3)  # حولي والفروانية والمنقف (ذواتا منطقة وسعر صالح)
 
     def test_fetch_market_insights_series_needs_two_months(self) -> None:
@@ -153,7 +156,8 @@ class TestMarketHarvest(unittest.TestCase):
         from backend.services import supabase_store
 
         with mock.patch.object(supabase_store, "market_listings_table_available", return_value=True), \
-             mock.patch.object(supabase_store, "_fetch_rows", return_value=self._insights_rows()):
+             mock.patch.object(supabase_store, "_fetch_rows", return_value=self._insights_rows()), \
+             mock.patch.object(supabase_store, "load_listings", return_value=[]):
             result = supabase_store.fetch_market_insights()
         # حولي لها نقطتان (07 و08) → تدخل السلسلة؛ الفروانية نقطة واحدة → لا
         areas_in_series = {s["area"] for s in result["series"]}
@@ -166,7 +170,30 @@ class TestMarketHarvest(unittest.TestCase):
 
         from backend.services import supabase_store
 
-        with mock.patch.object(supabase_store, "market_listings_table_available", return_value=False):
+        with mock.patch.object(supabase_store, "market_listings_table_available", return_value=False), \
+             mock.patch.object(supabase_store, "load_listings", return_value=[]):
             result = supabase_store.fetch_market_insights()
         self.assertFalse(result["tableOk"])
         self.assertEqual(result["areas"], [])
+
+    def test_fetch_market_insights_merges_local_demand(self) -> None:
+        """الدمج: طلب محلي (مطلوب للشراء) يدخل التحليل حتى بلا صفوف قاعدة."""
+        from unittest import mock
+
+        from backend.models import Listing
+        from backend.services import supabase_store
+
+        local = [Listing(
+            code="AF-1", transaction="مطلوب للشراء", governorate="محافظة الجهراء",
+            area="المطلاع", property_type="بيت", detail_class="طلب بيت", price=None,
+            price_text="", space=None, listing_mode="مباشر", summary="", features="",
+            published_date="2026-08-01", original_url="https://x", source="الفريج",
+            raw={"publishedDate": "2026-08-01"},
+        )]
+        with mock.patch.object(supabase_store, "market_listings_table_available", return_value=False), \
+             mock.patch.object(supabase_store, "load_listings", return_value=local):
+            result = supabase_store.fetch_market_insights()
+        self.assertTrue(result["tableOk"])
+        self.assertEqual(result["sampleTotals"]["buyRequests"], 1)
+        by_name = {s["source"]: s for s in result["sources"]}
+        self.assertEqual(by_name["الفريج"]["count"], 1)

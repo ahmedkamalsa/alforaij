@@ -3,7 +3,64 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from backend.models import Listing
 from backend.services.request_parser import GOVERNORATE_AREAS
+
+
+def is_demand_transaction(transaction: str) -> bool:
+    """طلب (مطلوب للشراء/للإيجار) مقابل عرض (للبيع/للإيجار)."""
+    return "مطلوب" in transaction
+
+
+def is_sale_transaction(transaction: str) -> bool:
+    """بيع أو شراء — تشمل «مطلوب للشراء» (كلمة «شراء» لا تحتوي «بيع»)."""
+    return ("بيع" in transaction) or ("شراء" in transaction)
+
+
+def is_rent_transaction(transaction: str) -> bool:
+    """إيجار بصيغتي الهمزة (إيجار/ايجار/أجار)."""
+    return ("إيجار" in transaction) or ("ايجار" in transaction) or ("أجار" in transaction)
+
+
+def local_listing_to_row(listing: Listing) -> dict[str, Any]:
+    """تحويل كائن Listing محلي (الفريج) إلى صف بنفس شكل market_listings.
+
+    المحللات النقية تستهلك صفوفًا قياسية؛ هذا التحويل يجعل إعلانات الفريج
+    (عرضًا وطلبًا) تدخل نفس التجميع بلا فرع خاص في منطق الحساب.
+    """
+    raw = listing.raw if isinstance(listing.raw, dict) else {}
+    return {
+        "source": listing.source or "الفريج",
+        "transaction": listing.transaction,
+        "governorate": listing.governorate,
+        "area": listing.area,
+        "property_type": listing.property_type,
+        "price": listing.price,
+        "space": listing.space,
+        "phone": str(raw.get("phone") or ""),
+        "fetched_at": str(raw.get("fetchedAt") or raw.get("publishedDate") or listing.published_date or ""),
+        "original_url": listing.original_url,
+        "code": listing.code,
+    }
+
+
+def local_listings_to_rows(listings: list[Listing]) -> list[dict[str, Any]]:
+    """تحويل قائمة إعلانات الفريج المحلية إلى صفوف تحليل."""
+    return [local_listing_to_row(listing) for listing in listings]
+
+
+def _demand_breakdown(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """عدّ طلبات الشراء والإيجار (جهة الطلب) في مجموعة صفوف."""
+    buy = rent = 0
+    for row in rows:
+        transaction = str(row.get("transaction") or "").strip()
+        if not is_demand_transaction(transaction):
+            continue
+        if is_sale_transaction(transaction):
+            buy += 1
+        elif is_rent_transaction(transaction):
+            rent += 1
+    return {"buyRequests": buy, "rentRequests": rent}
 
 
 def median(values: list[float]) -> float | None:
@@ -135,6 +192,7 @@ def build_market_analytics(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "transactions": trans_counts,
             "propertyTypes": type_counts,
             "lastFetched": last_fetched,
+            "demand": _demand_breakdown(rows),
         },
         "sources": sources,
         "areas": [{"area": area, "count": count} for area, count in areas],
@@ -179,8 +237,12 @@ def build_market_insights(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "rentPerM2": [],
             "monthlyPerM2": {},  # month -> [per_m2]
         })
-        is_rent = "إيجار" in transaction
-        is_sale = "بيع" in transaction
+        # ميزانيات الطلب (مطلوب للشراء/للإيجار) ليست أسعار عرض — تُعدّ في sampleTotals
+        # لكنها لا تدخل وسيطات العرض حتى لا تُشوّه سعر السوق (مطلوب للشراء كان
+        # يُسقط سابقًا لغياب «بيع» في نصه، بينما مطلوب للإيجار كان يدخل الإيجار!)
+        is_demand = is_demand_transaction(transaction)
+        is_rent = is_rent_transaction(transaction) and not is_demand
+        is_sale = is_sale_transaction(transaction) and not is_demand
         if is_rent:
             bucket["rentPrices"].append(price)
             if per_m2:
@@ -196,7 +258,8 @@ def build_market_insights(rows: list[dict[str, Any]]) -> dict[str, Any]:
     # سلسلة شهرية عامة لاتجاه السوق (وسيط سعر المتر لكل أشهر الحصاد)
     monthly_all: dict[str, list[float]] = {}
     for row in rows:
-        if "بيع" not in str(row.get("transaction") or ""):
+        tx = str(row.get("transaction") or "")
+        if not is_sale_transaction(tx) or is_demand_transaction(tx):
             continue
         try:
             _p = float(row.get("price"))
@@ -303,5 +366,9 @@ def build_market_insights(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "changePct": market_change,
             "series": overall_series,
         },
-        "sampleTotals": {"sale": sum(1 for r in rows if "بيع" in str(r.get("transaction") or "")), "rent": sum(1 for r in rows if "إيجار" in str(r.get("transaction") or ""))},
+        "sampleTotals": {
+            "sale": sum(1 for r in rows if is_sale_transaction(str(r.get("transaction") or "")) and not is_demand_transaction(str(r.get("transaction") or ""))),
+            "rent": sum(1 for r in rows if is_rent_transaction(str(r.get("transaction") or "")) and not is_demand_transaction(str(r.get("transaction") or ""))),
+            **_demand_breakdown(rows),
+        },
     }
