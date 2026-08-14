@@ -1534,7 +1534,7 @@ button:hover {
 }
 
 .results-panel {
-  order: 4;
+  order: 0; /* النتائج المرتبة أولًا — تتبع ترتيب DOM بعد لوح البحث وقبل الملخص */
 }
 
 .sources-panel {
