@@ -1,9 +1,36 @@
 {
-  "generatedAt": "2026-08-12T02:02:14",
-  "count": 5,
+  "generatedAt": "2026-08-14T06:01:26",
+  "count": 8,
   "status": "success",
-  "note": "جمع 5 تطورًا، 2/11 مصادر عقارية، 0/5 منصات مرشحة متاحة",
+  "note": "جمع 8 تطورًا، 3/11 مصادر عقارية، 0/5 منصات مرشحة متاحة",
   "developments": [
+    {
+      "url": "https://www.alanba.com.kw/1371827",
+      "title": "السعودية: أوامر ملكية بإعادة تشكيل مجلس الوزراء برئاسة الأمير محمد بن سلمان وبأعضائه الحاليين",
+      "source": "alanba",
+      "source_name": "الأنباء",
+      "category": "أخبار السوق",
+      "published": "",
+      "summary": ""
+    },
+    {
+      "url": "https://alanba.com.kw/BBCNews/19151/",
+      "title": "هيثم حسن إلى سيلتك... كيف استقبل الجمهور الصفقة؟",
+      "source": "alanba",
+      "source_name": "الأنباء",
+      "category": "أخبار السوق",
+      "published": "",
+      "summary": ""
+    },
+    {
+      "url": "https://alanba.com.kw/BBCNews/19148/",
+      "title": "البطاطس \"تغلي\" تحت الأرض مع اجتياح موجة حر قياسية لمساحات شاسعة من آسيا - الغارديان",
+      "source": "alanba",
+      "source_name": "الأنباء",
+      "category": "أخبار السوق",
+      "published": "",
+      "summary": ""
+    },
     {
       "url": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports/Real-estate-reports.html",
       "title": "Real estate Reports",
@@ -93,9 +120,9 @@
     },
     {
       "name": "الأنباء",
-      "status": "no_matches",
-      "records": 0,
-      "note": "لا عناوين",
+      "status": "success",
+      "records": 3,
+      "note": "3 عنوانًا إجمالًا، 3 عقاريًا",
       "fetchMethod": "HTML",
       "endpoint": "https://www.alanba.com.kw/rss/"
     },
@@ -147,7 +174,7 @@
       "url": "https://www.propertyfinder.kw/",
       "role": "منصة عقارية كويتية",
       "status": "غير متاحة",
-      "note": "<urlopen error timed out>"
+      "note": "<urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
     },
     {
       "id": "aqarmap_kw",

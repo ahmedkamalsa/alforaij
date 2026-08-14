@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-12T01:08:29",
+  "generatedAt": "2026-08-14T06:03:10",
   "hasPrevious": true,
   "counts": {
-    "added": 3,
-    "removed": 5,
+    "added": 14,
+    "removed": 13,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -20,90 +20,85 @@
     "priceDrops": [],
     "added": [
       {
-        "code": "AF-105",
-        "area": "جليب الشيوخ - الحساوي",
-        "propertyType": "عمارة",
-        "price": 800000.0,
-        "priceText": "800 ألف د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/105",
-        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
-      },
-      {
-        "code": "AF-76",
-        "area": "خيطان",
-        "propertyType": "عمارة",
-        "price": 1070000.0,
-        "priceText": "1,070 ألف د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/76",
-        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
-      },
-      {
-        "code": "OS-285431740",
-        "area": "",
+        "code": "AF-142",
+        "area": "المطلاع",
         "propertyType": "عقارات",
-        "price": 100000.0,
-        "priceText": "100,000 د.ك",
+        "price": 260000.0,
+        "priceText": "260 ألف د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة (أقل من السوق بوضوح)",
+        "source": "الفريج",
+        "url": "https://front.alforaij.com/Listing/Detail/142",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
+        "code": "BU3-6196",
+        "area": "العدان",
+        "propertyType": "أرض",
+        "price": 310000.0,
+        "priceText": "310,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285431740",
+        "source": "بوعقار / بوشملان (Bu3qar)",
+        "url": "https://www.bu3qar.com/product-details/6196/%D9%82%D8%B3%D9%8A%D9%85%D9%87-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%89-%D8%A7%D9%84%D8%B9%D8%AF%D8%A7%D9%86-%D9%85%D9%82%D8%A7%D8%A8%D9%84-%D8%AC%D8%B2%D9%8A%D8%B1%D9%87",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
+        "code": "MJ-30046320",
+        "area": "الأندلس",
+        "propertyType": "أرض",
+        "price": 410000.0,
+        "priceText": "410,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "Mourjan",
+        "url": "https://www.mourjan.com/kw/kuwait/villas-and-houses/for-sale/30046320/",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       }
     ],
     "removed": [
       {
-        "code": "OS-285199468",
-        "area": "الفروانية",
-        "propertyType": "بيت",
-        "price": 460000.0,
-        "priceText": "460,000 د.ك",
+        "code": "MJ-30040938",
+        "area": "حولي",
+        "propertyType": "عمارة",
+        "price": 300000.0,
+        "priceText": "300,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285199468",
+        "source": "Mourjan",
+        "url": "https://www.mourjan.com/kw/kuwait/buildings/for-sale/30040938/",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       },
       {
-        "code": "AF-302",
-        "area": "صباح السالم",
-        "propertyType": "بيت",
-        "price": 270000.0,
-        "priceText": "270 ألف د.ك",
+        "code": "MJ-30040542",
+        "area": "الأندلس",
+        "propertyType": "أرض",
+        "price": 275000.0,
+        "priceText": "275,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/302",
+        "source": "Mourjan",
+        "url": "https://www.mourjan.com/kw/kuwait/lands/for-sale/30040542/",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       },
       {
-        "code": "AF-218",
-        "area": "سلوى",
-        "propertyType": "بيت",
-        "price": 420000.0,
-        "priceText": "420 ألف د.ك",
+        "code": "MJ-30039033",
+        "area": "اليرموك",
+        "propertyType": "أرض",
+        "price": 150000.0,
+        "priceText": "150,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/218",
+        "source": "Mourjan",
+        "url": "https://www.mourjan.com/kw/kuwait/lands/for-sale/30039033/",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       }
     ]
-  },
-  "actions": [
-    "راجع الفرص الجديدة الأعلى درجة قبل إرسالها.",
-    "أضف ملف/رابط صفقات وزارة العدل اليومي حتى يصبح التقييم أقوى من الإعلانات فقط."
-  ],
-  "note": "ملخص مجاني من آخر تحديث يومي: يقارن آخر لقطة فرص باللقطة الحالية ويعرض ما يحتاج متابعة."
+  }
 }
