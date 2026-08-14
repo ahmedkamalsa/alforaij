@@ -14,7 +14,7 @@
 - The app honors `prefers-color-scheme` when no localStorage preference exists (headless Chromium defaults to light) — theme-toggle checks must account for which theme actually applies.
 
 ## Verification discipline
-- Computed-style checks of token *values* do NOT prove the cascade winner. A global `:focus-visible` added at `styles.css:119` is silently shadowed by the later unqualified rule at `styles.css:365` (equal specificity 0,1,0, later source order wins) — the brand-colored ring never renders; the blue `var(--accent)` rule at 365 wins. Verify on a real focused element, not just token resolution.
+- The `:focus-visible` ring is a **single unqualified rule** (currently ~`styles.css:352`) using `--ring-width/--ring-color/--ring-offset` tokens; `--ring-color` is `--brand-gold-300` (dark) / `--brand-navy-300` (light). It was consolidated in commit `b8a9197` (the earlier duplicate rule was deleted). Keep it single and later in the cascade, or a same-specificity rule will shadow it. Programmatic `.focus()` does NOT match `:focus-visible` — verify with real keyboard Tab (see `tests/playwright/focus_ring_check.py` / `focus_ring_board_check.py`: `ALFORAIJ_MOBILE_BASE=… python …/Python313/python.exe tests/playwright/focus_ring_check.py --dark|--light`). Component focus styles must not set `outline: none` in a `:focus-visible` block or the ring dies there (fixed for `.board-stat`, `.results-copy-sources`, `.development-card`).
 - Full UI regression runs need the **API-backed server** (backend defaults to port 8000, serves frontend too): `ALFORAIJ_MOBILE_BASE=http://localhost:8000 python tests/playwright/testsprint_audit.py` → 33/33. Against a bare static server it yields 26/29 with 3 *known* static-mode failures.
 - `scripts/run_mobile_checks.py` and `scripts/run_performance_checks.py` manage server lifecycle themselves (start → health wait → stop). Performance bounds: cold ≤8s, warm ≤2s (typical first load ~870ms).
 - pypdf extracts Arabic as **presentation forms** — normalize with `unicodedata.normalize("NFKC", ...)` before string comparisons in tests.
@@ -23,7 +23,8 @@
 - Deliberately dependency-free: stdlib Python + static HTML/JS/CSS. **No package.json, no Tailwind, no Node build** — don't add dependencies.
 - Deployed sites are static snapshots (`STATIC_SNAPSHOT_MODE`): no live API on hosted URLs — all numbers visitors see are snapshot data. The live backend (`http.server` stdlib, port 8000) is not hosted anywhere.
 - A PDF report subsystem exists and is tested: `backend/services/pdf_report.py` (reportlab + arabic_reshaper/bidi, Tahoma→DejaVu→Helvetica fallback) with `tests/test_pdf_report.py` (8 tests) and generators in `scripts/generate_*_pdf.py`; `reports/*.pdf` are git-tracked deliverables. It loads logos from `frontend/assets/` via `__file__` (not CWD) — deleting/moving those PNGs silently degrades headers to a drawn «ف» fallback.
-- **Three** workflows deploy on push to `main`, all watching `frontend/**`: `deploy-static.yml` (Netlify prod), `deploy-cloudflare-pages.yml`, `deploy-alforaijboard.yml` (force-push frontend to `ahmedkamalsa/alforaijboard` gh-pages — verify this is still wanted). Netlify/CF deploys are **guarded**: missing secrets emit `::warning::` and skip, never fail the workflow.
+- **Two** workflows deploy on push to `main`, all watching `frontend/**`: `deploy-static.yml` (Netlify prod), `deploy-cloudflare-pages.yml`. Netlify/CF deploys are **guarded**: missing secrets emit `::warning::` and skip, never fail the workflow. (`deploy-alforaijboard.yml` was deleted with the standalone board page.)
+- `pytest.yml` runs the backend suite (`python -m pytest tests/ -q`) on push/PR touching `backend/**` or `tests/**` (Python 3.11; no secrets needed — the `unittest`-in-sys.modules gate keeps network reads off in tests).
 
 ## Design system (frontend/styles.css)
 - Brand identity: navy `#0a2f91` + gold `#e2c968`; Kufi display + Tajawal body; glass panels. Token layers live in `:root` (brand gold 100–900, navy 100–600, radius scale, ring, motion tokens) — consumed only in the identity block; ~150 hardcoded radius values remain elsewhere (drift 7/9/10/14px around the 8/10px norm).
@@ -32,5 +33,5 @@
 ## Product decisions (user corrections — respect these)
 - The «المصادر والتشغيل» tab was **deliberately deleted** — product has 5 main tabs (search / opportunities / board / insights / developments). Do not re-add it; tests assert 5.
 - Never list un-integrated platforms (Property Finder, Aqarmap, Bayut, e.gov.kw, Kuwait Finder) as "unavailable" in the UI — only show real, working sources; integrate or omit.
-- Board lives at `alforaijboard.netlify.app` (independent page, separate from main); the board button opens that page. Light/dark toggle must exist.
+- The standalone board page (`frontend/board.html` + its hero button) was **deleted** at user request; the board lives only as the embedded «لوحة السوق» tab in `index.html`. Light/dark toggle must exist.
 - The xlsx exports on disk disagree: `offer-evidence.xlsx` = 275 records vs `offer-evidence (1).xlsx` = 171 (newer) — unresolved which is canonical; do not delete either without confirmation.

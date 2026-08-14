@@ -58,6 +58,5 @@ jobs:
           # عمليات النشر تلقائيًا عند الدفع بمثل هذا التوكن (حماية من التكرار)،
           # لذلك نشغّل النشر صراحةً هنا ليصل الحصاد الجديد للمواقع خلال دقائق.
           # الجدول اليومي 04:00 UTC يبقى احتياطًا إضافيًا.
-          gh workflow run deploy-alforaijboard.yml
           gh workflow run deploy-static.yml
           gh workflow run deploy-cloudflare-pages.yml

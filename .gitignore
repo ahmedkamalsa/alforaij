@@ -23,3 +23,6 @@ coverage/
 *.sqlite3
 Thumbs.db
 .DS_Store
+
+# Freebuff agent workspace artifacts
+.freebuff/
