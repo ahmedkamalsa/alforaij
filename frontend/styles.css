@@ -567,6 +567,47 @@ textarea {
   .hero-brand-link::after { animation: none; opacity: 0; }
 }
 
+/* تكيّف الشارة مع شاشات الجوال الصغيرة: إخفاء السطر الإنجليزي وتصغير الاسم والميدالية */
+@media (max-width: 460px) {
+  .hero-brand-link {
+    gap: 8px;
+    padding: 5px 12px 5px 6px;
+  }
+  .brand-badge {
+    width: 32px;
+    height: 32px;
+  }
+  .brand-name {
+    font-size: 12.5px;
+    letter-spacing: 0;
+  }
+  .brand-sub {
+    display: none;
+  }
+  .brand-arrow {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* شاشات ضيقة جدًا (≤340px): إخفاء السهم وضغط الاسم ليبقى كاملًا دون قص */
+@media (max-width: 340px) {
+  .hero-brand-link {
+    gap: 7px;
+    padding: 4px 10px 4px 5px;
+  }
+  .brand-badge {
+    width: 30px;
+    height: 30px;
+  }
+  .brand-name {
+    font-size: 11.5px;
+  }
+  .brand-arrow {
+    display: none;
+  }
+}
+
 .logo-showcase {
   display: grid;
   gap: 14px;
