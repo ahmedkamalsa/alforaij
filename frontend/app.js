@@ -4320,6 +4320,16 @@ if (chatFab) {
   });
 }
 
+// زر «لوحة الأرقام والفرص» في الترويسة: يعرض اللوحة داخل الصفحة (تبويب السوق)
+// بدل رابط خارجي — اللوحة مدمجة في المنصة نفسها كما اتفقنا.
+const openBoardBtn = document.getElementById("openBoardBtn");
+if (openBoardBtn) {
+  openBoardBtn.addEventListener("click", () => {
+    switchMainTab("board");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+}
+
 // ── تطورات السوق العقاري (وكيل الاكتشاف اليومي) ──────────────────────────
 const developmentsState = { data: null, loaded: false };
 

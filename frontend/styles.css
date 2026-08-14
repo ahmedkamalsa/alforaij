@@ -202,6 +202,12 @@
   font: inherit;
 }
 
+.board-link {
+  cursor: pointer;
+  background: transparent;
+  font: inherit;
+}
+
 [data-theme="light"] .hero-link {
   color: var(--ink);
   border-color: rgba(30, 58, 138, .3);
