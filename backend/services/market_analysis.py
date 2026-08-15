@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from typing import Any
 
@@ -76,6 +77,7 @@ def build_demand_indicators(rows: list[dict[str, Any]]) -> dict[str, Any]:
     by_gov: dict[str, dict[str, Any]] = {}
     by_platform: dict[str, dict[str, Any]] = {}
     monthly: dict[str, dict[str, int]] = {}
+    area_gov = _area_to_governorate_map()
     for row in rows:
         transaction = str(row.get("transaction") or "").strip()
         if not is_demand_transaction(transaction):
@@ -86,6 +88,14 @@ def build_demand_indicators(rows: list[dict[str, Any]]) -> dict[str, Any]:
             continue
         area = str(row.get("area") or "").strip() or "غير محددة"
         gov = str(row.get("governorate") or "").strip() or "غير محددة"
+        # صفوف الحصاد الخارجي (مثل «مطلوب» 4Sale) تُخزَّن بلا محافظة رغم أن منطقتها
+        # معروفة — نعبئ المحافظة من خريطة المنطقة الرسمية حتى لا تتكدس كل الطلبات
+        # تحت «غير محددة» في بُعد المحافظات.
+        if gov == "غير محددة" and area != "غير محددة" and area in area_gov:
+            gov = f"محافظة {area_gov[area]}"
+        # توحيد شكل المحافظة (محافظة الأحمدي == محافظة الاحمدي) عبر المصادر حتى لا
+        # تنقسم دلاء نفس المحافظة في الـ payload وفي العرض.
+        gov = re.sub(r"[إأآا]", "ا", gov)
         source = str(row.get("source") or "").strip() or "غير محدد"
         month = str(row.get("fetched_at") or "")[:7]
 

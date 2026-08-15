@@ -291,13 +291,15 @@ def detect_area(text: str) -> str:
 
 def detect_property_type(text: str, fallback: str = "") -> str:
     normalized = normalize_text(text)
-    if any(word in normalized for word in ("عماره", "بنايه", "استثماري")):
+    # صيغ الجمع الشائعة في عناوين 4Sale (شقق تمليك، بيوت وشقق، فلل، عماير، قسائم،
+    # اراضي) كانت تسقط كلها إلى «عقارات» لأن الكاشف كان يطابق المفرد فقط.
+    if any(word in normalized for word in ("عماره", "بنايه", "عماير", "عمائر", "عمارات", "استثماري")):
         return "عمارة"
-    if any(word in normalized for word in ("ارض", "قسيمه")):
+    if any(word in normalized for word in ("ارض", "اراضي", "قسيمه", "قسايم", "قسائم")):
         return "أرض"
-    if any(word in normalized for word in ("شقه", "دوبلكس")):
+    if any(word in normalized for word in ("شقه", "شقق", "دوبلكس")):
         return "شقة"
-    if any(word in normalized for word in ("بيت", "فيلا", "منزل", "هدام")):
+    if any(word in normalized for word in ("بيت", "بيوت", "فيلا", "فلل", "منزل", "منازل", "هدام")):
         return "بيت"
     return fallback or "عقارات"
 
@@ -307,10 +309,15 @@ def parse_price(text: str, fallback: Any = None) -> float | None:
     # Try "X الف" / "X مليون" patterns
     patterns = [
         r"([0-9]+(?:\.[0-9]+)?)\s*مليون",
-        r"(?:السعر|سعر البيع|المطلوب|بياع|الثمن|الايجار|ايجار|الاجار)[:\s]*([0-9]+(?:\.[0-9]+)?)\s*(مليون|الف|ألف|دينار|د\.ك|دك)?",
+        # رقم يليه «م/متر/م²» مساحة لا سعر — مثال حي: «مطلوب عقار سكني للإيجار 200م
+        # 550 د.ك» كانت تلتقط 200 (المساحة) بدل الميزانية 550.
+        r"(?:السعر|سعر البيع|المطلوب|بياع|الثمن|الايجار|ايجار|الاجار)[:\s]*([0-9]+(?:\.[0-9]+)?)(?!\s*م(?:تر|2|²|\s|$))\s*(مليون|الف|ألف|دينار|د\.ك|دك)?",
         r"([0-9]+(?:\.[0-9]+)?)\s*(مليون|الف|ألف)\s*(?:دينار|د\.ك|دك)?",
         # صيغة 4Sale والمواقع الإنجليزي: «850 KWD» / «1,300 KWD» — المبلغ بوحدة الدينار مباشرة
         r"([0-9][0-9,]*(?:\.[0-9]+)?)\s*KWD",
+        # رقم + عملة مباشرة دون كلمة مفتاح: «550 د.ك» في عناوين الطلب (بعد تجاوز
+        # رقم المساحة). الحارس value > 100 يطرد أسعار 4Sale الوهمية «1 د.ك».
+        r"([0-9]+(?:\.[0-9]+)?)\s*(دينار|د\.ك|دك)\b",
     ]
     for pattern in patterns:
         match = re.search(pattern, normalized)
