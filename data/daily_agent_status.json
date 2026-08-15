@@ -1,14 +1,23 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-14T07:35:36",
-  "finishedAt": "2026-08-14T07:37:42",
+  "startedAt": "2026-08-15T03:29:53",
+  "finishedAt": "2026-08-15T03:31:57",
   "steps": [
     {
       "name": "sync_source_registry",
       "status": "ok",
       "result": {
-        "count": 20
+        "status": "synced",
+        "count": 24,
+        "drift": {
+          "available": true,
+          "localCount": 24,
+          "remoteCount": 24,
+          "unregisteredLocal": [],
+          "remoteOnly": [],
+          "synced": true
+        }
       }
     },
     {
@@ -16,7 +25,16 @@
       "status": "ok",
       "result": {
         "count": 6,
-        "reachable": 2
+        "reachable": 3
+      }
+    },
+    {
+      "name": "check_candidate_platforms",
+      "status": "ok",
+      "result": {
+        "count": 5,
+        "reachable": 0,
+        "blocked": 5
       }
     },
     {
@@ -39,7 +57,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 409,
+        "totalScored": 414,
         "includeExternal": true
       }
     },
@@ -48,7 +66,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 470,
+        "count": 469,
         "error": ""
       }
     },
@@ -57,7 +75,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 242,
+        "count": 252,
         "error": ""
       }
     },
@@ -66,18 +84,18 @@
       "status": "ok",
       "result": {
         "status": "success",
-        "count": 8,
+        "count": 7,
         "local": "saved",
         "database": "saved",
-        "note": "جمع 8 تطورًا، 3/11 مصادر عقارية، 0/5 منصات مرشحة متاحة"
+        "note": "جمع 7 تطورًا، 3/11 مصادر عقارية"
       }
     },
     {
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 6,
-        "removed": 7,
+        "added": 2,
+        "removed": 2,
         "priceDrops": 0
       }
     },
@@ -96,11 +114,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "marketListingsHarvested": 470,
-    "opportunitiesScored": 409,
+    "marketListingsHarvested": 469,
+    "opportunitiesScored": 414,
     "notificationCounts": {
-      "added": 6,
-      "removed": 7,
+      "added": 2,
+      "removed": 2,
       "priceDrops": 0
     },
     "whatsappAlerts": {
@@ -111,7 +129,7 @@
     },
     "officialReferenceSources": {
       "count": 6,
-      "reachable": 2,
+      "reachable": 3,
       "sources": [
         {
           "id": "nbk_housing_loan",
@@ -128,6 +146,15 @@
           "url": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports.html",
           "role": "مؤشرات سوقية مرجعية عند غياب صفقات كافية.",
           "dataUse": "market_indicators",
+          "status": "reachable",
+          "detail": ""
+        },
+        {
+          "id": "moj_sale_deals",
+          "name": "وزارة العدل - صفقات التسجيل العقاري",
+          "url": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx",
+          "role": "مصدر الصفقات الرسمية عند توفر ملف/جدول قابل للاستيراد.",
+          "dataUse": "official_transactions",
           "status": "reachable",
           "detail": ""
         },
@@ -157,18 +184,63 @@
           "dataUse": "legal_verification",
           "status": "unreachable",
           "detail": "HTTP Error 403: Forbidden"
-        },
-        {
-          "id": "moj_sale_deals",
-          "name": "وزارة العدل - صفقات التسجيل العقاري",
-          "url": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx",
-          "role": "مصدر الصفقات الرسمية عند توفر ملف/جدول قابل للاستيراد.",
-          "dataUse": "official_transactions",
-          "status": "unreachable",
-          "detail": "The read operation timed out"
         }
       ],
       "note": "هذه مصادر مرجعية مجانية. لا تدخل أرقامها في التقييم إلا عند استخراج بيانات منظمة أو إدخال CSV/JSON موثق."
+    },
+    "candidatePlatforms": {
+      "count": 5,
+      "reachable": 0,
+      "blocked": 5,
+      "discontinued": 0,
+      "sources": [
+        {
+          "id": "aqarmap_kw",
+          "name": "Aqarmap Kuwait",
+          "url": "https://aqarmap.com/kw/",
+          "kind": "marketplace",
+          "role": "بحث وتقييم عند إعادة تفعيل النسخة الكويتية (متوقفة حاليًا — يعيد بوابة مصر).",
+          "status": "unreachable",
+          "detail": "HTTP Error 403: Forbidden"
+        },
+        {
+          "id": "bayut_kw",
+          "name": "Bayut Kuwait",
+          "url": "https://www.bayut.com/kuwait/",
+          "kind": "marketplace",
+          "role": "بحث وتقييم عند توفر وصول غير محمي (نظام captcha يمنعه حاليًا).",
+          "status": "unreachable",
+          "detail": "HTTP Error 401: Unauthorized"
+        },
+        {
+          "id": "paci_kuwait_finder",
+          "name": "Kuwait Finder (PACI)",
+          "url": "https://kuwaitfinder.paci.gov.kw/",
+          "kind": "official",
+          "role": "تأكيد الموقع/المنطقة/القطعة؛ غير قابل للوصول من شبكات الخوادم حاليًا.",
+          "status": "unreachable",
+          "detail": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1032)>"
+        },
+        {
+          "id": "propertyfinder_kw",
+          "name": "Property Finder Kuwait",
+          "url": "https://www.propertyfinder.kw/",
+          "kind": "marketplace",
+          "role": "بحث وتقييم عند توفر الوصول (محجوب جغرافيًا من شبكات الخوادم حاليًا).",
+          "status": "unreachable",
+          "detail": "<urlopen error [Errno 111] Connection refused>"
+        },
+        {
+          "id": "e_gov_kw_portal",
+          "name": "بوابة الكويت العقارية (e.gov.kw)",
+          "url": "https://www.e.gov.kw/sites/kgoArabic/Pages/ServicesPortal/RealEstateServices.aspx",
+          "kind": "official",
+          "role": "مرجع خدمي وتحقق قانوني؛ لا تغذية إعلانات عامة (HTTP 403 من WAF للخوادم حاليًا).",
+          "status": "unreachable",
+          "detail": "HTTP Error 403: Forbidden"
+        }
+      ],
+      "note": "منصات مرشحة أُدرجت في قاعدة المصادر بطلب المستخدم. تُفحص يوميًا لاكتشاف أي تغيّر في التوفر؛ المتاحة منها تدخل في البحث والتقييم فورًا عبر موصلاتها، وغير المتاحة تُسجَّل حالتها بشفافية (حجب جغرافي/حماية captcha/توقف خدمة) دون إسقاط بقية المصادر."
     },
     "dataSummary": {
       "configured": true,
@@ -183,13 +255,13 @@
         "market_listings": {
           "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
           "available": true,
-          "count": 1130,
+          "count": 1270,
           "status": "ok"
         },
         "price_trends": {
           "label": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
           "available": true,
-          "count": 313,
+          "count": 323,
           "status": "ok"
         },
         "market_ads": {
@@ -213,19 +285,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 593,
+          "count": 675,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 3886,
+          "count": 4506,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 57120,
+          "count": 64336,
           "status": "ok"
         },
         "client_leads": {
@@ -243,13 +315,13 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 376,
+          "count": 379,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 326,
+          "count": 408,
           "status": "ok"
         }
       },

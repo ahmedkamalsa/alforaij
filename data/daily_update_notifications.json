@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-14T07:37:42",
+  "generatedAt": "2026-08-15T03:31:57",
   "hasPrevious": true,
   "counts": {
-    "added": 6,
-    "removed": 7,
+    "added": 2,
+    "removed": 2,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -16,33 +16,64 @@
     "storedCount": 53,
     "status": "ok"
   },
+  "candidatePlatforms": {
+    "count": 5,
+    "reachable": 0,
+    "blocked": 5,
+    "discontinued": 0,
+    "sources": [
+      {
+        "id": "aqarmap_kw",
+        "name": "Aqarmap Kuwait",
+        "kind": "marketplace",
+        "status": "unreachable",
+        "detail": "HTTP Error 403: Forbidden"
+      },
+      {
+        "id": "bayut_kw",
+        "name": "Bayut Kuwait",
+        "kind": "marketplace",
+        "status": "unreachable",
+        "detail": "HTTP Error 401: Unauthorized"
+      },
+      {
+        "id": "paci_kuwait_finder",
+        "name": "Kuwait Finder (PACI)",
+        "kind": "official",
+        "status": "unreachable",
+        "detail": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1032)>"
+      },
+      {
+        "id": "propertyfinder_kw",
+        "name": "Property Finder Kuwait",
+        "kind": "marketplace",
+        "status": "unreachable",
+        "detail": "<urlopen error [Errno 111] Connection refused>"
+      },
+      {
+        "id": "e_gov_kw_portal",
+        "name": "بوابة الكويت العقارية (e.gov.kw)",
+        "kind": "official",
+        "status": "unreachable",
+        "detail": "HTTP Error 403: Forbidden"
+      }
+    ],
+    "newlyAvailable": []
+  },
   "top": {
     "priceDrops": [],
     "added": [
       {
-        "code": "OS-285566114",
-        "area": "الجهراء",
-        "propertyType": "عقارات",
-        "price": 20000.0,
-        "priceText": "20,000 د.ك",
+        "code": "AF-106",
+        "area": "سعد العبدالله",
+        "propertyType": "بيت",
+        "price": 330000.0,
+        "priceText": "330 ألف د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285566114",
-        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
-      },
-      {
-        "code": "OS-284691916",
-        "area": "القبلة",
-        "propertyType": "بيت",
-        "price": 360.0,
-        "priceText": "360 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "إيجار ممتاز",
-        "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/284691916",
+        "source": "الفريج",
+        "url": "https://front.alforaij.com/Listing/Detail/106",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       },
       {
@@ -61,42 +92,29 @@
     ],
     "removed": [
       {
-        "code": "BU3-6196",
-        "area": "العدان",
-        "propertyType": "أرض",
-        "price": 310000.0,
-        "priceText": "310,000 د.ك",
+        "code": "OS-285335034",
+        "area": "الفروانية",
+        "propertyType": "عمارة",
+        "price": 285000.0,
+        "priceText": "285,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "بوعقار / بوشملان (Bu3qar)",
-        "url": "https://www.bu3qar.com/product-details/6196/%D9%82%D8%B3%D9%8A%D9%85%D9%87-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%89-%D8%A7%D9%84%D8%B9%D8%AF%D8%A7%D9%86-%D9%85%D9%82%D8%A7%D8%A8%D9%84-%D8%AC%D8%B2%D9%8A%D8%B1%D9%87",
-        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
-      },
-      {
-        "code": "MJ-30046320",
-        "area": "الأندلس",
-        "propertyType": "أرض",
-        "price": 410000.0,
-        "priceText": "410,000 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "Mourjan",
-        "url": "https://www.mourjan.com/kw/kuwait/villas-and-houses/for-sale/30046320/",
-        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
-      },
-      {
-        "code": "OS-283608688",
-        "area": "حولي",
-        "propertyType": "بيت",
-        "price": 250.0,
-        "priceText": "250 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "إيجار ممتاز",
         "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/283608688",
+        "url": "https://kw.opensooq.com/search/285335034",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "AF-105",
+        "area": "جليب الشيوخ - الحساوي",
+        "propertyType": "عمارة",
+        "price": 800000.0,
+        "priceText": "800 ألف د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "الفريج",
+        "url": "https://front.alforaij.com/Listing/Detail/105",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       }
     ]

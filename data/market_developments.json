@@ -1,18 +1,9 @@
 {
-  "generatedAt": "2026-08-14T07:36:32",
-  "count": 8,
+  "generatedAt": "2026-08-15T03:30:57",
+  "count": 7,
   "status": "success",
-  "note": "جمع 8 تطورًا، 3/11 مصادر عقارية، 0/5 منصات مرشحة متاحة",
+  "note": "جمع 7 تطورًا، 3/11 مصادر عقارية",
   "developments": [
-    {
-      "url": "https://www.alanba.com.kw/1371827",
-      "title": "السعودية: أوامر ملكية بإعادة تشكيل مجلس الوزراء برئاسة الأمير محمد بن سلمان وبأعضائه الحاليين",
-      "source": "alanba",
-      "source_name": "الأنباء",
-      "category": "أخبار السوق",
-      "published": "",
-      "summary": ""
-    },
     {
       "url": "https://alanba.com.kw/BBCNews/19151/",
       "title": "هيثم حسن إلى سيلتك... كيف استقبل الجمهور الصفقة؟",
@@ -121,8 +112,8 @@
     {
       "name": "الأنباء",
       "status": "success",
-      "records": 3,
-      "note": "3 عنوانًا إجمالًا، 3 عقاريًا",
+      "records": 2,
+      "note": "2 عنوانًا إجمالًا، 2 عقاريًا",
       "fetchMethod": "HTML",
       "endpoint": "https://www.alanba.com.kw/rss/"
     },
@@ -165,48 +156,6 @@
       "note": "19 عنوانًا إجمالًا، 1 عقاريًا",
       "fetchMethod": "HTML",
       "endpoint": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx"
-    }
-  ],
-  "portals": [
-    {
-      "id": "propertyfinder_kw",
-      "name": "Property Finder Kuwait",
-      "url": "https://www.propertyfinder.kw/",
-      "role": "منصة عقارية كويتية",
-      "status": "غير متاحة",
-      "note": "<urlopen error [Errno 111] Connection refused>"
-    },
-    {
-      "id": "aqarmap_kw",
-      "name": "Aqarmap Kuwait",
-      "url": "https://kuwait.aqarmap.com/",
-      "role": "بوابة بحث عقاري",
-      "status": "غير متاحة",
-      "note": "<urlopen error [Errno -2] Name or service not known>"
-    },
-    {
-      "id": "bayut_kw",
-      "name": "Bayut Kuwait",
-      "url": "https://www.bayut.kw/",
-      "role": "بوابة إعلانات عقارية",
-      "status": "غير متاحة",
-      "note": "<urlopen error [Errno -2] Name or service not known>"
-    },
-    {
-      "id": "realestate_kw_guides",
-      "name": "بوابة الكويت العقارية (e.gov.kw)",
-      "url": "https://e.gov.kw/sites/kgoArabic/Pages/Services/MOJ/RealEstate.aspx",
-      "role": "مرجع حكومي",
-      "status": "غير متاحة",
-      "note": "HTTP Error 403: Forbidden"
-    },
-    {
-      "id": "kuwait_finder",
-      "name": "Kuwait Finder (PACI)",
-      "url": "https://kuwaitfinder.paci.gov.kw/",
-      "role": "مصدر مكاني رسمي",
-      "status": "غير متاحة",
-      "note": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1032)>"
     }
   ]
 }
