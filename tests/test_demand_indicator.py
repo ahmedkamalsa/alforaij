@@ -101,6 +101,53 @@ class DemandIndicatorPayloadTests(unittest.TestCase):
         self.assertEqual(item["phone"], "5000")
         self.assertEqual(item["originalUrl"], "https://front.alforaij.com/Listing/Detail/A1")
 
+    def test_accepts_external_dict_rows_mixed_with_local_listings(self) -> None:
+        """الطلبات الخارجية المحصودة (صفوف dict من market_listings مثل «مطلوب» 4Sale)
+        تُدمج مع طلبات الفريج المحلية في نفس المؤشر."""
+        request = PropertyRequest(raw_text="بيت في السالمية", transaction="للبيع", areas=["السالمية"])
+        external = [
+            {
+                "code": "4S-wanted-property-for-sale-1",
+                "transaction": "مطلوب للشراء",
+                "area": "السالمية",
+                "governorate": "محافظة حولي",
+                "property_type": "بيت",
+                "detail_class": "",
+                "summary": "مطلوب بيت في السالمية",
+                "published_date": "2026-08-12",
+                "original_url": "https://www.q84sale.com/ar/listing/wanted-property-for-sale-1",
+                "raw": {"phone": "5555"},
+                "source": "4Sale",
+            },
+            {
+                "code": "4S-wanted-property-for-rent-2",
+                "transaction": "مطلوب للإيجار",
+                "area": "حولي",
+                "governorate": "محافظة حولي",
+                "property_type": "شقة",
+                "detail_class": "",
+                "summary": "",
+                "published_date": "2026-08-11",
+                "original_url": "",
+                "raw": None,
+                "source": "4Sale",
+            },
+        ]
+        result = self.main._demand_indicator_payload(self._listings() + external, request)
+        # 3 محلية (A1/A2/A3) + 1 خارجية في السالمية؛ الثانية (حولي) خارج النطاق
+        self.assertEqual(result["count"], 4)
+        self.assertEqual(result["buyRequests"], 3)  # A1 + A2 + 4S-1
+        self.assertEqual(result["rentRequests"], 1)  # A3
+        codes = [item["code"] for item in result["items"]]
+        self.assertIn("4S-wanted-property-for-sale-1", codes)
+        by_code = {item["code"]: item for item in result["items"]}
+        self.assertEqual(by_code["4S-wanted-property-for-sale-1"]["propertyType"], "بيت")
+        self.assertEqual(by_code["4S-wanted-property-for-sale-1"]["phone"], "5555")
+        self.assertEqual(
+            by_code["4S-wanted-property-for-sale-1"]["originalUrl"],
+            "https://www.q84sale.com/ar/listing/wanted-property-for-sale-1",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

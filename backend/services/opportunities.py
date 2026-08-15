@@ -54,6 +54,7 @@ from backend.connectors.live_sources import (
     broad_combo_requests,
     enrich_listings_from_details,
     scan_opensooq_inventory,
+    scan_four_sale_wanted,
     search_combo_sources,
     search_external_sources,
 )
@@ -1002,6 +1003,12 @@ def build_opportunities(limit_per_tier: int = 30, include_external: bool = True,
             _inventory, _inventory_status = scan_opensooq_inventory()
             external_listings.extend(_inventory)
             external_statuses.append(_inventory_status)
+            # جرد «مطلوب» في 4Sale: المصدر الخارجي الوحيد الذي ينشر قسم طلبات
+            # (مطلوب عقار للبيع/للإيجار) — يُحفظ في market_listings كطلبات حتى
+            # تُحتسب في مؤشرات الطلب مع الفريج المحلي بدل أن تُعدّ عروضًا.
+            _wanted, _wanted_status = scan_four_sale_wanted()
+            external_listings.extend(_wanted)
+            external_statuses.append(_wanted_status)
             # وكيل إكمال التفاصيل: يقرأ صفحة تفاصيل كل إعلان ناقص (سعر/مساحة/منطقة/هاتف)
             # حتى تُقيَّم الإعلانات ببيانات كاملة وتُحفظ في قاعدة المعرفة مكتملة. سقف 40
             # صفحة في الحصاد (وليس 15) لملء هواتف الإعلانات الجديدة أسرع — كل صفحة خفيفة

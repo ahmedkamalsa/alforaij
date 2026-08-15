@@ -614,9 +614,28 @@ def fetch_demand_indicators(limit: int = 8000) -> dict[str, Any]:
     return {
         "tableOk": built["totals"]["total"] > 0,
         "fetchedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "note": "طلبات الشراء والإيجار من إعلانات «مطلوب» المحلية (الفريج) — ميزانية الطلب ليست سعر عرض، لذا تُعدّ هنا ولا تدخل وسيطات السوق.",
+        "note": "طلبات الشراء والإيجار من إعلانات «مطلوب» المحلية (الفريج) والمحصودة من المنصات الخارجية (مثل قسم «مطلوب» في 4Sale) — ميزانية الطلب ليست سعر عرض، لذا تُعدّ هنا ولا تدخل وسيطات السوق.",
         **built,
     }
+
+
+def fetch_external_demand_rows(limit: int = 3000) -> list[dict[str, Any]]:
+    """سجلات «مطلوب» المحصودة من المنصات الخارجية (market_listings) كصفوف.
+
+    تُدمج مع طلبات الفريج المحلية في مؤشر الطلب بجانب نتائج التقييم حتى يعكس
+    المؤشر كل المنصات لا الفريج فقط (4Sale ينشر قسم «مطلوب عقار»).
+    متسامح: غياب الجدول أو فشل القراءة يعيد [] بدل كسر الطلب.
+    """
+    if not market_listings_table_available():
+        return []
+    try:
+        rows = _fetch_rows(
+            f"{SUPABASE_URL}/rest/v1/market_listings?select=*&order=fetched_at.desc&limit={int(limit)}"
+        ) or []
+        return [r for r in rows if market_analysis.is_demand_transaction(str(r.get("transaction") or ""))]
+    except Exception as exc:
+        logger.warning("External demand rows failed: %s", exc)
+        return []
 
 
 def fetch_market_listing_source_counts(limit: int = 5000) -> list[dict[str, Any]]:

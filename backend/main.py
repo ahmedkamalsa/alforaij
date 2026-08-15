@@ -511,13 +511,18 @@ def _flat_dashboard_opportunities(selected: set[str], include_local: bool, area_
 def _demand_indicator_payload(listings, request, top_area: str = "") -> dict:
     """سجلات «مطلوب للشراء/للإيجار» في نطاق الطلب كمؤشر طلب بجانب النتائج.
 
+    يقبل كائنات Listing (الفريج المحلي) وصفوفًا dict (الطلبات الخارجية المحصودة
+    من market_listings مثل قسم «مطلوب» في 4Sale) — الوصول عبر _di يتسامح مع النوعين.
     النطاق: مناطق الطلب أولًا، ثم محافظاته، ثم منطقة أقرب نتيجة — حتى يرى
     العميل من يبحث في نفس المنطقة التي قيّم عقاره فيها. لا يكسر التحليل أبدًا.
     """
     from backend.services.market_analysis import is_demand_transaction
     from backend.services.request_parser import normalize_text
 
-    demand = [item for item in listings if is_demand_transaction(str(item.transaction or ""))]
+    def _di(item, key: str, default: Any = ""):
+        return item.get(key, default) if isinstance(item, dict) else getattr(item, key, default)
+
+    demand = [item for item in listings if is_demand_transaction(str(_di(item, "transaction") or ""))]
     empty = {"count": 0, "buyRequests": 0, "rentRequests": 0, "scope": "", "items": []}
     if not demand:
         return empty
@@ -525,11 +530,11 @@ def _demand_indicator_payload(listings, request, top_area: str = "") -> dict:
     wanted_govs = {normalize_text(g) for g in request.governorates}
 
     def _in_scope(item) -> bool:
-        area = normalize_text(item.area)
+        area = normalize_text(str(_di(item, "area") or ""))
         if wanted_areas:
             return area in wanted_areas
         if wanted_govs:
-            return normalize_text(item.governorate) in wanted_govs
+            return normalize_text(str(_di(item, "governorate") or "")) in wanted_govs
         if top_area:
             return area == normalize_text(top_area)
         return True
@@ -537,23 +542,27 @@ def _demand_indicator_payload(listings, request, top_area: str = "") -> dict:
     matched = [item for item in demand if _in_scope(item)]
     if not matched:
         return empty
-    matched.sort(key=lambda item: str(item.published_date or ""), reverse=True)
+    matched.sort(key=lambda item: str(_di(item, "published_date") or ""), reverse=True)
     items = []
     for item in matched[:12]:
-        raw = item.raw if isinstance(item.raw, dict) else {}
+        raw = _di(item, "raw")
+        raw = raw if isinstance(raw, dict) else {}
         items.append({
-            "transaction": item.transaction,
-            "area": item.area,
-            "governorate": item.governorate,
-            "propertyType": item.property_type or item.detail_class or "",
-            "summary": str(item.summary or "").strip()[:160],
+            "transaction": _di(item, "transaction"),
+            "area": _di(item, "area"),
+            "governorate": _di(item, "governorate"),
+            "propertyType": str(_di(item, "property_type") or "") or str(_di(item, "detail_class") or ""),
+            "summary": str(_di(item, "summary") or "").strip()[:160],
             "phone": str(raw.get("phone") or ""),
-            "originalUrl": item.original_url,
-            "publishedDate": item.published_date,
-            "code": item.code,
+            "originalUrl": _di(item, "original_url"),
+            "publishedDate": _di(item, "published_date"),
+            "code": _di(item, "code"),
         })
-    buy = sum(1 for item in matched if "شراء" in str(item.transaction))
-    rent = sum(1 for item in matched if "إيجار" in str(item.transaction))
+    buy = sum(1 for item in matched if "شراء" in str(_di(item, "transaction")))
+    rent = sum(
+        1 for item in matched
+        if ("إيجار" in str(_di(item, "transaction")) or "ايجار" in str(_di(item, "transaction")))
+    )
     if wanted_areas:
         scope = "، ".join(request.areas[:3])
     elif wanted_govs:
@@ -1209,11 +1218,17 @@ class Handler(BaseHTTPRequestHandler):
                     logger.warning("Could not save valuation request: %s", ve)
 
                 # مؤشر الطلب بجانب النتائج: من يبحث عن شراء/إيجار في نفس المنطقة
-                # (سجلات «مطلوب» المحلية) — يُعرض كقسم في صفحة النتائج.
+                # (طلبات «مطلوب» المحلية + الخارجية المحصودة مثل قسم «مطلوب» في 4Sale)
+                # — يُعرض كقسم في صفحة النتائج.
                 try:
                     # RankedListing يحمل العقار في .listing (لا .area مباشرة)
                     top_area = deduped[0].listing.area if deduped else ""
-                    report["demandIndicators"] = _demand_indicator_payload(local_demand_source, request, top_area)
+                    demand_source = list(local_demand_source)
+                    if supabase_is_configured():
+                        from backend.services.supabase_store import fetch_external_demand_rows
+
+                        demand_source.extend(fetch_external_demand_rows())
+                    report["demandIndicators"] = _demand_indicator_payload(demand_source, request, top_area)
                 except Exception as demand_error:
                     logger.warning("Demand indicators failed: %s", demand_error)
                     report["demandIndicators"] = {"count": 0, "buyRequests": 0, "rentRequests": 0, "scope": "", "items": []}

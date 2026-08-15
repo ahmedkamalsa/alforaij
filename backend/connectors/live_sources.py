@@ -1670,6 +1670,118 @@ def _four_sale_fallback(request: PropertyRequest, reason: str, ms: float, attemp
     }
 
 
+# ---------------------------------------------------------------------------
+# إعلانات «مطلوب» في 4Sale: قسم مخصص للطلبات (مطلوب عقار للبيع/للإيجار)
+# ---------------------------------------------------------------------------
+# 4Sale هو المصدر الخارجي الوحيد بين المنصات المحصودة الذي ينشر قسمًا مخصصًا
+# لإعلانات الطلب («مطلوب عقار للبيع» / «مطلوب عقار للإيجار») — OpenSooq وQ8Aqar
+# لا يملكان فئة «مطلوب» (تحقق فعلي من الصفحات). تُصنَّف هذه الإعلانات
+# «مطلوب للشراء/للإيجار» صراحةً حسب القسم فتدخل في مؤشرات الطلب (demand) مع
+# بيانات الفريج المحلية بدل أن تُفقد أو تُعدّ عروضًا.
+_FOUR_SALE_WANTED_SECTIONS: list[tuple[str, str]] = [
+    ("wanted-property-for-sale", "مطلوب للشراء"),
+    ("wanted-property-for-rent", "مطلوب للإيجار"),
+]
+_FOUR_SALE_WANTED_PAGES = 3  # صفحات 1..3 من كل قسم طلب
+
+
+def _four_sale_wanted_from_page(
+    body: str,
+    transaction: str,
+    seen_codes: set[str],
+    max_total: int,
+) -> tuple[list[Listing], int]:
+    """استخراج إعلانات «مطلوب» من صفحة 4Sale لقسم محدد — دالة نقية قابلة للاختبار.
+
+    تُصنَّف المعاملة صراحةً حسب القسم (مطلوب للشراء/للإيجار) لا بالاعتماد على
+    عنوان الإعلان: عناوين الطلب قد لا تحمل «للبيع/للإيجار» صراحةً (مثل
+    «مطلوب شقة في السالمية»)، والتصنيف الخاطئ كان سيجعلها تظهر كعروض.
+    """
+    listings: list[Listing] = []
+    candidates = 0
+    for href, title_html in re.findall(r'<a[^>]*href="(/ar/listing/[^"]+)"[^>]*>(.*?)</a>', body, re.S | re.I):
+        candidates += 1
+        title_clean = clean_text(title_html)
+        if not title_clean or len(title_clean) < 5:
+            continue
+        code = f"4S-{href.rstrip('/').split('/')[-1]}"
+        if code in seen_codes:
+            continue
+        seen_codes.add(code)
+        listing = listing_from_text(
+            source="4Sale",
+            code=code,
+            url=urllib.parse.urljoin(_FOUR_SALE_BASE, href),
+            title=title_clean,
+            description=title_clean,
+            price=extract_price_from_title(title_clean) or parse_price(title_clean),
+            transaction=transaction,
+            fallback_type="عقارات",
+            space_override=extract_space_from_title(title_clean),
+        )
+        listing.raw = {**(getattr(listing, "raw", None) or {}), "demandSection": transaction}
+        listings.append(listing)
+        if len(listings) >= max_total:
+            break
+    return listings, candidates
+
+
+def scan_four_sale_wanted(
+    *,
+    max_pages: int = _FOUR_SALE_WANTED_PAGES,
+    max_total: int = 200,
+) -> tuple[list[Listing], dict[str, Any]]:
+    """مسح جرد «مطلوب» في 4Sale: قسمي طلبات الشراء والإيجار (صفحات 1..n).
+
+    يعيد إعلانات الطلب المنشورة (تُحفظ في market_listings كطلبات) مع حالة مصدر
+    موحدة. DNS ميت → فشل فوري بنفس نمط search_four_sale.
+    """
+    started = time.perf_counter()
+    try:
+        socket.gethostbyname(_FOUR_SALE_HOST)
+    except Exception as dns_error:
+        return [], _link_search_result(
+            "4Sale (مطلوب)", [], 0, round((time.perf_counter() - started) * 1000, 1),
+            f"{_FOUR_SALE_BASE}/ar/property/for-sale/wanted-property-for-sale/1",
+            f"DNS: {dns_error}", "",
+            "تعذر الوصول إلى 4Sale — DNS لا يحل النطاق.", 0,
+        )
+
+    listings: list[Listing] = []
+    seen_codes: set[str] = set()
+    candidates = 0
+    pages_read = 0
+    max_ms = 0.0
+    first_url = ""
+    last_body = ""
+    for section, transaction in _FOUR_SALE_WANTED_SECTIONS:
+        for page in range(1, max_pages + 1):
+            url = f"{_FOUR_SALE_BASE}/ar/property/{section}/{page}"
+            first_url = first_url or url
+            body, status, ms, error, attempts = fetch_url(url)
+            max_ms = max(max_ms, ms)
+            if not body or error:
+                break
+            pages_read += 1
+            last_body = body
+            page_listings, page_candidates = _four_sale_wanted_from_page(
+                body, transaction, seen_codes, max_total - len(listings)
+            )
+            candidates += page_candidates
+            listings.extend(page_listings)
+            if len(listings) >= max_total:
+                break
+        if len(listings) >= max_total:
+            break
+    note = (
+        f"تم مسح {pages_read} صفحة في قسمي «مطلوب» بـ 4Sale — {len(listings)} طلبًا "
+        f"(شراء/إيجار) منشورًا يُحتسب في مؤشر الطلب."
+    )
+    return listings, _link_search_result(
+        "4Sale (مطلوب)", listings, candidates, round(max_ms, 1), first_url, None, last_body, note, pages_read,
+    )
+
+
 def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
     """
     Bu3qar / Boshamlan (بوعقار / بوشملان) is a prominent Kuwait real estate platform.

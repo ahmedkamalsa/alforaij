@@ -240,6 +240,24 @@ class DemandIndicatorsTests(unittest.TestCase):
         self.assertEqual(result["areas"], [])
         empty = build_demand_indicators([])
         self.assertEqual(empty["totals"], {"buyRequests": 0, "rentRequests": 0, "total": 0})
+        self.assertEqual(empty["platforms"], [])
+
+    def test_platform_breakdown_transparent(self) -> None:
+        rows = self._rows() + [
+            # طلبات خارجية من 4Sale — تدخل التوزيع بشفافية
+            {"area": "السالمية", "source": "4Sale", "transaction": "مطلوب للإيجار", "fetched_at": "2026-08-10T00:00:00"},
+            {"area": "السالمية", "source": "4Sale", "transaction": "مطلوب للشراء", "fetched_at": "2026-08-11T00:00:00"},
+        ]
+        result = build_demand_indicators(rows)
+        by_source = {p["source"]: p for p in result["platforms"]}
+        # الصفوف المحلية بلا مفتاح source تُجمَّع تحت «غير محدد»
+        self.assertEqual(by_source["غير محدد"]["total"], 5)
+        self.assertEqual(by_source["4Sale"], {"source": "4Sale", "buy": 1, "rent": 1, "total": 2, "sharePct": 28.6})
+        # إجمالي المنصات يساوي إجمالي الطلبات
+        self.assertEqual(sum(p["total"] for p in result["platforms"]), result["totals"]["total"])
+        # مرتبة تنازليًا
+        totals = [p["total"] for p in result["platforms"]]
+        self.assertEqual(totals, sorted(totals, reverse=True))
 
 
 class LocalRowsConversionTests(unittest.TestCase):

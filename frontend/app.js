@@ -1349,7 +1349,7 @@ function renderInsights() {
     <div class="insights-section">
       <div class="section-title compact-title">
         <h3>مؤشرات الطلب</h3>
-        <span>طلبات الشراء والإيجار من إعلانات «مطلوب» المحلية — عدّ لكل منطقة ومحافظة مع الاتجاه الشهري. كل طلب عميل محتمل، وميزانيته لا تدخل وسيطات أسعار العرض.</span>
+        <span>طلبات الشراء والإيجار من إعلانات «مطلوب» المحلية والخارجية (مثل قسم «مطلوب» في 4Sale) — عدّ لكل منطقة ومحافظة ومنصة مع الاتجاه الشهري. كل طلب عميل محتمل، وميزانيته لا تدخل وسيطات أسعار العرض.</span>
       </div>
       ${demandHtml}
     </div>
@@ -1395,7 +1395,8 @@ function renderDemandIndicators(data) {
       <div class="kpi-card kpi-demand"><span class="kpi-label">إجمالي الطلبات</span><strong>${totals.total || 0}</strong><small>شراء + إيجار معًا</small></div>
       <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات شراء</span><strong>${totals.buyRequests || 0}</strong><small>أشخاص يبحثون عن شراء</small></div>
       <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات إيجار</span><strong>${totals.rentRequests || 0}</strong><small>أشخاص يبحثون عن إيجار</small></div>
-    </div>`;
+    </div>
+    <p class="demand-clarify">طلبات «مطلوب للشراء/للإيجار» منشورة في الفريج وفي قسم «مطلوب عقار» في 4Sale — بقية المنصات الخارجية تنشر عروضًا فقط. التوزيع حسب المنصة أدناه يوضح مصدر كل طلب بشفافية.</p>`;
   const areas = (data.areas || []).slice(0, 15);
   const areaTable = areas.length ? `
     <div style="overflow-x:auto">
@@ -1418,6 +1419,15 @@ function renderDemandIndicators(data) {
       <div class="gov-bar"><i style="width:${(((g.total || 0) / govMax) * 100).toFixed(1)}%"></i></div>
       <b class="gov-val">${g.buy || 0} ش / ${g.rent || 0} إج</b>
     </div>`).join("") || '<div class="empty">لا توجد محافظات بطلبات بعد.</div>';
+  const platforms = data.platforms || [];
+  const platMax = Math.max(...platforms.map((p) => p.total || 0), 1);
+  const platformRows = platforms.map((p) => `
+    <div class="gov-row">
+      <span class="gov-name">${escapeHtml(p.source)}</span>
+      <div class="gov-bar"><i style="width:${(((p.total || 0) / platMax) * 100).toFixed(1)}%"></i></div>
+      <b class="gov-val">${p.buy || 0} ش / ${p.rent || 0} إج</b>
+      <small class="gov-share">${p.total || 0} · ${p.sharePct || 0}%</small>
+    </div>`).join("") || '<div class="empty">لا توجد منصات بطلبات بعد.</div>';
   return `${chips}
     <div class="demand-trend-block">
       <h4 class="demand-subhead">اتجاه الطلب شهريًا</h4>
@@ -1431,6 +1441,10 @@ function renderDemandIndicators(data) {
       <div>
         <h4 class="demand-subhead">حسب المحافظة</h4>
         <div class="gov-list">${govRows}</div>
+      </div>
+      <div>
+        <h4 class="demand-subhead">توزيع الطلبات حسب المنصة</h4>
+        <div class="gov-list">${platformRows}</div>
       </div>
     </div>`;
 }
@@ -2358,7 +2372,7 @@ function renderDemandIndicator(report) {
     <div class="demand-indicator">
       <div class="demand-indicator-head">
         <strong>مؤشر الطلب في المنطقة${escapeHtml(scope)}</strong>
-        <span>${parts.join(" · ") || "لا طلبات"} — من إعلانات «مطلوب» المحلية، كل رقم عميل محتمل.</span>
+        <span>${parts.join(" · ") || "لا طلبات"} — من إعلانات «مطلوب» المحلية والخارجية، كل رقم عميل محتمل.</span>
       </div>
       <div class="demand-cards">${cards}</div>
     </div>`;
