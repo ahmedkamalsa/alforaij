@@ -4123,6 +4123,13 @@ function renderOppTier() {
   if (oppState.tier === "clients") { renderClientsTab(root); updateOppTabCount(); return; }
   if (oppState.tier === "alerts") { renderAlertsTab(root); updateOppTabCount(); return; }
   if (oppState.tier === "history") { renderHistoryTab(root); updateOppTabCount(); return; }
+  // التبويبات غير البطاقية (العرض والطلب / الجديد والمحذوف / الموجز الأسبوعي): أعد رسمها من
+  // الحالة المخزنة. بدون هذا، «تحديث الفرص» أو تغيير أي فلتر أثناء وجودك عليها يُسقطها إلى
+  // «لا توجد بيانات.» لأن tiers[] لا يحوي مفاتيحها — وإن لم تُحمل بعد، أعد جلبها من نقطتها.
+  if (oppState.tier === "matching" && oppState.matching) { renderMatchingTab(root); updateOppTabCount(); return; }
+  if (oppState.tier === "delta" && oppState.delta) { renderDeltaTab(root); updateOppTabCount(); return; }
+  if (oppState.tier === "digest" && oppState.digest) { renderDigestTab(root); updateOppTabCount(); return; }
+  if (oppState.tier === "matching" || oppState.tier === "delta" || oppState.tier === "digest") { loadOpportunityTab(oppState.tier); return; }
   if (oppState.tier === "forecast") {
     const total = oppState.data.forecast || [];
     const items = total.filter((item) => {
@@ -4252,6 +4259,11 @@ async function loadOpportunities(forceRefresh = false) {
     renderOppMeta();
     renderOppTier();
     updateOppTabCount();
+    // «تحديث الفرص» على تبويب غير بطاقي: أعد جلب نقطته بعد التحديث حتى لا يبقى
+    // العرض والطلب / الجديد والمحذوف / الموجز على نسخة سابقة من الفرص.
+    if (["matching", "delta", "digest"].includes(oppState.tier)) {
+      loadOpportunityTab(oppState.tier);
+    }
   } catch (err) {
     console.error(err);
     const refreshBtn = $("oppRefreshBtn");
