@@ -5008,7 +5008,10 @@ async function boot() {
   syncHeatmapLegends();
   loadDashboardBoard();
   loadOpportunities();
-  loadShareCounts();
+  // عدّادات المشاركة ميزة الموقع المنشور (قراءة مباشرة من القاعدة عبر anon REST مثل
+  // applyLiveDbCounts) — في وضع الخادم لا توجد لقطات static-data في نسخة نظيفة،
+  // فيُحاول الجلب فيرجع 404 مسجَّل في الكونسول. يُحمَّل عند الحاجة في وضع الثابت فقط.
+  if (STATIC_SNAPSHOT_MODE) loadShareCounts();
   scheduleDailySixAM();
   // تحديث أول بأول: أول تحميل يدمج المصادر الحية (لأن الكاش فارغ)، ثم تحديث محلي سريع كل 5 دقائق
   // (الفحص الحي المتكرر كل دقائق قد يُحظر من المواقع الخارجية — لذلك يكون صريحًا فقط)
