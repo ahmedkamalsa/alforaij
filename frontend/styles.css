@@ -5875,3 +5875,89 @@ body.drill-open {
     display: none;
   }
 }
+
+/* ── لماذا مجاني وأدق — مقارنة شفافة موثقة المصادر ─────────────────── */
+.whyfree-panel {
+  display: grid;
+  gap: 14px;
+  padding: 4px 2px 28px;
+}
+
+.whyfree-hero {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(620px 130px at 92% -18%, var(--blue-soft), transparent 62%),
+    var(--panel);
+  padding: 18px 20px;
+}
+.whyfree-hero h3 { margin: 0 0 8px; }
+.whyfree-hero p { margin: 0; color: var(--muted); line-height: 1.9; font-size: .95rem; }
+.whyfree-hero b { color: var(--blue); }
+
+.whyfree-compare {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  overflow: hidden;
+}
+.whyfree-row {
+  display: grid;
+  grid-template-columns: 1fr 1.05fr 1.05fr 118px;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+.whyfree-row:last-child { border-bottom: 0; }
+.whyfree-head { background: var(--surface); }
+.whyfree-row h4 { margin: 0 0 6px; font-size: .93rem; }
+.whyfree-head h4 { margin: 0; font-size: .78rem; color: var(--muted); }
+.whyfree-row p { margin: 0; font-size: .86rem; color: var(--muted); line-height: 1.75; }
+.whyfree-row .paid b { color: var(--red); }
+.whyfree-row .free b { color: var(--green); }
+.whyfree-src {
+  font-size: .75rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.whyfree-src a { color: var(--blue); text-decoration: none; }
+.whyfree-src a:hover { text-decoration: underline; }
+.whyfree-tag {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 1px 8px;
+  font-size: .68rem;
+  font-weight: 800;
+  border-radius: var(--radius-pill);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.whyfree-sources {
+  margin: 0;
+  padding: 2px 18px 2px 0;
+  color: var(--muted);
+  font-size: .84rem;
+  line-height: 1.9;
+}
+.whyfree-sources li { margin-bottom: 8px; }
+.whyfree-sources a { color: var(--blue); }
+
+.whyfree-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.whyfree-cta.alt {
+  background: transparent;
+  color: var(--blue);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+
+@media (max-width: 720px) {
+  .whyfree-row { grid-template-columns: 1fr; gap: 8px; }
+  .whyfree-src { line-height: 1.7; }
+}

@@ -4777,6 +4777,15 @@ if (chatFab) {
   });
 }
 
+// أزرار «لماذا مجاني وأدق» — قفزة مباشرة إلى البحث أو الفرص
+const whyfreeCtas = document.querySelectorAll(".whyfree-cta");
+whyfreeCtas.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    switchMainTab(btn.dataset.go || "search");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+});
+
 // ── تطورات السوق العقاري (وكيل الاكتشاف اليومي) ──────────────────────────
 const developmentsState = { data: null, loaded: false };
 
