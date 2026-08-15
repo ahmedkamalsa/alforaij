@@ -3002,8 +3002,17 @@ function renderReport(report) {
     shareLink.target = "_blank";
     shareLink.rel = "noreferrer";
     shareLink.textContent = "إرسال واتساب";
-    shareLink.addEventListener("click", () => trackOutreach({ action: "send", channel: "chat_result", opportunityCode: item.code || "" }));
+    shareLink.addEventListener("click", () => {
+      trackOutreach({ action: "send", channel: "chat_result", opportunityCode: item.code || "" });
+      incrementShare(item.code || "");
+    });
     copyBtn.after(shareLink);
+    const shareChip = document.createElement("span");
+    shareChip.className = "share-count";
+    shareChip.dataset.code = item.code || "";
+    shareChip.hidden = true;
+    shareChip.innerHTML = "🔄 <b>0</b>";
+    shareLink.after(shareChip);
     root.appendChild(node);
   };
 
@@ -3433,6 +3442,71 @@ function trackOutreach(click) {
   } catch { /* ignore */ }
 }
 
+// عدّاد مشاركات بطاقات التقييم: جدول share_counts يُقرأ ويُزاد عبر REST العام (مثل عدّادات
+// القاعدة الحية) فيعمل على الموقع المرفوع بلا خادم API — مع سقوط سلس عند تعذر الاتصال.
+const shareState = { counts: {}, base: null, loaded: false };
+
+async function shareCountsBase() {
+  if (shareState.base) return shareState.base;
+  try {
+    const cfg = await fetchStaticJson("/api/live-db");
+    if (cfg && cfg.url && cfg.anonKey) {
+      shareState.base = { url: String(cfg.url).replace(/\/$/, ""), key: cfg.anonKey };
+    }
+  } catch { /* ignore */ }
+  return shareState.base;
+}
+
+function refreshShareChips() {
+  document.querySelectorAll(".share-count").forEach((el) => {
+    const code = el.dataset.code || "";
+    const n = shareState.counts[code] || 0;
+    const b = el.querySelector("b");
+    if (b) b.textContent = n;
+    el.hidden = n <= 0;
+    if (n > 0) el.title = `شارك هذا التقييم ${n} مرة`;
+  });
+}
+
+async function loadShareCounts() {
+  if (shareState.loaded) return;
+  shareState.loaded = true;
+  try {
+    const base = await shareCountsBase();
+    if (!base) return;
+    const res = await fetch(`${base.url}/rest/v1/share_counts?select=opportunity_code,count`, {
+      headers: { apikey: base.key, Authorization: `Bearer ${base.key}` },
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    (rows || []).forEach((r) => {
+      if (r && r.opportunity_code) shareState.counts[r.opportunity_code] = Number(r.count || 0);
+    });
+    refreshShareChips();
+  } catch { /* ignore */ }
+}
+
+function incrementShare(code) {
+  if (!code) return;
+  shareState.counts[code] = (shareState.counts[code] || 0) + 1;
+  refreshShareChips();
+  shareCountsBase().then((base) => {
+    if (!base) return;
+    fetch(`${base.url}/rest/v1/rpc/increment_share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: base.key, Authorization: `Bearer ${base.key}` },
+      body: JSON.stringify({ p_code: code }),
+    }).catch(() => {});
+  });
+}
+
+// شارة العدّاد داخل بطاقة تقييم — تُبنى من الحالة المحمّلة (قد تكتمل القراءة قبل رسم البطاقات)،
+// ومخفية حتى يتجاوز العدّاد الصفر.
+function shareCounterChip(code) {
+  const n = shareState.counts[code] || 0;
+  return `<span class="share-count" data-code="${escapeHtml(code || "")}" ${n > 0 ? "" : "hidden"}>🔄 <b>${n}</b></span>`;
+}
+
 // روابط إرسال شخصية لكل عميل مطابق: رسالة مخصصة بمنطقته/نوعه وميزانيته + الفرصة كاملة بأدلتها
 function oppClientSendLinks(item) {
   const base = oppWhatsAppSummary(item);
@@ -3503,6 +3577,7 @@ function oppCard(item, index) {
         ${item.phone ? `<a class="wa-contact" href="${escapeHtml(waLink(item.phone))}?text=${encodeURIComponent(oppWhatsAppSummary(item))}" target="_blank" rel="noreferrer">تواصل مع المعلن (واتساب)</a>` : ""}
         <button class="opp-copy-btn" type="button">نسخ ملخص الفرصة</button>
         <a class="wa-share" href="${waShareLink(oppWhatsAppSummary(item))}" target="_blank" rel="noreferrer">إرسال واتساب</a>
+        ${shareCounterChip(item.code)}
       </div>
       ${oppClientSendLinks(item)}
     </div>
@@ -4193,7 +4268,10 @@ function renderOppTier() {
       });
     });
     card.querySelectorAll(".wa-share").forEach((link) => {
-      link.addEventListener("click", () => trackOutreach({ action: "send", channel: "opportunity_card", opportunityCode: code }));
+      link.addEventListener("click", () => {
+        trackOutreach({ action: "send", channel: "opportunity_card", opportunityCode: code });
+        incrementShare(code);
+      });
     });
     card.querySelectorAll(".wa-client").forEach((link, j) => {
       const client = clients[j] || {};
@@ -4930,6 +5008,7 @@ async function boot() {
   syncHeatmapLegends();
   loadDashboardBoard();
   loadOpportunities();
+  loadShareCounts();
   scheduleDailySixAM();
   // تحديث أول بأول: أول تحميل يدمج المصادر الحية (لأن الكاش فارغ)، ثم تحديث محلي سريع كل 5 دقائق
   // (الفحص الحي المتكرر كل دقائق قد يُحظر من المواقع الخارجية — لذلك يكون صريحًا فقط)

@@ -3902,6 +3902,23 @@ summary {
   filter: brightness(.94);
 }
 
+/* شارة عدّاد المشاركات في بطاقات التقييم — مخفية حتى تتجاوز الصفر */
+.share-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px dashed var(--muted);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.share-count[hidden] {
+  display: none;
+}
+
 /* زر «تواصل مع المعلن» عبر واتساب: يظهر عندما يحمل الإعلان رقم هاتف المعلن
    (يُستخرج من صفحة تفاصيل الإعلان — Q8Aqar/Mourjan/4Sale…) */
 .wa-contact {
