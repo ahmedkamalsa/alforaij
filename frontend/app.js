@@ -3507,6 +3507,337 @@ function shareCounterChip(code) {
   return `<span class="share-count" data-code="${escapeHtml(code || "")}" ${n > 0 ? "" : "hidden"}>🔄 <b>${n}</b></span>`;
 }
 
+// ===== الحساب المجاني (المهمتان 2 و4): تسجيل بالهاتف + بحث محفوظ + تنبيهات =====
+// السرّ (مفتاح الملكية) والهاتف في localStorage — بلا كلمة مرور، ولا يُكشف السرّ أبدًا.
+const accountState = {
+  secret: "",
+  phone: "",
+  saved: [],
+  loaded: false,
+  isLoggedIn() {
+    return Boolean(this.secret);
+  },
+};
+
+function accountLoad() {
+  try {
+    accountState.secret = localStorage.getItem("alforaij_secret") || "";
+    accountState.phone = localStorage.getItem("alforaij_phone") || "";
+  } catch {
+    /* ignore */
+  }
+}
+
+function accountSave() {
+  try {
+    if (accountState.secret) localStorage.setItem("alforaij_secret", accountState.secret);
+    else localStorage.removeItem("alforaij_secret");
+    if (accountState.phone) localStorage.setItem("alforaij_phone", accountState.phone);
+    else localStorage.removeItem("alforaij_phone");
+  } catch {
+    /* ignore */
+  }
+}
+
+function accountLogout() {
+  accountState.secret = "";
+  accountState.phone = "";
+  accountState.saved = [];
+  accountState.loaded = false;
+  accountSave();
+  renderAccountStatus();
+  renderSavedSearches();
+  showAccountMsg("سجّلت خروجك من هذا الجهاز.", false);
+}
+
+accountLoad();
+
+// قاعدة Supabase (عنوان + مفتاح anon): تُقرأ من /api/live-db التي يقدمها الخادم حيًا
+// أو اللقطة الثابتة على الموقع المنشور — أي فشل يُبتلع صامتًا (درس فحص الجوال).
+let _supabaseBaseCache = null;
+async function supabaseBase() {
+  if (_supabaseBaseCache) return _supabaseBaseCache;
+  try {
+    const cfg = await fetchStaticJson("/api/live-db");
+    if (cfg && cfg.url && cfg.anonKey) {
+      _supabaseBaseCache = { url: String(cfg.url).replace(/\/$/, ""), key: cfg.anonKey };
+    }
+  } catch {
+    /* ignore */
+  }
+  return _supabaseBaseCache;
+}
+
+// نداء دالة RPC محروس: أي فشل يُرجع null بصمت — لا أخطاء كونسول من الميزة أبدًا.
+async function supabaseRpc(name, args) {
+  try {
+    const base = await supabaseBase();
+    if (!base) return null;
+    const res = await fetch(`${base.url}/rest/v1/rpc/${name}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: base.key, Authorization: `Bearer ${base.key}` },
+      body: JSON.stringify(args || {}),
+    });
+    if (!res.ok) return null;
+    const raw = await res.text();
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizePhoneKw(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.startsWith("00965")) return "+965" + digits.slice(5);
+  if (digits.startsWith("965") && digits.length === 11) return "+" + digits;
+  if (digits.length === 8 && !digits.startsWith("0") && !digits.startsWith("1")) return "+965" + digits;
+  return "";
+}
+
+function showAccountMsg(text, isError) {
+  const msg = $("accountMsg");
+  if (!msg) return;
+  msg.textContent = text;
+  msg.className = "account-msg" + (isError ? " error" : " ok");
+  msg.hidden = false;
+}
+
+function renderAccountStatus() {
+  const el = $("accountStatus");
+  if (!el) return;
+  if (accountState.secret) {
+    el.hidden = false;
+    el.innerHTML = `مسجّل ✓ — <b>${escapeHtml(accountState.phone || "")}</b>
+      <button type="button" class="account-logout" id="accountLogoutBtn">تسجيل خروج</button>`;
+    const btn = $("accountLogoutBtn");
+    if (btn) btn.onclick = accountLogout;
+  } else {
+    el.hidden = true;
+  }
+}
+
+function openAccountModal() {
+  const modal = $("accountModal");
+  if (!modal) return;
+  modal.hidden = false;
+  renderAccountStatus();
+  const phoneEl = $("accountPhone");
+  const stepPhone = $("accountStepPhone");
+  const stepOtp = $("accountStepOtp");
+  const msg = $("accountMsg");
+  if (accountState.secret) {
+    if (stepPhone) stepPhone.hidden = true;
+    if (stepOtp) stepOtp.hidden = true;
+    if (msg) msg.hidden = true;
+  } else {
+    if (stepPhone) stepPhone.hidden = false;
+    if (stepOtp) stepOtp.hidden = true;
+    if (phoneEl) phoneEl.value = accountState.phone || "";
+    if (msg) msg.hidden = true;
+    setTimeout(() => phoneEl && phoneEl.focus(), 60);
+  }
+}
+
+function closeAccountModal() {
+  const modal = $("accountModal");
+  if (modal) modal.hidden = true;
+}
+
+async function accountRequestOtp() {
+  const sendBtn = $("accountSendOtp");
+  const raw = (($("accountPhone") || {}).value || "").trim();
+  const phone = normalizePhoneKw(raw);
+  if (!phone) {
+    showAccountMsg("أدخل رقم هاتف كويتي صحيح (مثال: 55512345)", true);
+    return;
+  }
+  if (sendBtn) sendBtn.disabled = true;
+  try {
+    const res = await supabaseRpc("register_user", { p_phone: phone });
+    if (!res || !res.code) {
+      showAccountMsg("تعذر إرسال الرمز — أعد المحاولة بعد قليل", true);
+      return;
+    }
+    accountState.phone = phone;
+    accountSave();
+    const stepPhone = $("accountStepPhone");
+    const stepOtp = $("accountStepOtp");
+    if (stepPhone) stepPhone.hidden = true;
+    if (stepOtp) stepOtp.hidden = false;
+    const note = $("accountOtpNote");
+    if (note) {
+      note.innerHTML =
+        res.delivery === "whatsapp"
+          ? `أرسلنا رمز التحقق عبر واتساب إلى <b>${escapeHtml(phone)}</b>.`
+          : `الرمز: <b>${escapeHtml(res.code)}</b> — أدخله في الخانة لتأكيد تسجيل <b>${escapeHtml(phone)}</b>.`;
+    }
+    const codeEl = $("accountOtpCode");
+    if (codeEl) codeEl.value = "";
+    const msg = $("accountMsg");
+    if (msg) msg.hidden = true;
+    setTimeout(() => codeEl && codeEl.focus(), 60);
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
+async function accountVerifyOtp() {
+  const verifyBtn = $("accountVerifyBtn");
+  const code = (($("accountOtpCode") || {}).value || "").trim();
+  if (code.length !== 6) {
+    showAccountMsg("أدخل الرمز المكوّن من 6 أرقام", true);
+    return;
+  }
+  if (verifyBtn) verifyBtn.disabled = true;
+  try {
+    const res = await supabaseRpc("verify_otp_code", { p_phone: accountState.phone, p_code: code });
+    if (!res || !res.secret) {
+      showAccountMsg("الرمز غير صحيح أو منتهي — أعد المحاولة أو أرسل رمزًا جديدًا", true);
+      return;
+    }
+    accountState.secret = res.secret;
+    accountState.phone = res.phone || accountState.phone;
+    accountSave();
+    const stepOtp = $("accountStepOtp");
+    if (stepOtp) stepOtp.hidden = true;
+    renderAccountStatus();
+    showAccountMsg("تم التسجيل بنجاح ✓ — تنبيهاتك مفعّلة", false);
+    loadSavedSearches();
+  } finally {
+    if (verifyBtn) verifyBtn.disabled = false;
+  }
+}
+
+// حفظ البحث الحالي (من الفلاتر الحالية في صفحة البحث) مع تفعيل التنبيه
+async function handleSaveSearch() {
+  if (!accountState.secret) {
+    showAccountMsg("");
+    openAccountModal();
+    return;
+  }
+  const filters = collectAdvancedFilters();
+  const typed = (($("chatInput") || {}).value || "").trim();
+  const text = typed || buildTextFromFilters(filters);
+  if (!text) {
+    showAccountMsg("لا يوجد بحث للحفظ — نفّذ بحثًا أولًا", true);
+    return;
+  }
+  const isRent = /إيجار|ايجار/.test(String(filters.transaction || ""));
+  const budgetRaw = isRent ? filters.rentBudget : filters.budget;
+  const budget = budgetRaw ? Number(budgetRaw) : null;
+  const res = await supabaseRpc("save_search", {
+    p_secret: accountState.secret,
+    p_name: String(text).slice(0, 60),
+    p_request: text,
+    p_transaction: filters.transaction,
+    p_property: filters.propertyType,
+    p_areas: String(filters.areas || "")
+      .split(/[،,]/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+    p_govs: filters.governorate ? [filters.governorate] : [],
+    p_min: null,
+    p_max: Number.isFinite(budget) ? budget : null,
+    p_id: 0,
+  });
+  const msgEl = $("saveSearchMsg");
+  if (res) {
+    loadSavedSearches().then(() => {
+      const box = $("savedSearchesBox");
+      if (box) box.hidden = false;
+    });
+    if (msgEl) {
+      msgEl.textContent = "تم الحفظ ✓ — سننبّهك عند نزول فرصة مطابقة.";
+      msgEl.className = "save-search-msg ok";
+      msgEl.hidden = false;
+      setTimeout(() => {
+        if (msgEl) msgEl.hidden = true;
+      }, 6000);
+    }
+  } else if (msgEl) {
+    msgEl.textContent = "تعذر الحفظ — تحقق من اتصالك وأعد المحاولة";
+    msgEl.className = "save-search-msg error";
+    msgEl.hidden = false;
+  }
+}
+
+async function loadSavedSearches() {
+  if (!accountState.secret) return;
+  const rows = await supabaseRpc("list_saved_searches", { p_secret: accountState.secret });
+  accountState.saved = Array.isArray(rows) ? rows : [];
+  accountState.loaded = true;
+  renderSavedSearches();
+}
+
+function renderSavedSearches() {
+  const box = $("savedSearchesBox");
+  if (!box) return;
+  if (!accountState.secret) {
+    box.hidden = true;
+    return;
+  }
+  // لا نغيّر حالة الإظهار هنا — إظهار/إخفاء الصندوق من اختصاص زر «بحثي المحفوظ»
+  // ولحظة الحفظ؛ هذا يُملأ المحتوى فقط حتى لا يقفز الصندوق ظاهرًا عند كل إقلاع.
+  const list = accountState.saved || [];
+  if (!list.length) {
+    box.innerHTML =
+      '<div class="saved-empty">لا أبحاث محفوظة بعد — نفّذ بحثًا ثم اضغط «احفظ البحث ونبّهني».</div>';
+    return;
+  }
+  box.innerHTML =
+    `<div class="saved-title">بحثي المحفوظ (${list.length})</div>` +
+    list
+      .map(
+        (s) => `
+      <div class="saved-item" data-id="${Number(s.id)}">
+        <div class="saved-info">
+          <strong>${escapeHtml(s.name || "")}</strong>
+          <span>${escapeHtml(s.request_text || "")}</span>
+        </div>
+        <div class="saved-actions">
+          <label class="saved-alert" title="تنبيه واتساب عند نزول فرصة مطابقة">
+            <input type="checkbox" data-alert="${Number(s.id)}" ${s.alert_enabled ? "checked" : ""}> تنبيه
+          </label>
+          <button class="saved-del" data-del="${Number(s.id)}" type="button" aria-label="حذف البحث">حذف</button>
+        </div>
+      </div>`
+      )
+      .join("");
+}
+
+function toggleSavedSearches() {
+  const box = $("savedSearchesBox");
+  if (!box) return;
+  if (box.hidden) {
+    if (accountState.secret && !accountState.loaded) loadSavedSearches();
+    box.hidden = false;
+  } else {
+    box.hidden = true;
+  }
+}
+
+function bindSavedSearchesEvents() {
+  const box = $("savedSearchesBox");
+  if (!box) return;
+  box.addEventListener("change", (e) => {
+    const cb = e.target.closest && e.target.closest("input[data-alert]");
+    if (!cb || !accountState.secret) return;
+    supabaseRpc("set_search_alert", {
+      p_secret: accountState.secret,
+      p_id: Number(cb.dataset.alert),
+      p_enabled: cb.checked,
+    });
+  });
+  box.addEventListener("click", (e) => {
+    const btn = e.target.closest && e.target.closest("button[data-del]");
+    if (!btn || !accountState.secret) return;
+    supabaseRpc("delete_saved_search", {
+      p_secret: accountState.secret,
+      p_id: Number(btn.dataset.del),
+    }).then(() => loadSavedSearches());
+  });
+}
+
 // روابط إرسال شخصية لكل عميل مطابق: رسالة مخصصة بمنطقته/نوعه وميزانيته + الفرصة كاملة بأدلتها
 function oppClientSendLinks(item) {
   const base = oppWhatsAppSummary(item);
@@ -5021,6 +5352,22 @@ async function boot() {
   // applyLiveDbCounts) — في وضع الخادم لا توجد لقطات static-data في نسخة نظيفة،
   // فيُحاول الجلب فيرجع 404 مسجَّل في الكونسول. يُحمَّل عند الحاجة في وضع الثابت فقط.
   if (STATIC_SNAPSHOT_MODE) loadShareCounts();
+  // الحساب المجاني: إغلاق النافذة (زر/خلفية/Escape) + أحداث قائمة الأبحاث المحفوظة.
+  // تُحمَّل الأبحاث المحفوظة عند وجود سرّ مسجّل فقط (لا نداءات في وضع الخادم النظيف
+  // بلا مستخدم — صفر 404 في الكونسول).
+  const accountCloseBtn = $("accountCloseBtn");
+  if (accountCloseBtn) accountCloseBtn.onclick = closeAccountModal;
+  const accountModal = $("accountModal");
+  if (accountModal) {
+    accountModal.addEventListener("click", (e) => {
+      if (e.target === accountModal) closeAccountModal();
+    });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAccountModal();
+  });
+  bindSavedSearchesEvents();
+  if (accountState.secret) loadSavedSearches();
   scheduleDailySixAM();
   // تحديث أول بأول: أول تحميل يدمج المصادر الحية (لأن الكاش فارغ)، ثم تحديث محلي سريع كل 5 دقائق
   // (الفحص الحي المتكرر كل دقائق قد يُحظر من المواقع الخارجية — لذلك يكون صريحًا فقط)

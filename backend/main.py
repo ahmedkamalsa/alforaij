@@ -1016,6 +1016,20 @@ class Handler(BaseHTTPRequestHandler):
                 logger.exception("Opportunity delta build failed")
                 json_response(self, {"error": "Opportunity delta build failed", "detail": str(exc)}, status=500)
             return
+        if path == "/api/live-db":
+            # إعداد القاعدة الحية للواجهة (المفتاح العام anon): على الموقع المنشور الثابت
+            # تُقرأ من static-data/live-db.json عبر fetchStaticJson، وعلى خادم API تُقدَّم
+            # حيًا من البيئة — فلا 404 في نسخة نظيفة (درس فحص الجوال) وتعمل الميزتان.
+            from backend.config import SUPABASE_ANON_KEY, SUPABASE_URL
+            json_response(
+                self,
+                {
+                    "url": SUPABASE_URL,
+                    "anonKey": SUPABASE_ANON_KEY,
+                    "note": "قراءة مباشرة من القاعدة الحية عبر المفتاح العام (anon) — الجداول العامة فقط عبر RLS.",
+                },
+            )
+            return
         if path == "/api/weekly-digest":
             # الموجز الأسبوعي: أفضل 10 فرص بيع لكل عميل محتمل مع رسالة واتساب جاهزة
             from backend.services.opportunities import build_opportunities, build_weekly_digest

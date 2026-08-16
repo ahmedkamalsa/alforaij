@@ -10,7 +10,7 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260816-why-free-dubai-costs">
+  <link rel="stylesheet" href="styles.css?v=20260816-free-accounts">
   <script src="config.js?v=20260811-trends"></script>
 </head>
 <body>
@@ -280,6 +280,13 @@
           <h2>النتائج المرتبة</h2>
           <span>حسب درجة التوصية</span>
         </div>
+        <div class="results-toolbar">
+          <button id="saveSearchBtn" class="save-search-btn" type="button" onclick="handleSaveSearch()">🔔 احفظ البحث ونبّهني</button>
+          <button id="savedSearchesToggle" class="saved-toggle-btn" type="button" onclick="toggleSavedSearches()">بحثي المحفوظ</button>
+          <button id="accountBtn" class="saved-toggle-btn" type="button" onclick="openAccountModal()">حسابي</button>
+          <span id="saveSearchMsg" class="save-search-msg" hidden></span>
+        </div>
+        <div id="savedSearchesBox" class="saved-searches-box" hidden></div>
         <div id="resultsSources" class="results-sources" hidden></div>
         <div id="demandIndicatorBox" class="results-demand" hidden></div>
         <div id="results" class="results"></div>
@@ -664,6 +671,29 @@
     <span class="chat-fab-label">اسأل المساعد</span>
   </button>
 
-  <script src="app.js?v=20260816-why-free-dubai-costs"></script>
+  <div id="accountModal" class="account-overlay" hidden>
+    <aside class="account-panel" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+      <button class="account-close" id="accountCloseBtn" type="button" aria-label="إغلاق">✕</button>
+      <h3 id="accountTitle">حسابي المجاني</h3>
+      <p class="account-sub">سجّل برقم هاتفك — بلا كلمة مرور — واحفظ بحثك ليصلَك تنبيه عند نزول فرصة مطابقة.</p>
+      <div id="accountStepPhone">
+        <label class="account-field">رقم الهاتف (كويتي)
+          <input id="accountPhone" type="tel" inputmode="tel" placeholder="55512345" autocomplete="tel">
+        </label>
+        <button id="accountSendOtp" class="primary" type="button" onclick="accountRequestOtp()">أرسل الرمز</button>
+      </div>
+      <div id="accountStepOtp" hidden>
+        <p id="accountOtpNote" class="account-otp-note"></p>
+        <label class="account-field">رمز التحقق
+          <input id="accountOtpCode" type="text" inputmode="numeric" maxlength="6" placeholder="6 أرقام" autocomplete="one-time-code">
+        </label>
+        <button id="accountVerifyBtn" class="primary" type="button" onclick="accountVerifyOtp()">تأكيد التسجيل</button>
+      </div>
+      <p id="accountMsg" class="account-msg" hidden></p>
+      <p id="accountStatus" class="account-status" hidden></p>
+    </aside>
+  </div>
+
+  <script src="app.js?v=20260816-free-accounts"></script>
 </body>
 </html>

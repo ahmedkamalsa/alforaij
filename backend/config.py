@@ -51,6 +51,7 @@ HOST = os.getenv("ALFORAIJ_ASSISTANT_HOST", "127.0.0.1")
 PORT = int(os.getenv("ALFORAIJ_ASSISTANT_PORT", "8000"))
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 
 AGENT_ROUTER_API_KEY = os.getenv("AGENT_ROUTER_API_KEY", "")
 AGENT_ROUTER_API_URL = os.getenv("AGENT_ROUTER_API_URL", "https://api.agentrouter.org/v1/chat/completions")

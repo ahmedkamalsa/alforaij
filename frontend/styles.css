@@ -5961,3 +5961,212 @@ body.drill-open {
   .whyfree-row { grid-template-columns: 1fr; gap: 8px; }
   .whyfree-src { line-height: 1.7; }
 }
+
+/* ===== الحساب المجاني (المهمتان 2 و4): نافذة التسجيل + حفظ البحث ===== */
+.results-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 12px;
+}
+
+.save-search-btn,
+.saved-toggle-btn {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color .15s ease, color .15s ease;
+}
+
+.save-search-btn:hover,
+.saved-toggle-btn:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.save-search-msg {
+  font-size: 13px;
+}
+
+.save-search-msg.ok {
+  color: var(--green);
+}
+
+.save-search-msg.error {
+  color: var(--red);
+}
+
+.saved-searches-box {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--panel);
+}
+
+.saved-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.saved-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.saved-item:last-child {
+  border-bottom: none;
+}
+
+.saved-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.saved-info span {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.saved-alert {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.saved-del {
+  background: none;
+  border: none;
+  color: var(--red);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.saved-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.account-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, .72);
+  backdrop-filter: blur(3px);
+  padding: 16px;
+}
+
+.account-overlay[hidden] {
+  display: none;
+}
+
+.account-panel {
+  background: var(--panel);
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  max-width: 380px;
+  width: 100%;
+  padding: 22px;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(2, 6, 23, .45);
+  animation: drill-in .2s ease;
+}
+
+.account-close {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.account-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 14px;
+}
+
+.account-field {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.account-field input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: inherit;
+  font-size: 14px;
+}
+
+.account-otp-note {
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.account-msg {
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.account-msg.error {
+  color: var(--red);
+}
+
+.account-msg.ok {
+  color: var(--green);
+}
+
+.account-status {
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.account-logout {
+  background: none;
+  border: none;
+  color: var(--red);
+  cursor: pointer;
+  font-size: 12px;
+  margin-inline-start: 6px;
+}
