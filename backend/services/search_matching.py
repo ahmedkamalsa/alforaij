@@ -75,15 +75,21 @@ def match_search_to_item(search: dict[str, Any], item: dict[str, Any]) -> float:
         if fam and fam != "swap" and _family(item_transaction) != fam:
             return 0.0
 
-    points = 0.0
-
-    # المنطقة/المحافظة: 40
-    area_points = 0.0
+    # بوابة المنطقة (حادة مثل مطابقة العملاء): البحث المحدد بمناطق لا يُنبّه
+    # إلا لمنطقة ضمنها — حتى لا تصل تنبيهات من مناطق أخرى ولو تطابق النوع والميزانية.
     if area and search_areas:
         if area in search_areas:
             area_points = 40.0
         elif any(area in a or a in area for a in search_areas):
-            area_points = 25.0
+            area_points = 40.0  # منطقة متضمنة (إعلان «شمال غرب الصليبيخات» لبحث «الصليبيخات»)
+        else:
+            return 0.0
+    else:
+        area_points = 0.0
+
+    points = 0.0
+
+    # المنطقة/المحافظة: 40 (المحافظة فقط +30 — أضعف من المنطقة الصريحة)
     if area_points == 0.0 and governorate and search_govs and governorate in search_govs:
         area_points = 30.0
     points += area_points

@@ -34,6 +34,20 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           AGENT_ROUTER_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
           OFFICIAL_TRANSACTIONS_SOURCE: ${{ vars.OFFICIAL_TRANSACTIONS_SOURCE }}
+      - name: Send opportunity alerts to saved searches
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase not configured; skipping alerts."
+            exit 0
+          fi
+          python scripts/send_opportunity_alerts.py || echo "Alert run finished with warnings (bell-only fallback)."
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
+          WHATSAPP_ALERT_TEMPLATE: ${{ secrets.WHATSAPP_ALERT_TEMPLATE }}
       - name: Commit and push harvested data
         run: |
           set -e

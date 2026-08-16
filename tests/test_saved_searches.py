@@ -40,9 +40,10 @@ class MatchSearchTests(unittest.TestCase):
         score = match_search_to_item(_search(), _item())
         self.assertEqual(score, 100.0)
 
-    def test_area_mismatch_within_budget_loses_area_points(self) -> None:
+    def test_area_mismatch_excluded(self) -> None:
+        # بوابة حادة: البحث المحدد بمنطقة لا يطابق منطقة أخرى (دقة التنبيهات)
         score = match_search_to_item(_search(), _item(area="حولي"))
-        self.assertEqual(score, 60.0)  # نوع 30 + ميزانية 30
+        self.assertEqual(score, 0.0)
 
     def test_governorate_only_match_gives_30(self) -> None:
         search = _search(areas=[], governorates=["محافظة حولي"])

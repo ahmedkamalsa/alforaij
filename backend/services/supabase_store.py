@@ -1006,3 +1006,38 @@ def patch_user(phone: str, fields: dict[str, Any]) -> None:
                 raise RuntimeError(f"Supabase returned HTTP {response.status}")
     except Exception as exc:
         logger.warning("Supabase users patch failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# تنبيهات الفرص للمستخدمين (المهمة 3): جلب الأبحاث المحفوظة + كتابة صفوف التنبيه
+# ---------------------------------------------------------------------------
+def fetch_saved_searches() -> list[dict[str, Any]]:
+    """قراءة الأبحاث المحفوظة مع التنبيه المفعل (alert_enabled=true) — للسكربت اليومي."""
+    return _fetch_rows(
+        f"{SUPABASE_URL}/rest/v1/saved_searches?select=*&alert_enabled=eq.true"
+    )
+
+
+def fetch_existing_alert_keys() -> list[tuple[str, str]]:
+    """كل أزواج (سرّ، فرصة) المنبّهة سابقًا — لمنع التكرار عند التشغيل المزدوج."""
+    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/user_alerts?select=user_secret,opportunity_code")
+    return [(str(r.get("user_secret") or ""), str(r.get("opportunity_code") or "")) for r in rows]
+
+
+def insert_user_alerts(rows: list[dict[str, Any]]) -> int:
+    """كتابة صفوف تنبيه جديدة (upsert على سرّ×فرصة — لا تكرار)."""
+    if not rows or not is_configured():
+        return 0
+    _post(
+        "user_alerts",
+        rows,
+        upsert=True,
+        conflict="user_secret,opportunity_code",
+    )
+    return len(rows)
+
+
+def fetch_user_phones() -> dict[str, str]:
+    """خريطة secret → phone لجميع المستخدمين (للتسليم عبر واتساب في سكربت التنبيهات)."""
+    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/users?select=secret,phone")
+    return {str(r.get("secret") or ""): str(r.get("phone") or "") for r in rows if r.get("secret")}
