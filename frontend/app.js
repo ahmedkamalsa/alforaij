@@ -3431,8 +3431,11 @@ function waShareLink(message) {
   return `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
-// تتبع نقرات التسويق (نسخ/إرسال فرصة أو عميل) في Supabase — بلا انتظار وبلا كسر أي شيء عند الفشل
+// تتبع نقرات التسويق (نسخ/إرسال فرصة أو عميل) في Supabase — بلا انتظار وبلا كسر أي شيء عند الفشل.
+// الموقع المنشور ثابت بلا خادم API (لا نقطة outreach-click) — التتبع محصور في وضع الخادم
+// حتى لا تُسجَّل 405 في الكونسول (درس فحص الجوال)؛ الإحصاءات تصل للوحة من اللقطة الثابتة.
 function trackOutreach(click) {
+  if (STATIC_SNAPSHOT_MODE) return;
   try {
     fetch(apiUrl("/api/outreach-click"), {
       method: "POST",
