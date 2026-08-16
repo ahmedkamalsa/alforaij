@@ -183,14 +183,21 @@
             <i class="legend-swatch legend-expensive"></i>أعلى من الوسيط (مضخم)
           </span>
         </div>
-        <div class="heatmap-mode-switch" role="group" aria-label="أساس تلوين الخريطة">
-          <button type="button" class="mode-btn" data-heat-mode="gap">فجوة السعر</button>
-          <button type="button" class="mode-btn" data-heat-mode="yield">عائد الإيجار</button>
+        <div class="heatmap-actions">
+          <div class="heatmap-view-switch" role="group" aria-label="طريقة عرض المناطق">
+            <button type="button" class="view-btn active" data-heat-view="grid">شبكة المناطق</button>
+            <button type="button" class="view-btn" data-heat-view="map">🗺 خريطة تفاعلية</button>
+          </div>
+          <div class="heatmap-mode-switch" role="group" aria-label="أساس تلوين الخريطة">
+            <button type="button" class="mode-btn" data-heat-mode="gap">فجوة السعر</button>
+            <button type="button" class="mode-btn" data-heat-mode="yield">عائد الإيجار</button>
+          </div>
         </div>
       </div>
       <div id="insightsHeatmap" class="board-heatmap">
         <div class="empty">جاري تحميل الخريطة الحرارية...</div>
       </div>
+      <div id="insightsLeafletMap" class="insights-leaflet-map" hidden></div>
       <div id="watchedAreasInsights" class="watched-areas"></div>
       <div id="insightsRoot" class="insights-root">
         <div class="empty">جاري تحميل تحليلات السوق...</div>

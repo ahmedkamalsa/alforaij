@@ -214,6 +214,14 @@ def main() -> None:
     write_json("outreach-stats.json", outreach)
     write_json("health.json", health)
 
+    # إحداثيات مناطق الكويت للخريطة التفاعلية — بيانات مرجعية ثابتة في data/
+    # (مُلتَزمة في المستودع) تُنسَخ كما هي إلى اللقطة؛ غيابها لا يكسر التصدير.
+    _coords_path = ROOT / "data" / "kuwait_areas.json"
+    if _coords_path.exists():
+        write_json("kuwait-areas.json", json.loads(_coords_path.read_text(encoding="utf-8")))
+    else:
+        print("warning: data/kuwait_areas.json مفقود — الخريطة التفاعلية بلا إحداثيات.", file=sys.stderr)
+
     # رابط القاعدة الحية للموقع المنشور: عندما تتوفر بيانات Supabase في بيئة البناء،
     # يُصدَّر ملف إعداد يسمح للواجهة الثابتة بالقراءة المباشرة من القاعدة (قراءة anon فقط،
     # تسمح بها سياسات RLS للجداول العامة) — فيصبح الموقع المرفوع ديناميكيًا فعليًا،

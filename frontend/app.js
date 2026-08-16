@@ -1705,12 +1705,151 @@ function renderInsightsHeatmap(data) {
   const root = $("insightsHeatmap");
   if (!root) return;
   const areas = computeInsightsHeatmap(data);
+  lastHeatmapAreas = areas;
   if (!areas.length) {
     root.innerHTML = '<div class="empty">لا توجد بيانات سعر/مساحة كافية للرسم الحراري — تتراكم مع الحصاد اليومي.</div>';
     return;
   }
   root.innerHTML = heatmapCellsHtml(areas);
   renderWatchedAreas($("watchedAreasInsights"), areas);
+  // الخريطة التفاعلية (إن كانت مفتوحة) تتلوّن من نفس القيم ونفس الوضع
+  if (heatmapView === "map") renderInsightsMap(areas);
+}
+
+// ─── الخريطة التفاعلية Leaflet: مناطق الكويت فوق الخريطة الحرارية ─────────
+let heatmapView = "grid";
+let lastHeatmapAreas = [];
+let insightsMap = null;
+let insightsMapMarkers = [];
+let kuwaitCoords = null;
+let leafletPromise = null;
+
+function loadLeaflet() {
+  if (window.L) return Promise.resolve(window.L);
+  if (leafletPromise) return leafletPromise;
+  leafletPromise = new Promise((resolve, reject) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    document.head.appendChild(css);
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload = () => resolve(window.L);
+    script.onerror = () => reject(new Error("تعذر تحميل مكتبة الخريطة (تحقق من الاتصال بالإنترنت)"));
+    document.head.appendChild(script);
+  });
+  return leafletPromise;
+}
+
+async function loadKuwaitCoords() {
+  if (kuwaitCoords) return kuwaitCoords;
+  try {
+    const response = await fetch("static-data/kuwait-areas.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    kuwaitCoords = await response.json();
+  } catch {
+    kuwaitCoords = { areas: {}, governorates: {} };
+  }
+  return kuwaitCoords;
+}
+
+function areaCoord(areaName, governorate) {
+  // محافظة مفهرسة بصيغتها الكنسية (محافظة حولي) أو المختصرة (حولي)
+  const gov = GOVERNORATE_CANONICAL[normalizeArabic(governorate)] || governorate || "";
+  const coords = kuwaitCoords || { areas: {}, governorates: {} };
+  const entry = coords.areas[normalizeArabic(areaName)];
+  if (entry) return { lat: entry.lat, lng: entry.lng, governorate: entry.governorate };
+  const govEntry = coords.governorates[gov] || coords.governorates[normalizeArabic(gov)];
+  if (govEntry) return { lat: govEntry.lat, lng: govEntry.lng, governorate: gov };
+  return null;
+}
+
+function renderInsightsMap(areas) {
+  const container = $("insightsLeafletMap");
+  if (!container) return;
+  const L = window.L;
+  if (!L) return;
+  if (!insightsMap) {
+    insightsMap = L.map(container, { zoomControl: true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(insightsMap);
+  }
+  insightsMapMarkers.forEach((marker) => marker.remove());
+  insightsMapMarkers = [];
+  const isYield = heatmapMode === "yield";
+  const points = [];
+  for (const a of areas) {
+    const coord = areaCoord(a.area, a.governorate);
+    if (!coord) continue;
+    const value = isYield ? a.yieldPct : a.gapPct;
+    const color = isYield ? yieldColor(value) : heatColor(value);
+    const sign = !isYield && value > 0 ? "+" : "";
+    const watched = isWatchedArea(a.area);
+    const valueText = value != null ? `${sign}${value.toLocaleString("en-US", { maximumFractionDigits: 1 })}%` : "—";
+    const unitText = isYield ? "عائد سنوي" : "فجوة عن وسيط المحافظة";
+    const watchLabel = watched ? "★ مراقَبة — إلغاء" : "☆ احجز لمراقبة التغيّر";
+    const marker = L.circleMarker([coord.lat, coord.lng], {
+      radius: isYield ? 13 : 14,
+      color: "#fff",
+      weight: 2,
+      fillColor: color,
+      fillOpacity: 0.9,
+    });
+    marker.bindPopup(`
+      <b>${escapeHtml(a.area)}</b> <span class="map-popup-gov">${escapeHtml(coord.governorate || "")}</span><br>
+      <span>${escapeHtml(unitText)}: <strong>${valueText}</strong></span><br>
+      <span class="map-popup-sub">${a.count || 0} إعلان · سعر المتر ${Number(a.perM2).toLocaleString("en-US")} د.ك</span><br>
+      <button type="button" class="map-watch-btn${watched ? " watched" : ""}" data-map-watch-area="${escapeHtml(a.area)}" data-map-watch-gap="${a.gapPct}" data-map-watch-yield="${a.yieldPct ?? ""}">${watchLabel}</button>
+    `);
+    marker.addTo(insightsMap);
+    insightsMapMarkers.push(marker);
+    points.push([coord.lat, coord.lng]);
+  }
+  if (points.length) {
+    insightsMap.fitBounds(L.latLngBounds(points).pad(0.18));
+  } else {
+    insightsMap.setView([29.31, 47.85], 9);
+  }
+  // أزرار «احجز» داخل النوافذ المنبثقة
+  document.querySelectorAll(".map-watch-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const area = btn.dataset.mapWatchArea || "";
+      const gap = btn.dataset.mapWatchGap != null && btn.dataset.mapWatchGap !== "" ? Number(btn.dataset.mapWatchGap) : null;
+      toggleWatchedArea(area, "", gap);
+      renderInsightsMap(lastHeatmapAreas);
+      renderInsightsHeatmap(insightsState.data);
+    });
+  });
+}
+
+async function setHeatmapView(view) {
+  const grid = $("insightsHeatmap");
+  const map = $("insightsLeafletMap");
+  if (!grid || !map) return;
+  heatmapView = view === "map" ? "map" : "grid";
+  document.querySelectorAll(".heatmap-view-switch .view-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.heatView === heatmapView);
+  });
+  grid.hidden = heatmapView === "map";
+  map.hidden = heatmapView !== "map";
+  if (heatmapView === "map") {
+    map.innerHTML = '<div class="empty map-loading">جاري تحميل الخريطة...</div>';
+    try {
+      await Promise.all([loadLeaflet(), loadKuwaitCoords()]);
+    } catch {
+      map.innerHTML = '<div class="empty">تعذر تحميل الخريطة التفاعلية — تحقق من الاتصال بالإنترنت، أو استخدم «شبكة المناطق».</div>';
+      return;
+    }
+    map.innerHTML = "";
+    renderInsightsMap(lastHeatmapAreas);
+  } else if (insightsMap) {
+    // تنظيف عند الرجوع للشبكة — تُعاد تهيئة الخريطة عند فتحها مجددًا
+    insightsMap.remove();
+    insightsMap = null;
+    insightsMapMarkers = [];
+  }
 }
 
 // قائمة «المناطق المراقبة»: تعرض فجوة كل منطقة محجوزة وتحدّث تلقائيًا عند تغيّر الحصاد
@@ -5343,6 +5482,12 @@ function bind() {
     if (modeBtn) {
       ev.preventDefault();
       setHeatmapMode(modeBtn.dataset.heatMode);
+      return;
+    }
+    const viewBtn = ev.target.closest?.("[data-heat-view]");
+    if (viewBtn) {
+      ev.preventDefault();
+      setHeatmapView(viewBtn.dataset.heatView);
       return;
     }
     const watchBtn = ev.target.closest?.("[data-watch-area]");
