@@ -973,3 +973,36 @@ def persist_analysis(request: PropertyRequest, report: dict[str, Any], statuses:
     save_source_runs(request, statuses)
     save_listing_evidence(report)
     return {"enabled": True, "status": "saved"}
+
+
+# ---------------------------------------------------------------------------
+# حسابات المستخدمين المجانيين (المهمة 1): تسجيل/تحقق OTP عبر خادم API
+# ---------------------------------------------------------------------------
+def fetch_user(phone: str) -> dict[str, Any] | None:
+    """قراءة مستخدم برقمه الموحّد (+965XXXXXXXX) — أو None عند غيابه/فشل الاتصال."""
+    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/users?phone=eq.{urllib.parse.quote(phone)}&select=*")
+    return rows[0] if rows else None
+
+
+def upsert_user(row: dict[str, Any]) -> None:
+    """إنشاء مستخدم جديد (أو إعادة إرسال الرمز) — upsert على رقم الهاتف."""
+    _post("users", [row], upsert=True, conflict="phone")
+
+
+def patch_user(phone: str, fields: dict[str, Any]) -> None:
+    """تحديث حقول مستخدم (التحقق/المحاولات/السرّ) — عبر PATCH على رقم الهاتف."""
+    if not fields or not is_configured():
+        return
+    endpoint = f"{SUPABASE_URL}/rest/v1/users?phone=eq.{urllib.parse.quote(phone)}"
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(fields, ensure_ascii=False).encode("utf-8"),
+        method="PATCH",
+        headers=_headers("return=representation"),
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            if response.status not in {200, 204}:
+                raise RuntimeError(f"Supabase returned HTTP {response.status}")
+    except Exception as exc:
+        logger.warning("Supabase users patch failed: %s", exc)

@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import logging
 import mimetypes
+import os
 import re
 import time
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -657,6 +659,36 @@ def json_response(handler: BaseHTTPRequestHandler, payload: dict, status: int = 
     handler.wfile.write(body)
 
 
+def _iso_utc(epoch: float) -> str:
+    """تحويل epoch إلى صيغة ISO معروفة لـ Supabase (timestamptz)."""
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+
+def _parse_epoch(iso_value) -> float | None:
+    """تحويل صيغة ISO من Supabase إلى epoch — أو None عند غياب/فشل."""
+    if not iso_value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(iso_value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except (ValueError, TypeError):
+        return None
+
+
+_OTP_ERROR_TEXT = {
+    "no_otp": "أرسل رمز التحقق أولًا",
+    "expired": "انتهت صلاحية الرمز — أعد إرسال رمز جديد",
+    "too_many_attempts": "تجاوزت عدد المحاولات — أعد إرسال الرمز",
+    "wrong_code": "الرمز غير صحيح — حاول مجددًا",
+}
+
+
+def _otp_error_text(reason: str) -> str:
+    return _OTP_ERROR_TEXT.get(reason, "تعذر التحقق من الرمز")
+
+
 def _default_sale_when_unspecified(request) -> None:
     text = f"{request.raw_text or ''}"
     if request.transaction:
@@ -1071,6 +1103,102 @@ class Handler(BaseHTTPRequestHandler):
         text = str(payload.get("text") or "")
         if path == "/api/parse":
             json_response(self, {"request": parse_request(text).__dict__})
+            return
+        if path == "/api/register":
+            # تسجيل مستخدم مجاني: توحيد الهاتف الكويتي + إصدار OTP (6 أرقام/10 دقائق)
+            # + نافذة 15 دقيقة بين إعادة الإرسال. التسليم واتساب (قالب) أو انحدار أنيق:
+            # الرمز على الشاشة مرة واحدة (delivery: on_screen) عند غياب أسرار واتساب.
+            from backend.services.accounts import (
+                OTP_RESEND_WINDOW_SECONDS,
+                issue_otp,
+                normalize_phone_kw,
+                otp_resend_allowed,
+            )
+            from backend.services.supabase_store import fetch_user, upsert_user
+            from scripts.send_whatsapp_message import send_template_message
+
+            phone = normalize_phone_kw(payload.get("phone") or "")
+            if not phone:
+                json_response(
+                    self,
+                    {"error": "invalid_phone", "detail": "أدخل رقم هاتف كويتي صحيح (مثال: 55512345)"},
+                    status=400,
+                )
+                return
+            now = time.time()
+            user = fetch_user(phone)
+            requested_at = _parse_epoch(user.get("otp_requested_at")) if user else None
+            if user and not otp_resend_allowed(now, requested_at):
+                remaining_min = max(1, int((OTP_RESEND_WINDOW_SECONDS - (now - (requested_at or 0))) // 60))
+                json_response(
+                    self,
+                    {"error": "rate_limited", "detail": f"أعد المحاولة بعد {remaining_min} دقيقة"},
+                    status=429,
+                )
+                return
+            code, stored, expires = issue_otp()
+            upsert_user(
+                {
+                    "phone": phone,
+                    "otp_hash": stored,
+                    "otp_expires_at": _iso_utc(expires),
+                    "otp_attempts": 0,
+                    "otp_requested_at": _iso_utc(now),
+                }
+            )
+            template = os.getenv("WHATSAPP_OTP_TEMPLATE", "alforaij_otp")
+            delivery = send_template_message(phone, template, [code])
+            if delivery:
+                json_response(self, {"status": "ok", "delivery": "whatsapp"})
+            else:
+                json_response(
+                    self,
+                    {
+                        "status": "ok",
+                        "delivery": "on_screen",
+                        "code": code,
+                        "expires_in_seconds": 600,
+                    },
+                )
+            return
+        if path == "/api/verify-otp":
+            # التحقق من الرمز: يصحح المحاولات/الانتهاء، ويُنشئ سرّ المستخدم (24 حرفًا)
+            # إن لم يكن موجودًا ويرجعه — المفتاح الوحيد لبياناته في المهام التالية.
+            from backend.services.accounts import check_otp, new_secret, normalize_phone_kw
+            from backend.services.supabase_store import fetch_user, patch_user
+
+            phone = normalize_phone_kw(payload.get("phone") or "")
+            code = str(payload.get("code") or "").strip()
+            if not phone or not code:
+                json_response(self, {"error": "missing_fields", "detail": "أدخل الهاتف والرمز"}, status=400)
+                return
+            user = fetch_user(phone)
+            if not user or not user.get("otp_hash"):
+                json_response(self, {"error": "no_otp", "detail": "أرسل رمز التحقق أولًا"}, status=400)
+                return
+            ok, reason = check_otp(
+                code,
+                user.get("otp_hash") or "",
+                _parse_epoch(user.get("otp_expires_at")) or 0,
+                int(user.get("otp_attempts") or 0),
+            )
+            if not ok:
+                if reason == "wrong_code":
+                    patch_user(phone, {"otp_attempts": int(user.get("otp_attempts") or 0) + 1})
+                json_response(self, {"error": reason, "detail": _otp_error_text(reason)}, status=400)
+                return
+            secret = user.get("secret") or new_secret()
+            patch_user(
+                phone,
+                {
+                    "verified": True,
+                    "secret": secret,
+                    "otp_hash": None,
+                    "otp_expires_at": None,
+                    "otp_attempts": 0,
+                },
+            )
+            json_response(self, {"status": "ok", "secret": secret, "phone": phone})
             return
         if path == "/api/analyze":
             job_id = str(payload.get("jobId") or "")
