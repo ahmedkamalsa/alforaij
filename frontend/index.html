@@ -10,7 +10,7 @@
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
-  <link rel="stylesheet" href="styles.css?v=20260816-free-accounts">
+  <link rel="stylesheet" href="styles.css?v=20260816-free-accounts-bell">
   <script src="config.js?v=20260811-trends"></script>
 </head>
 <body>
@@ -21,6 +21,10 @@
         <h1>منصة الفريج للفرص والتقييم العقاري</h1>
         <p class="hero-copy">بحث موحد في بيانات الفريج والمصادر الخارجية، تقييم موثق بمصدر كل رقم، وفرص مكسب تربط العرض بالطلب والعملاء المحتملين.</p>
         <div class="hero-actions">
+          <div class="bell-wrap">
+            <button class="hero-link bell-toggle" id="bellToggle" type="button" aria-label="تنبيهاتي" title="تنبيهاتي — الفرص المطابقة لبحثك المحفوظ">🔔 <span id="bellCount" class="bell-count" hidden>0</span></button>
+            <div id="bellDropdown" class="bell-dropdown" hidden></div>
+          </div>
           <button class="hero-link theme-toggle" id="themeToggle" type="button" aria-label="تبديل الوضع الفاتح/الداكن" title="الوضع الداكن/الفاتح"><svg class="hero-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg> الوضع الفاتح</button>
           <a class="hero-link hero-brand-link" href="https://front.alforaij.com/" target="_blank" rel="noreferrer" aria-label="فتح لوحة الفريج الأساسية — منصة الفريج الأصلية">
             <span class="brand-badge"><img class="brand-badge-ic" src="assets/alforaij-official-symbol.png" alt=""></span>
@@ -694,6 +698,6 @@
     </aside>
   </div>
 
-  <script src="app.js?v=20260816-free-accounts"></script>
+  <script src="app.js?v=20260816-free-accounts-bell"></script>
 </body>
 </html>

@@ -3544,9 +3544,13 @@ function accountLogout() {
   accountState.phone = "";
   accountState.saved = [];
   accountState.loaded = false;
+  alertState.alerts = [];
+  alertState.loaded = false;
   accountSave();
   renderAccountStatus();
   renderSavedSearches();
+  renderBell();
+  closeBell();
   showAccountMsg("سجّلت خروجك من هذا الجهاز.", false);
 }
 
@@ -3703,6 +3707,7 @@ async function accountVerifyOtp() {
     renderAccountStatus();
     showAccountMsg("تم التسجيل بنجاح ✓ — تنبيهاتك مفعّلة", false);
     loadSavedSearches();
+    loadUserAlerts();
   } finally {
     if (verifyBtn) verifyBtn.disabled = false;
   }
@@ -3836,6 +3841,80 @@ function bindSavedSearchesEvents() {
       p_id: Number(btn.dataset.del),
     }).then(() => loadSavedSearches());
   });
+}
+
+// ===== جرس التنبيهات (المهمة 4): عدّاد غير المقروء + قائمة منسدلة + «تم» =====
+const alertState = { alerts: [], loaded: false };
+
+async function loadUserAlerts() {
+  if (!accountState.secret) return;
+  const rows = await supabaseRpc("list_user_alerts", { p_secret: accountState.secret });
+  alertState.alerts = Array.isArray(rows) ? rows : [];
+  alertState.loaded = true;
+  renderBell();
+}
+
+function renderBell() {
+  const countEl = $("bellCount");
+  const list = alertState.alerts || [];
+  const unseen = list.filter((a) => !a.seen).length;
+  if (countEl) {
+    countEl.hidden = unseen <= 0;
+    countEl.textContent = unseen > 99 ? "99+" : String(unseen);
+    countEl.title = unseen > 0 ? `${unseen} تنبيه غير مقروء` : "لا تنبيهات غير مقروءة";
+  }
+  const dropdown = $("bellDropdown");
+  if (!dropdown) return;
+  if (!accountState.secret) {
+    dropdown.innerHTML =
+      '<div class="bell-empty">سجّل حسابك المجاني ثم احفظ بحثًا — سننبّهك عند نزول فرصة مطابقة.</div>';
+    return;
+  }
+  if (!list.length) {
+    dropdown.innerHTML =
+      '<div class="bell-empty">لا تنبيهات بعد — احفظ بحثًا لننبّهك عند نزول فرصة مطابقة لبحثك.</div>';
+    return;
+  }
+  dropdown.innerHTML =
+    `<div class="bell-head">تنبيهاتي (${list.length}) <button type="button" class="bell-mark" id="bellMarkAll">تم — علّم الكل مقروءًا</button></div>` +
+    list
+      .map(
+        (a) => `
+      <div class="bell-item ${a.seen ? "seen" : ""}">
+        <div class="bell-item-main">
+          <strong>${a.change === "price_drop" ? "📉 انخفاض سعر" : "🆕 فرصة جديدة"}</strong>
+          <span>${escapeHtml(a.message || "")}</span>
+          <em>${escapeHtml(a.area || "")}${a.price ? ` — ${Number(a.price).toLocaleString("en-US")} د.ك` : ""}</em>
+        </div>
+        ${a.url ? `<a class="bell-open" href="${escapeHtml(a.url)}" target="_blank" rel="noreferrer">فتح الفرصة</a>` : ""}
+      </div>`
+      )
+      .join("");
+  const markBtn = $("bellMarkAll");
+  if (markBtn) markBtn.onclick = markAllAlertsSeen;
+}
+
+function toggleBell() {
+  const dropdown = $("bellDropdown");
+  if (!dropdown) return;
+  if (dropdown.hidden) {
+    if (accountState.secret) loadUserAlerts();
+    dropdown.hidden = false;
+  } else {
+    dropdown.hidden = true;
+  }
+}
+
+async function markAllAlertsSeen() {
+  if (!accountState.secret) return;
+  await supabaseRpc("mark_alerts_seen", { p_secret: accountState.secret });
+  (alertState.alerts || []).forEach((a) => (a.seen = true));
+  renderBell();
+}
+
+function closeBell() {
+  const dropdown = $("bellDropdown");
+  if (dropdown) dropdown.hidden = true;
 }
 
 // روابط إرسال شخصية لكل عميل مطابق: رسالة مخصصة بمنطقته/نوعه وميزانيته + الفرصة كاملة بأدلتها
@@ -5367,7 +5446,17 @@ async function boot() {
     if (e.key === "Escape") closeAccountModal();
   });
   bindSavedSearchesEvents();
-  if (accountState.secret) loadSavedSearches();
+  // الجرس: التبديل + الإغلاق عند النقر خارجه أو Escape؛ تُحمَّل التنبيهات عند وجود سرّ فقط
+  const bellToggle = $("bellToggle");
+  if (bellToggle) bellToggle.onclick = toggleBell;
+  document.addEventListener("click", (e) => {
+    const wrap = e.target.closest && e.target.closest(".bell-wrap");
+    if (!wrap) closeBell();
+  });
+  if (accountState.secret) {
+    loadSavedSearches();
+    loadUserAlerts();
+  }
   scheduleDailySixAM();
   // تحديث أول بأول: أول تحميل يدمج المصادر الحية (لأن الكاش فارغ)، ثم تحديث محلي سريع كل 5 دقائق
   // (الفحص الحي المتكرر كل دقائق قد يُحظر من المواقع الخارجية — لذلك يكون صريحًا فقط)

@@ -45,6 +45,11 @@ PYTHONIOENCODING=utf-8 python -m backend.main
 | `AGENT_ROUTER_API_KEY` | تحليل الخبير AI عبر agentrouter (غيابه = تحليل محلي احترافي) |
 | `OFFICIAL_TRANSACTIONS_SOURCE` | رابط/مسار CSV/JSON موثق لصفقات وزارة العدل |
 | `ALFORAIJ_SEED_LISTINGS` / `ALFORAIJ_BOARD_HTML` | مسار نسخة الفريج / ملف اللوحة |
+| `SUPABASE_ANON_KEY` | المفتاح العام (anon) للواجهة المرفوعة — تُقدَّم عبر `/api/live-db` |
+| `WHATSAPP_TOKEN` (اختياري) | رمز واجهة Meta Cloud API — غيابه: رمز OTP يظهر على الشاشة والتنبيهات تتراكم في الجرس فقط |
+| `WHATSAPP_PHONE_ID` (اختياري) | رقم الهاتف المرسِل في Cloud API (منفصل عن رقمك الشخصي) |
+| `WHATSAPP_OTP_TEMPLATE` (اختياري) | اسم قالب رمز التحقق المعتمد في Meta (افتراضي `alforaij_otp`) |
+| `WHATSAPP_ALERT_TEMPLATE` (اختياري) | اسم قالب تنبيه الفرصة (متغيرات: فرصة/منطقة/سعر/رابط — افتراضي `alforaij_alert`) |
 
 ---
 
