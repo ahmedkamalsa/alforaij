@@ -1,18 +1,9 @@
 {
-  "generatedAt": "2026-08-16T03:40:02",
-  "count": 8,
+  "generatedAt": "2026-08-16T15:41:42",
+  "count": 6,
   "status": "success",
-  "note": "جمع 8 تطورًا، 3/11 مصادر عقارية",
+  "note": "جمع 6 تطورًا، 2/11 مصادر عقارية",
   "developments": [
-    {
-      "url": "https://www.alanba.com.kw/1372017",
-      "title": "هاتف سبايدرمان يثير الفضول... فما الجهاز الذي يستخدمه بيتر باركر في فيلم «يوم جديد»؟",
-      "source": "alanba",
-      "source_name": "الأنباء",
-      "category": "أخبار السوق",
-      "published": "",
-      "summary": ""
-    },
     {
       "url": "https://alanba.com.kw/BBCNews/19151/",
       "title": "هيثم حسن إلى سيلتك... كيف استقبل الجمهور الصفقة؟",
@@ -66,15 +57,6 @@
       "category": "تمويل عقاري",
       "published": "",
       "summary": ""
-    },
-    {
-      "url": "https://www.moj.gov.kw/EN/pages/DeptProcedure.aspx?ItemID=865",
-      "title": "Selling the absolute ownership of the property or ...",
-      "source": "moj_deals",
-      "source_name": "وزارة العدل - التسجيل العقاري",
-      "category": "تنظيم وقانون",
-      "published": "",
-      "summary": ""
     }
   ],
   "sources": [
@@ -121,8 +103,8 @@
     {
       "name": "الأنباء",
       "status": "success",
-      "records": 3,
-      "note": "3 عنوانًا إجمالًا، 3 عقاريًا",
+      "records": 2,
+      "note": "2 عنوانًا إجمالًا، 2 عقاريًا",
       "fetchMethod": "HTML",
       "endpoint": "https://www.alanba.com.kw/rss/"
     },
@@ -160,9 +142,9 @@
     },
     {
       "name": "وزارة العدل - التسجيل العقاري",
-      "status": "success",
-      "records": 1,
-      "note": "19 عنوانًا إجمالًا، 1 عقاريًا",
+      "status": "failed",
+      "records": 0,
+      "note": "<urlopen error timed out>",
       "fetchMethod": "HTML",
       "endpoint": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx"
     }
