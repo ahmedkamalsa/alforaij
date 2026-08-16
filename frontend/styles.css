@@ -6294,3 +6294,21 @@ body.drill-open {
   text-decoration: none;
   white-space: nowrap;
 }
+
+/* ===== زر مشاركة صفحة «لماذا مجاني وأدق» ===== */
+.whyfree-share {
+  background: transparent;
+  color: var(--green);
+  border: 1px solid var(--green);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  min-height: 44px;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
+}
+
+.whyfree-share:hover {
+  background: var(--green-soft);
+}
