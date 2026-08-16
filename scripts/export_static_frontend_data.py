@@ -33,6 +33,58 @@ def guarded(name: str, fn: Callable[[], dict[str, Any]], fallback: dict[str, Any
         return payload
 
 
+def build_platform_dates(listings: list[Any]) -> dict[str, Any]:
+    """بداية الحصاد لكل منصة: عدد الإعلانات + أول يوم جلب + أقدم تاريخ نشر معروف.
+
+    المصدر: الفريج المحلي من ملف البذرة، والمواقع الخارجية من market_listings
+    (الجدول لا يُكشف لـ anon — هنا عبر service_role في بيئة البناء).
+    المواقع لا تنشر تواريخ إعلاناتها عادة، لذا firstFetch هو المرجع الصادق.
+    """
+    import collections
+
+    from backend.services.supabase_store import _fetch_rows, SUPABASE_URL, is_configured
+
+    per: dict[str, dict[str, Any]] = collections.defaultdict(
+        lambda: {"count": 0, "firstFetch": None, "earliestPublished": None}
+    )
+    for row in listings:
+        src = str(getattr(row, "source", "") or "الفريج") or "الفريج"
+        per[src]["count"] += 1
+    rows: list[dict[str, Any]] = []
+    if is_configured():
+        try:
+            # Supabase يحدّ أقصى صفوف لكل طلب بـ 1000 — نمرّر الصفحات لنحصي الكل
+            for offset in range(0, 6000, 1000):
+                page = _fetch_rows(
+                    f"{SUPABASE_URL}/rest/v1/market_listings?select=source,published_date,fetched_at&limit=1000&offset={offset}"
+                ) or []
+                rows.extend(page)
+                if len(page) < 1000:
+                    break
+        except Exception as exc:
+            print(f"warning: platform-dates market fetch failed: {exc}", file=sys.stderr)
+            rows = []
+        for row in rows:
+            src = str(row.get("source") or "(بلا مصدر)")
+            info = per[src]
+            info["count"] += 1
+            first = str(row.get("fetched_at") or "")[:10]
+            if first and (not info["firstFetch"] or first < info["firstFetch"]):
+                info["firstFetch"] = first
+            pub = str(row.get("published_date") or "")[:10]
+            if pub and (not info["earliestPublished"] or pub < info["earliestPublished"]):
+                info["earliestPublished"] = pub
+    platforms = [
+        {"source": src, **info}
+        for src, info in sorted(per.items(), key=lambda kv: (-kv[1]["count"], kv[0]))
+    ]
+    return {
+        "generatedAt": __import__("datetime").datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "note": "firstFetch = أول يوم بدأنا فيه جلب الإعلانات من هذه المنصة؛ المواقع الخارجية لا تنشر تاريخ الإعلان عادة، لذا هو المرجع الصادق لبداية التغطية.",
+        "platforms": platforms,
+    }
+
+
 def main() -> None:
     from backend.connectors.alforaij import load_listings
     from backend.services.source_registry import source_registry
@@ -122,6 +174,7 @@ def main() -> None:
     }
 
     write_json("dashboard-summary.json", dashboard)
+    write_json("platform-dates.json", guarded("platform-dates", lambda: build_platform_dates(listings)))
     write_json("opportunities.json", opportunities)
     write_json("price-trends.json", _price_trends)
     write_json("market-insights.json", guarded(

@@ -158,6 +158,7 @@ const STATIC_DATA_MAP = {
   "/api/live-db": "live-db.json",
   "/api/market-insights": "market-insights.json",
   "/api/developments": "developments.json",
+  "/api/platform-dates": "platform-dates.json",
 };
 
 function apiUrl(path) {
@@ -496,17 +497,21 @@ async function applyLiveDbCounts(statusEl) {
     const base = cfg.url.replace(/\/$/, "");
     const [market, opps] = await Promise.all([
       fetch(`${base}/rest/v1/market_listings?select=count`, { headers }).then((r) => r.json()),
-      fetch(`${base}/rest/v1/opportunities?select=count`, { headers }).then((r) => r.json()),
+      // عدد الفرص الحقيقي: آخر لقطة فرص (total_scored) — لا عدد صفوف اللقطات المتراكمة
+      fetch(`${base}/rest/v1/opportunities?select=total_scored,total_listings&order=generated_at.desc&limit=1`, { headers }).then((r) => r.json()),
     ]);
     const marketN = Number((market[0] || {}).count || 0);
-    const oppsN = Number((opps[0] || {}).count || 0);
+    const oppRow = Array.isArray(opps) && opps[0] ? opps[0] : null;
+    const scoredN = Number((oppRow || {}).total_scored || 0);
+    const listedN = Number((oppRow || {}).total_listings || 0);
     if (!marketN) return;
     const el = statusEl || $("healthStatus");
     if (!el) return;
     // إعلانات الفريج المحلية من اللقطة (مصدرها ملف محلي لا جدول القاعدة)
     const localN = Number(el.dataset.snapshotLocal || 0);
     const breakdown = [`الفريج ${localN}`, `المواقع الخارجية ${marketN}`].join(" + ");
-    el.textContent = `البيانات: ${localN + marketN} إعلان مباشر من القاعدة (${breakdown}) | القاعدة: متصلة | ${oppsN} فرصة`;
+    const oppsText = scoredN > 0 ? ` | ${scoredN.toLocaleString("en-US")} فرصة مقيّمة (من ${listedN.toLocaleString("en-US")} مفحوصة)` : "";
+    el.textContent = `البيانات: ${localN + marketN} إعلان مباشر من القاعدة (${breakdown}) | القاعدة: متصلة${oppsText}`;
     el.title = `قراءة حية من قاعدة البيانات — ${breakdown}`;
     el.dataset.live = "1";
   } catch {
@@ -3549,9 +3554,12 @@ function accountLogout() {
   accountState.loaded = false;
   alertState.alerts = [];
   alertState.loaded = false;
+  portfolioState.items = [];
+  portfolioState.loaded = false;
   accountSave();
   renderAccountStatus();
   renderSavedSearches();
+  portfolioShowHide();
   renderBell();
   closeBell();
   showAccountMsg("سجّلت خروجك من هذا الجهاز.", false);
@@ -3628,6 +3636,7 @@ function openAccountModal() {
   if (!modal) return;
   modal.hidden = false;
   renderAccountStatus();
+  portfolioShowHide();
   const phoneEl = $("accountPhone");
   const stepPhone = $("accountStepPhone");
   const stepOtp = $("accountStepOtp");
@@ -3711,6 +3720,7 @@ async function accountVerifyOtp() {
     showAccountMsg("تم التسجيل بنجاح ✓ — تنبيهاتك مفعّلة", false);
     loadSavedSearches();
     loadUserAlerts();
+    loadPortfolio();
   } finally {
     if (verifyBtn) verifyBtn.disabled = false;
   }
@@ -3844,6 +3854,207 @@ function bindSavedSearchesEvents() {
       p_id: Number(btn.dataset.del),
     }).then(() => loadSavedSearches());
   });
+}
+
+// ===== محفظة المستثمر المجانية: سجّل عقاراتك وتتبّع قيمتها التقديرية وعائدها =====
+const portfolioState = { items: [], loaded: false, trends: null, forecast: null };
+
+// مصادر التقييم: التوقعات (سعر المتر المتوقع لكل منطقة) ثم price_trends — تُحمَّل مرة واحدة.
+async function ensurePortfolioData() {
+  if (!portfolioState.trends) {
+    portfolioState.trends = await getJson("/api/price-trends")
+      .then((d) => (d && Array.isArray(d.rows) ? d.rows : null))
+      .catch(() => null);
+  }
+  if (!portfolioState.forecast) {
+    if (oppState.data && Array.isArray(oppState.data.forecast)) {
+      portfolioState.forecast = oppState.data.forecast;
+    } else {
+      const opp = await getJson("/api/opportunities").catch(() => null);
+      portfolioState.forecast = opp && Array.isArray(opp.forecast) ? opp.forecast : null;
+    }
+  }
+}
+
+// مرآة جافاسكربت لمنطق portfolio.py النقي (نفس قواعد التطبيع والاختيار).
+function portfolioNorm(text) {
+  return String(text || "")
+    .replace(/[\u0640]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function portfolioEstimate(item) {
+  const space = Number(item.space);
+  const purchase = Number(item.purchase_price);
+  const rent = Number(item.monthly_rent);
+  const areaN = portfolioNorm(item.area);
+  let perSqm = null;
+  const forecast = portfolioState.forecast || [];
+  for (const entry of forecast) {
+    if (portfolioNorm(entry.area) !== areaN) continue;
+    const v = Number(entry.expectedPricePerSqm);
+    if (Number.isFinite(v) && v > 0 && (perSqm === null || v > perSqm)) perSqm = v;
+  }
+  if (!(perSqm > 0)) {
+    const trends = portfolioState.trends || [];
+    let bestType = null;
+    let bestArea = null;
+    const typeN = portfolioNorm(item.property_type);
+    for (const t of trends) {
+      const v = Number(t.median_price_per_m2);
+      if (!Number.isFinite(v) || v <= 0 || portfolioNorm(t.area) !== areaN) continue;
+      const month = String(t.month || "");
+      if (portfolioNorm(t.property_type) && portfolioNorm(t.property_type) === typeN) {
+        if (!bestType || month > bestType.month) bestType = { month, v };
+      }
+      if (!bestArea || month > bestArea.month) bestArea = { month, v };
+    }
+    perSqm = bestType ? bestType.v : bestArea ? bestArea.v : null;
+  }
+  const value = Number.isFinite(space) && space > 0 && perSqm !== null && perSqm > 0 ? space * perSqm : null;
+  const changePct = value !== null && Number.isFinite(purchase) && purchase > 0 ? ((value - purchase) / purchase) * 100 : null;
+  const yieldPct = Number.isFinite(rent) && rent > 0 && Number.isFinite(purchase) && purchase > 0 ? (rent * 12 / purchase) * 100 : null;
+  return {
+    estimatedValue: value !== null ? Math.round(value) : null,
+    changePct: changePct !== null ? Math.round(changePct * 10) / 10 : null,
+    yieldPct: yieldPct !== null ? Math.round(yieldPct * 10) / 10 : null,
+  };
+}
+
+async function loadPortfolio() {
+  if (!accountState.secret) return;
+  const rows = await supabaseRpc("list_portfolio_items", { p_secret: accountState.secret });
+  portfolioState.items = Array.isArray(rows) ? rows : [];
+  portfolioState.loaded = true;
+  renderPortfolio();
+}
+
+// يعرض/يخفي قسم المحفظة حسب حالة التسجيل — يُستدعى عند فتح نافذة الحساب وبعد كل تسجيل/خروج.
+function portfolioShowHide() {
+  const wrap = $("portfolioWrap");
+  if (!wrap) return;
+  wrap.hidden = !accountState.isLoggedIn();
+  if (accountState.isLoggedIn() && !portfolioState.loaded) loadPortfolio();
+}
+
+async function renderPortfolio() {
+  const list = $("portfolioList");
+  if (!list) return;
+  await ensurePortfolioData();
+  const items = portfolioState.items || [];
+  if (!items.length) {
+    list.innerHTML = '<div class="saved-empty">لا عقارات بعد — أضف أول عقار لتتتبّع قيمته التقديرية وعائده.</div>';
+    return;
+  }
+  list.innerHTML =
+    `<div class="saved-title">عقاراتي (${items.length})</div>` +
+    items
+      .map((item) => {
+        const est = portfolioEstimate(item);
+        const change =
+          est.changePct !== null
+            ? `<span class="pf-change ${est.changePct >= 0 ? "up" : "down"}">${est.changePct >= 0 ? "+" : ""}${est.changePct}%</span>`
+            : "";
+        return `
+      <article class="portfolio-item" data-id="${Number(item.id)}">
+        <div class="portfolio-item-head">
+          <strong>${escapeHtml(item.area || "")}${item.property_type ? ` · ${escapeHtml(item.property_type)}` : ""}</strong>
+          <button type="button" class="saved-del" data-pf-del="${Number(item.id)}" aria-label="حذف العقار">حذف</button>
+        </div>
+        <div class="portfolio-stats">
+          <span>المساحة: ${item.space ? `${Number(item.space).toLocaleString("en-US")} م²` : "—"}</span>
+          <span>الشراء: ${oppMoney(item.purchase_price)}</span>
+          <span>الإيجار: ${oppMoney(item.monthly_rent)}/شهر</span>
+        </div>
+        <div class="portfolio-value">
+          القيمة التقديرية الحالية: <strong>${oppMoney(est.estimatedValue)}</strong> ${change}
+          <span class="portfolio-yield">عائد سنوي تقديري: ${est.yieldPct !== null ? `${est.yieldPct}%` : "—"}</span>
+        </div>
+      </article>`;
+      })
+      .join("");
+}
+
+async function portfolioSave(ev) {
+  if (ev && ev.preventDefault) ev.preventDefault();
+  if (!accountState.secret) {
+    showAccountMsg("سجّل حسابك أولًا لحفظ عقاراتك", true);
+    return false;
+  }
+  const area = (($("pfArea") || {}).value || "").trim();
+  if (!area) {
+    showAccountMsg("أدخل اسم المنطقة", true);
+    return false;
+  }
+  const res = await supabaseRpc("save_portfolio_item", {
+    p_secret: accountState.secret,
+    p_area: area,
+    p_governorate: "",
+    p_property_type: (($("pfType") || {}).value || "").trim(),
+    p_space: Number(($("pfSpace") || {}).value) || null,
+    p_purchase_price: Number(($("pfPrice") || {}).value) || null,
+    p_purchase_date: (($("pfDate") || {}).value || "").trim(),
+    p_monthly_rent: Number(($("pfRent") || {}).value) || null,
+    p_note: "",
+  });
+  if (res == null) {
+    showAccountMsg("تعذر الحفظ — أعد المحاولة لاحقًا", true);
+    return false;
+  }
+  const form = $("portfolioForm");
+  if (form) form.reset();
+  await loadPortfolio();
+  showAccountMsg("أُضيف العقار إلى محفظتك ✓", false);
+  return false;
+}
+
+function bindPortfolioEvents() {
+  const list = $("portfolioList");
+  if (!list) return;
+  list.addEventListener("click", (e) => {
+    const btn = e.target.closest && e.target.closest("button[data-pf-del]");
+    if (!btn || !accountState.secret) return;
+    supabaseRpc("delete_portfolio_item", {
+      p_secret: accountState.secret,
+      p_id: Number(btn.dataset.pfDel),
+    }).then(() => loadPortfolio());
+  });
+}
+
+// ===== جدول «بداية التغطية لكل منصة» في صفحة لماذا مجاني وأدق =====
+async function renderPlatformDates() {
+  const wrap = $("platformDatesWrap");
+  if (!wrap) return;
+  try {
+    const data = await getJson("/api/platform-dates");
+    const platforms = data && Array.isArray(data.platforms) ? data.platforms : [];
+    if (!platforms.length) {
+      wrap.innerHTML = '<div class="saved-empty">بيانات بداية الحصاد غير متاحة بعد.</div>';
+      return;
+    }
+    const fmt = (d) => (d ? String(d).replace(/-/g, "/") : "—");
+    const rows = platforms
+      .map(
+        (p) => `
+      <div class="coverage-row" role="row">
+        <span class="coverage-src">${escapeHtml(p.source || "")}</span>
+        <strong>${Number(p.count || 0).toLocaleString("en-US")}</strong>
+        <span>${fmt(p.firstFetch)}</span>
+        <span>${fmt(p.earliestPublished)}</span>
+      </div>`
+      )
+      .join("");
+    wrap.innerHTML =
+      `<div class="coverage-row coverage-head" role="row">
+        <span>المنصة</span><span>إعلانات</span><span>أول جلب</span><span>أقدم تاريخ نشر معروف</span>
+      </div>` + rows;
+  } catch {
+    wrap.innerHTML = '<div class="saved-empty">بيانات بداية الحصاد غير متاحة حاليًا.</div>';
+  }
 }
 
 // ===== جرس التنبيهات (المهمة 4): عدّاد غير المقروء + قائمة منسدلة + «تم» =====
@@ -5473,6 +5684,8 @@ async function boot() {
     if (e.key === "Escape") closeAccountModal();
   });
   bindSavedSearchesEvents();
+  bindPortfolioEvents();
+  renderPlatformDates();
   // الجرس: التبديل + الإغلاق عند النقر خارجه أو Escape؛ تُحمَّل التنبيهات عند وجود سرّ فقط
   const bellToggle = $("bellToggle");
   if (bellToggle) bellToggle.onclick = toggleBell;
@@ -5483,6 +5696,7 @@ async function boot() {
   if (accountState.secret) {
     loadSavedSearches();
     loadUserAlerts();
+    loadPortfolio();
   }
   scheduleDailySixAM();
   // تحديث أول بأول: أول تحميل يدمج المصادر الحية (لأن الكاش فارغ)، ثم تحديث محلي سريع كل 5 دقائق

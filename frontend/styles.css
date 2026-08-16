@@ -6312,3 +6312,133 @@ body.drill-open {
 .whyfree-share:hover {
   background: var(--green-soft);
 }
+/* ── جدول بداية التغطية لكل منصة (صفحة لماذا مجاني وأدق) ── */
+.whyfree-coverage {
+  margin-top: 22px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.whyfree-coverage h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+.whyfree-coverage-note {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.coverage-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.coverage-row {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 1fr 1.4fr;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.coverage-head {
+  background: var(--blue-soft);
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 12px;
+}
+.coverage-src {
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .coverage-row {
+    grid-template-columns: 1fr 1fr;
+    font-size: 12px;
+  }
+}
+
+/* ── محفظة المستثمر (داخل نافذة الحساب) ── */
+.portfolio-wrap {
+  margin-top: 16px;
+  border-top: 1px dashed var(--line);
+  padding-top: 14px;
+}
+.portfolio-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.portfolio-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+.portfolio-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.portfolio-add-btn {
+  width: 100%;
+}
+.portfolio-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.portfolio-item {
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.portfolio-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.portfolio-item-head strong {
+  font-size: 13.5px;
+}
+.portfolio-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.portfolio-value {
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+.portfolio-value strong {
+  color: var(--blue);
+}
+.pf-change.up {
+  color: var(--green);
+}
+.pf-change.down {
+  color: var(--red);
+}
+.portfolio-yield {
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 520px) {
+  .portfolio-grid2 {
+    grid-template-columns: 1fr;
+  }
+}

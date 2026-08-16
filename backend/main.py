@@ -891,6 +891,11 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 json_response(self, _build_dashboard())
             return
+        if path == "/api/platform-dates":
+            # بداية الحصاد لكل منصة: عدد الإعلانات + أول يوم جلب + أقدم تاريخ نشر
+            from scripts.export_static_frontend_data import build_platform_dates
+            json_response(self, _ttl_cached("platform-dates", 900, lambda: build_platform_dates(load_listings())))
+            return
         if path == "/api/update-notifications":
             from backend.services.update_notifications import load_update_notifications
             json_response(self, load_update_notifications())

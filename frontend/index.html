@@ -538,6 +538,12 @@
           </div>
         </div>
 
+        <div class="whyfree-coverage">
+          <h4>من أين نجمع؟ بداية التغطية لكل منصة</h4>
+          <p class="whyfree-coverage-note">عدد الإعلانات الحالي وأول يوم بدأنا فيه الجلب من كل منصة — المواقع الخارجية لا تنشر تاريخ الإعلان عادة، لذلك «أول جلب» هو المرجع الصادق لبداية التغطية، وتاريخ النشر المعروف يُذكر حيث توفره المنصة.</p>
+          <div id="platformDatesWrap" class="coverage-table" role="table" aria-label="بداية الحصاد لكل منصة"></div>
+        </div>
+
         <details class="collapsible">
           <summary>مصادر الأسعار — افتح وتحقّق بنفسك</summary>
           <ul class="whyfree-sources">
@@ -696,9 +702,46 @@
       </div>
       <p id="accountMsg" class="account-msg" hidden></p>
       <p id="accountStatus" class="account-status" hidden></p>
+      <div id="portfolioWrap" class="portfolio-wrap" hidden>
+        <h4 class="portfolio-title">محفظتي العقارية</h4>
+        <p class="account-sub">سجّل عقاراتك لتتتبّع قيمتها السوقية التقديرية وعائدها — مجانًا. التقدير من سعر المتر المتوقع في المنطقة، وليس تقييمًا نهائيًا.</p>
+        <form id="portfolioForm" class="portfolio-form" onsubmit="return portfolioSave(event)">
+          <label class="account-field">المنطقة
+            <input id="pfArea" type="text" placeholder="مثال: السالمية" required>
+          </label>
+          <label class="account-field">نوع العقار
+            <select id="pfType">
+              <option value="">—</option>
+              <option>شقة</option>
+              <option>بيت</option>
+              <option>أرض</option>
+              <option>مكتب</option>
+              <option>محل</option>
+            </select>
+          </label>
+          <div class="portfolio-grid2">
+            <label class="account-field">المساحة (م²)
+              <input id="pfSpace" type="number" min="1" placeholder="400">
+            </label>
+            <label class="account-field">سعر الشراء (د.ك)
+              <input id="pfPrice" type="number" min="1" placeholder="250000">
+            </label>
+          </div>
+          <div class="portfolio-grid2">
+            <label class="account-field">الإيجار الشهري (د.ك)
+              <input id="pfRent" type="number" min="0" placeholder="900">
+            </label>
+            <label class="account-field">تاريخ الشراء
+              <input id="pfDate" type="text" placeholder="2026-01">
+            </label>
+          </div>
+          <button type="submit" class="primary portfolio-add-btn">أضف إلى محفظتي</button>
+        </form>
+        <div id="portfolioList" class="portfolio-list"></div>
+      </div>
     </aside>
   </div>
 
-  <script src="app.js?v=20260816-why-free-share-fix"></script>
+  <script src="app.js?v=20260816-accounts-portfolio-platform-dates"></script>
 </body>
 </html>
