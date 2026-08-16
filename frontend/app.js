@@ -65,6 +65,8 @@ const state = {
   report: null,
   chatMessages: [],
   chatSubmitting: false,
+  simpleMode: false,
+  simpleFilters: {}, // { area: Set, type: Set, tx: Set } — فلاتر النقر السريعة
 };
 
 const boardState = {
@@ -2714,6 +2716,124 @@ function renderProfitOpportunities(report) {
   }).join("");
 }
 
+// ─── وضع مبسّط للباحث العادي: بطاقات أكبر بلا جداول تحليلية + فلترة بالنقر ───
+
+function toggleSimpleMode() {
+  state.simpleMode = !state.simpleMode;
+  localStorage.setItem("alforaij_simple_mode", state.simpleMode ? "1" : "0");
+  applySimpleMode();
+}
+
+function applySimpleMode() {
+  const on = localStorage.getItem("alforaij_simple_mode") === "1";
+  state.simpleMode = on;
+  document.body.classList.toggle("simple-mode", on);
+  const btn = $("simpleModeToggle");
+  if (btn) btn.textContent = on ? "👁 وضع مفصل" : "👁 وضع مبسّط";
+  if (btn) btn.title = on ? "العودة للتحليل المفصل الكامل" : "بطاقات أكبر واتصال مباشر بلا جداول تحليلية";
+}
+
+function countByNormalized(items, pick) {
+  const counts = {};
+  for (const item of items) {
+    const raw = String(pick(item) || "").trim();
+    const key = normalizeArabic(raw);
+    if (!key) continue;
+    if (!counts[key]) counts[key] = { label: raw, count: 0 };
+    counts[key].count += 1;
+  }
+  return counts;
+}
+
+function renderResultsFilterChips(results) {
+  const root = $("resultsFilterChips");
+  if (!root) return;
+  root.innerHTML = "";
+  const items = (results || []).filter((r) => !(r.warnings || []).some((w) => String(w).includes("خارج المنطقة المطلوبة")));
+  const byArea = countByNormalized(items, (r) => r.area);
+  const byType = countByNormalized(items, (r) => r.propertyType || r.detailClass);
+  const byTx = countByNormalized(items, (r) => r.transaction);
+  if (!Object.keys(byArea).length && !Object.keys(byType).length && !Object.keys(byTx).length) {
+    root.hidden = true;
+    return;
+  }
+  root.hidden = false;
+  const groups = [
+    ["area", "المنطقة", byArea],
+    ["type", "نوع العقار", byType],
+    ["tx", "المعاملة", byTx],
+  ];
+  for (const [key, label, counts] of groups) {
+    const entries = Object.entries(counts).sort((a, b) => b[1].count - a[1].count).slice(0, 8);
+    if (!entries.length) continue;
+    root.insertAdjacentHTML("beforeend", `<span class="chip-group-label">${escapeHtml(label)}</span>`);
+    for (const [value, meta] of entries) {
+      const active = (state.simpleFilters[key] || new Set()).has(value);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `filter-chip${active ? " active" : ""}`;
+      btn.dataset.key = key;
+      btn.dataset.value = value;
+      btn.innerHTML = `${escapeHtml(meta.label)} <b>${meta.count}</b>`;
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+      btn.addEventListener("click", () => toggleSimpleFilter(key, value, btn));
+      root.appendChild(btn);
+    }
+  }
+  if (Object.keys(state.simpleFilters).some((k) => (state.simpleFilters[k] || new Set()).size)) {
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "filter-chip clear";
+    clear.textContent = "✕ مسح الفلاتر";
+    clear.addEventListener("click", () => {
+      state.simpleFilters = {};
+      renderResultsFilterChips(results);
+      applySimpleFilters();
+    });
+    root.appendChild(clear);
+  }
+}
+
+function toggleSimpleFilter(key, value, btn) {
+  if (!state.simpleFilters[key]) state.simpleFilters[key] = new Set();
+  const set = state.simpleFilters[key];
+  if (set.has(value)) set.delete(value);
+  else set.add(value);
+  btn.classList.toggle("active", set.has(value));
+  btn.setAttribute("aria-pressed", set.has(value) ? "true" : "false");
+  applySimpleFilters();
+}
+
+function applySimpleFilters() {
+  const root = $("results");
+  if (!root) return;
+  let note = $("simpleFilterNote");
+  const all = root.querySelectorAll(".result-card");
+  const hasFilters = Object.keys(state.simpleFilters).some((k) => (state.simpleFilters[k] || new Set()).size);
+  if (!hasFilters) {
+    all.forEach((card) => { card.hidden = false; });
+    if (note) note.remove();
+    return;
+  }
+  let shown = 0;
+  all.forEach((card) => {
+    const matches = Object.entries(state.simpleFilters).every(([key, set]) => {
+      if (!set.size) return true;
+      const val = card.dataset[key === "area" ? "sarea" : key === "type" ? "stype" : "stx"] || "";
+      return set.has(val);
+    });
+    card.hidden = !matches;
+    if (matches) shown += 1;
+  });
+  if (!note) {
+    note = document.createElement("div");
+    note.id = "simpleFilterNote";
+    note.className = "simple-filter-note";
+    root.insertAdjacentElement("afterbegin", note);
+  }
+  note.textContent = `معروض ${shown} من ${all.length} نتيجة حسب الفلاتر.`;
+}
+
 function renderReport(report) {
   const summaryEl = $("summaryText");
   const summary = report.summary || "";
@@ -2775,6 +2895,22 @@ function renderReport(report) {
     renderedIndex += 1;
     node.querySelector(".rank-cell").textContent = renderedIndex;
     node.querySelector("h3").textContent = `${item.code} - ${item.area || "منطقة غير محددة"}`;
+    // حقول الفلترة بالنقر (منطقة/نوع/معاملة) — تُطابق الرقائق فوق النتائج
+    const cardNode = node.querySelector(".result-card");
+    if (cardNode) {
+      cardNode.dataset.sarea = normalizeArabic(item.area || "");
+      cardNode.dataset.stype = normalizeArabic(item.propertyType || item.detailClass || "");
+      cardNode.dataset.stx = normalizeArabic(item.transaction || "");
+    }
+    // كتلة البطاقة المبسطة: السعر كبير + منطقة + نوع + تاريخ (تظهر في وضع مبسّط فقط)
+    const simplePrice = node.querySelector(".simple-price");
+    if (simplePrice) simplePrice.textContent = item.priceText || (item.price ? formatMoney(item.price) : "غير معلن");
+    const simpleArea = node.querySelector(".simple-area");
+    if (simpleArea) simpleArea.textContent = item.area ? `📍 ${item.area}` : "";
+    const simpleType = node.querySelector(".simple-type");
+    if (simpleType) simpleType.textContent = item.propertyType || item.detailClass || "";
+    const simpleDate = node.querySelector(".simple-date");
+    if (simpleDate) simpleDate.textContent = item.publishedDate ? `🗓 ${dateText(item.publishedDate)}` : "";
     // شارات التصنيف: مكتب/مباشر (نمط الإدراج) + نوع المعاملة + المصدر
     const modeEl = node.querySelector(".mode-pill");
     if (modeEl) {
@@ -2978,6 +3114,16 @@ function renderReport(report) {
     link.hidden = !item.originalUrl;
     // اسم المصدر في زر الفتح — يعرف المستخدم أين يذهب قبل النقر
     link.textContent = item.source ? `فتح على ${item.source}` : "فتح الإعلان الأصلي";
+    // زر اتصال مباشر (tel:) — يظهر عند توفر رقم هاتف المعلن بجانب فتح الإعلان
+    const callLink = node.querySelector(".call-link");
+    if (callLink) {
+      if (item.phone) {
+        callLink.href = `tel:${String(item.phone).replace(/[^\d+]/g, "")}`;
+        callLink.title = `اتصال بالمعلن: ${latinDigits(item.phone)}`;
+        callLink.hidden = false;
+        callLink.addEventListener("click", () => trackOutreach({ action: "call", channel: "search_result", opportunityCode: item.code || "" }));
+      }
+    }
     // زر «تواصل مع المعلن» عبر واتساب: يظهر عندما يحمل الإعلان رقم هاتف المعلن
     // (يُستخرج من صفحة تفاصيل الإعلان — Q8Aqar/Mourjan/4Sale…) برسالة جاهزة مخصصة
     if (item.phone) {
@@ -3032,6 +3178,10 @@ function renderReport(report) {
     root.appendChild(separator);
     expandedResults.forEach(renderItem);
   }
+  // فلاتر النقر تُبنى من نتائج هذا البحث، ويُصفَّر الاختيار عند كل بحث جديد
+  state.simpleFilters = {};
+  renderResultsFilterChips(results);
+  applySimpleFilters();
 }
 
 function downloadReport() {
@@ -5649,6 +5799,7 @@ function sortBoardRows(rows) {
 
 async function boot() {
   initTheme();
+  applySimpleMode();
   initCardReveal();
   bind();
   bindMainTabs();

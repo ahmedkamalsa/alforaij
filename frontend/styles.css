@@ -6442,3 +6442,148 @@ body.drill-open {
     grid-template-columns: 1fr;
   }
 }
+
+/* ─── وضع مبسّط للباحث العادي: بطاقات أكبر + فلترة بالنقر + اتصال مباشر ─── */
+.simple-block {
+  display: none;
+}
+
+/* في وضع مبسّط: يُخفى العمود التحليلي بالكامل (الخلاصة/طريقة الترتيب/فرص المكسب/المشابهة) */
+body.simple-mode section.main-panel[data-main-panel="search"] {
+  display: none;
+}
+body.simple-mode #resultsSources,
+body.simple-mode #demandIndicatorBox {
+  display: none;
+}
+
+/* البطاقات أكبر وأبسط: سعر ضخم + منطقة/نوع/تاريخ — بلا جداول تحليلية */
+body.simple-mode #results .result-card {
+  grid-template-columns: 48px minmax(0, 1fr);
+  border-right-width: 8px;
+}
+body.simple-mode #results .result-body {
+  padding: 18px 20px 20px;
+}
+body.simple-mode #results .result-card h3 {
+  font-size: 24px;
+}
+body.simple-mode #results .simple-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: baseline;
+  margin: 10px 0 6px;
+}
+body.simple-mode #results .simple-price {
+  font-size: 27px;
+  font-weight: 900;
+  color: var(--blue);
+}
+body.simple-mode #results .simple-area,
+body.simple-mode #results .simple-type,
+body.simple-mode #results .simple-date {
+  font-size: 14.5px;
+  color: var(--muted);
+}
+body.simple-mode #results .result-card .card-facts,
+body.simple-mode #results .result-card .score-grid,
+body.simple-mode #results .result-card .result-insights,
+body.simple-mode #results .result-card .decision-line,
+body.simple-mode #results .result-card .result-details,
+body.simple-mode #results .result-card .outside-area,
+body.simple-mode #results .result-card .price-gap-badge,
+body.simple-mode #results .result-card .mode-pill,
+body.simple-mode #results .result-card .verdict {
+  display: none;
+}
+body.simple-mode #results .result-card .card-actions {
+  gap: 10px;
+  margin-top: 4px;
+}
+body.simple-mode #results .result-card .card-actions a,
+body.simple-mode #results .result-card .card-actions button {
+  min-height: 46px;
+  padding: 10px 18px;
+  font-size: 14px;
+}
+
+/* فلاتر النقر السريعة (منطقة / نوع العقار / المعاملة) */
+.results-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0 12px;
+}
+.results-filter-chips[hidden] {
+  display: none;
+}
+.chip-group-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  margin-inline-end: 2px;
+}
+.filter-chip {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.filter-chip b {
+  color: var(--blue);
+  font-size: 12px;
+}
+.filter-chip.active {
+  border-color: var(--blue);
+  background: var(--blue-deep);
+  color: #fff;
+}
+.filter-chip.active b {
+  color: #fff;
+}
+.filter-chip.clear {
+  border-color: var(--red);
+  color: var(--red);
+}
+.filter-chip:hover {
+  filter: brightness(.96);
+}
+
+/* زر الاتصال المباشر (tel:) في بطاقة النتيجة */
+.call-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--green);
+  border-radius: var(--radius-md);
+  background: var(--green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.call-link:hover {
+  filter: brightness(.94);
+}
+
+/* ملاحظة عدد المعروض بعد الفلترة بالنقر */
+.simple-filter-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0 8px;
+  padding: 6px 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+}

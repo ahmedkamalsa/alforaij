@@ -285,11 +285,13 @@
           <span>حسب درجة التوصية</span>
         </div>
         <div class="results-toolbar">
+          <button id="simpleModeToggle" class="save-search-btn" type="button" onclick="toggleSimpleMode()" title="تبديل بين البطاقات المبسطة والتحليل المفصل">👁 وضع مبسّط</button>
           <button id="saveSearchBtn" class="save-search-btn" type="button" onclick="handleSaveSearch()">🔔 احفظ البحث ونبّهني</button>
           <button id="savedSearchesToggle" class="saved-toggle-btn" type="button" onclick="toggleSavedSearches()">بحثي المحفوظ</button>
           <button id="accountBtn" class="saved-toggle-btn" type="button" onclick="openAccountModal()">حسابي</button>
           <span id="saveSearchMsg" class="save-search-msg" hidden></span>
         </div>
+        <div id="resultsFilterChips" class="results-filter-chips" hidden aria-label="فلاتر سريعة بالنقر"></div>
         <div id="savedSearchesBox" class="saved-searches-box" hidden></div>
         <div id="resultsSources" class="results-sources" hidden></div>
         <div id="demandIndicatorBox" class="results-demand" hidden></div>
@@ -590,6 +592,13 @@
           </div>
         </div>
 
+        <div class="simple-block">
+          <strong class="simple-price"></strong>
+          <span class="simple-area"></span>
+          <span class="simple-type"></span>
+          <span class="simple-date"></span>
+        </div>
+
         <div class="card-facts"></div>
 
         <div class="score-grid"></div>
@@ -631,6 +640,7 @@
           <span class="pub-date"></span>
           <div class="card-actions">
             <button type="button" class="details-btn">عرض التفاصيل</button>
+            <a class="call-link" target="_blank" rel="noreferrer" hidden>📞 اتصال مباشر</a>
             <a class="open-link" target="_blank" rel="noreferrer">فتح الإعلان الأصلي</a>
           </div>
         </div>
