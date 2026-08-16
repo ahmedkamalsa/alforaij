@@ -11,7 +11,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from scripts.send_opportunity_alerts import _alert_template_params
+from scripts.send_opportunity_alerts import _alert_send_plan
 from scripts.whatsapp_setup import (
     ALERT_TEMPLATE_NAME,
     OTP_TEMPLATE_NAME,
@@ -228,23 +228,23 @@ class TestWabaIdOverride(unittest.TestCase):
 
 
 class TestAlertParams(unittest.TestCase):
-    """متغيرات الإرسال الفعلية لقالب التنبيه — تطابق النص المعتمد في Meta."""
+    """خطة إرسال كل نوع تغيير (القالب + متغيراته) — تطابق النصوص المعتمدة في Meta."""
 
     def test_three_params_in_order(self) -> None:
-        params = _alert_template_params(
-            {"opportunity_code": "BU3-7211", "area": "القصور", "price": 300000}
+        template, params = _alert_send_plan(
+            {"opportunity_code": "BU3-7211", "area": "القصور", "price": 300000, "change": "new"}
         )
+        self.assertEqual(template, "alforaij_alert")
         self.assertEqual(params, ["BU3-7211", "القصور", "300,000"])
 
     def test_no_url_ever(self) -> None:
-        params = _alert_template_params(
-            {"opportunity_code": "X-1", "area": "النهضة", "price": 100, "url": "https://example.com/x"}
-        )
-        self.assertEqual(len(params), 3)
-        self.assertNotIn("http", "\n".join(params))
+        row = {"opportunity_code": "X-1", "area": "النهضة", "price": 100, "url": "https://example.com/x"}
+        for change in ("new", "price_drop"):
+            _, params = _alert_send_plan({**row, "change": change})
+            self.assertNotIn("http", "\n".join(params))
 
     def test_bad_price_falls_back_to_raw(self) -> None:
-        params = _alert_template_params({"opportunity_code": "X-1", "area": "", "price": None})
+        _, params = _alert_send_plan({"opportunity_code": "X-1", "area": "", "price": None, "change": "new"})
         self.assertEqual(params, ["X-1", "", ""])
 
 

@@ -34,7 +34,10 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           AGENT_ROUTER_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
           OFFICIAL_TRANSACTIONS_SOURCE: ${{ vars.OFFICIAL_TRANSACTIONS_SOURCE }}
-      - name: Send opportunity alerts to saved searches
+      - name: Send opportunity alerts to saved searches (ready-gated)
+        # بوابة الجاهزية داخل السكربت: إن اعتُمدت القوالب الثلاثة (OTP + فرصة +
+        # انخفاض السعر) أُرسلت تنبيهات الوكيل عبر واتساب؛ وإلا تُوثَّق الحالة في
+        # ملخص التشغيل (GITHUB_STEP_SUMMARY) ويُكتفى بالجرس — ولا يكسر الحصاد أبدًا.
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
             echo "Supabase not configured; skipping alerts."
@@ -47,6 +50,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
           WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
+          WHATSAPP_WABA_ID: ${{ secrets.WHATSAPP_WABA_ID }}
           WHATSAPP_ALERT_TEMPLATE: ${{ secrets.WHATSAPP_ALERT_TEMPLATE }}
       - name: Commit and push harvested data
         run: |

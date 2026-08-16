@@ -6,7 +6,9 @@
 3. مطابقة الأبحاث المحفوظة المفعلة (المنطقة/النوع/الميزانية) عبر match_search_to_item.
 4. كتابة صف تنبيه في user_alerts لكل (سرّ × فرصة) — منع التكرار بقيد unique
    + فحص مسبق (لا يُرسل نفس الزوج مرتين).
-5. إن وُجدت أسرار واتساب: إرسال قالب alert_template؛ وإلا يكتفي بالجرس (الانحدار الأنيق).
+5. بوابة الجاهزية: إن اعتُمدت القوالب الثلاثة (OTP + فرصة + انخفاض السعر) أُرسلت
+   تنبيهات الوكيل عبر القوالب المعتمدة؛ وإلا تُوثَّق الحالة في ملخص التشغيل
+   (GITHUB_STEP_SUMMARY في CI) ويُكتفى بالجرس — دون كسر الحصاد أبدًا.
 
 الاستخدام:
     python scripts/send_opportunity_alerts.py            # لقطتان من Supabase
@@ -15,13 +17,14 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from backend.config import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WHATSAPP_PHONE_ID, WHATSAPP_TOKEN  # noqa: E402
+from backend.config import SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL  # noqa: E402
 from backend.services.opportunity_alerts import (  # noqa: E402
     build_alert_rows,
     filter_unsent_alerts,
@@ -41,6 +44,11 @@ def main() -> int:
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         print("ERROR: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY غير مضبوطين — لا يمكن تشغيل التنبيهات.")
         return 1
+
+    # بوابة الجاهزية: إن اعتُمدت القوالب الثلاثة (OTP + فرصة + انخفاض) يُرسل الوكيل
+    # واتساب؛ وإلا تُوثَّق الحالة في ملخص التشغيل دون كسر الحصاد (الجرس يعمل دائمًا).
+    readiness = whatsapp_readiness()
+    write_readiness_summary(readiness)
 
     snapshots = fetch_opportunity_snapshots(limit=2)
     if not snapshots:
@@ -70,7 +78,7 @@ def main() -> int:
             return 0
         written = insert_user_alerts(rows)
         print(f"كُتب {written} تنبيهًا في الجرس.")
-        sent = _send_whatsapp(rows)
+        sent = _send_whatsapp(rows, readiness)
         summary = {
             "status": "ok",
             "snapshots": len(snapshots),
@@ -78,9 +86,11 @@ def main() -> int:
             "matchedRows": len(rows),
             "written": written,
             "whatsappSent": sent,
-            "note": "الجسر داخل التطبيق يعمل دائمًا؛ واتساب يُرسل فقط عند ضبط أسرار Cloud API.",
+            "whatsappReady": bool(readiness.get("ready")),
+            "note": "الجسر داخل التطبيق يعمل دائمًا؛ واتساب يُرسل فقط عند اعتماد القوالب الثلاثة.",
         }
         print(json.dumps(summary, ensure_ascii=False, indent=2))
+        _emit(f"- التنبيهات: {written} في الجرس · واتساب: {'أُرسل ' + str(sent) if sent else 'لم يُرسل'}")
     else:
         print(json.dumps({"dryRun": True, "candidateRows": len(rows)}, ensure_ascii=False, indent=2))
     return 0
@@ -95,18 +105,24 @@ def _to_snapshot(row: dict) -> dict:
     }
 
 
-def _send_whatsapp(rows: list[dict]) -> int:
-    """إرسال قالب واتساب لكل تنبيه — صامت عند غياب الأسرار (الانحدار الأنيق)."""
-    if not WHATSAPP_TOKEN or not WHATSAPP_PHONE_ID:
+def _send_whatsapp(rows: list[dict], readiness: dict) -> int:
+    """إرسال قالب واتساب معتمد لكل تنبيه — صامت ما لم تكتمل الجاهزية.
+
+    البوابة: لا يُرسل شيء عند غياب الأسرار، ولا عند ضبطها دون اعتماد القوالب
+    الثلاثة (Meta ترفض إرسال قالب غير معتمد). الجرس داخل التطبيق يعمل دائمًا
+    بغضّ النظر — هذا الإرسال طبقة اختيارية فوقه.
+    """
+    if not readiness.get("configured"):
+        return 0
+    if not readiness.get("ready"):
         print(
-            "WARNING: WHATSAPP_TOKEN / WHATSAPP_PHONE_ID غير مضبوطين — "
-            "التنبيهات متراكمة في الجرس داخل التطبيق (لا إرسال واتساب).",
+            "WARNING: القوالب الثلاثة غير معتمدة بعد — تُركت التنبيهات في الجرس "
+            "(لا إرسال واتساب). التفاصيل في ملخص التشغيل.",
             file=sys.stderr,
         )
         return 0
     from scripts.send_whatsapp_message import send_template_message
 
-    template = _template_name()
     sent = 0
     # كل صف يخص مستخدمًا — رقمه من جدول users (الجرس يخزن السرّ لا الهاتف)
     phones = fetch_user_phones()
@@ -114,34 +130,127 @@ def _send_whatsapp(rows: list[dict]) -> int:
         phone = phones.get(str(row.get("user_secret") or ""))
         if not phone:
             continue
-        result = send_template_message(phone, template, _alert_template_params(row))
+        template, params = _alert_send_plan(row)
+        result = send_template_message(phone, template, params)
         if result:
             sent += 1
     return sent
 
 
-def _alert_template_params(row: dict) -> list[str]:
-    """متغيرات قالب التنبيه بالترتيب المعتمد في Meta: الرمز ثم المنطقة ثم السعر المنسق.
+def _alert_send_plan(row: dict) -> tuple[str, list[str]]:
+    """القالب والمتغيرات حسب نوع التغيير — كل قالب بمتغيراته المعتمدة في Meta.
+
+    - new: alforaij_alert (الرمز، المنطقة، السعر)
+    - price_drop: alforaij_price_drop (الرمز، المنطقة، السعر الجديد، السعر السابق)
 
     الرابط مستبعد عمدًا — Meta تمنع الروابط داخل متغيرات نصوص القوالب (مؤكدة
     في وثائق القوالب الرسمية)؛ الرابط متاح داخل التطبيق في الجرس.
     """
-    price = row.get("price")
+    price = _price_text(row.get("price"))
+    if row.get("change") == "price_drop":
+        return (
+            os.getenv("WHATSAPP_PRICE_DROP_TEMPLATE", "alforaij_price_drop"),
+            [
+                str(row.get("opportunity_code") or ""),
+                str(row.get("area") or ""),
+                price,
+                _price_text(row.get("oldPrice") or row.get("price")),
+            ],
+        )
+    return (
+        os.getenv("WHATSAPP_ALERT_TEMPLATE", "alforaij_alert"),
+        [str(row.get("opportunity_code") or ""), str(row.get("area") or ""), price],
+    )
+
+
+def _price_text(price) -> str:
+    """تنسيق السعر رقمًا بلا عملة (القالب يضيف «د.ك») — سقوط آمن للقيم الشاذة."""
     try:
-        price_text = f"{int(float(price)):,}"
+        return f"{int(float(price)):,}"
     except (TypeError, ValueError):
-        price_text = str(price or "")
-    return [
-        str(row.get("opportunity_code") or ""),
-        str(row.get("area") or ""),
-        price_text,
-    ]
+        return str(price or "")
 
 
 def _template_name() -> str:
-    import os
-
     return os.getenv("WHATSAPP_ALERT_TEMPLATE", "alforaij_alert")
+
+
+def whatsapp_readiness() -> dict:
+    """تقرير جاهزية إرسال واتساب من الأسرار الحالية — بلا شبكة عند غياب التكوين.
+
+    عند ضبط WHATSAPP_TOKEN / WHATSAPP_PHONE_ID يستدعي check_setup (فحص حي لقوالب
+    Meta الثلاثة)، مع WHATSAPP_WABA_ID الاختياري إن وُجد. أي فشل شبكي يُحتوى
+    ولا يكسر الحصاد: ready=False مع توثيق السبب في الملخص.
+    """
+    token = os.getenv("WHATSAPP_TOKEN", "").strip()
+    phone_id = os.getenv("WHATSAPP_PHONE_ID", "").strip()
+    if not token or not phone_id:
+        return {
+            "configured": False,
+            "ready": False,
+            "templates": {},
+            "reason": "not_configured",
+            "nextSteps": ["اضبط WHATSAPP_TOKEN و WHATSAPP_PHONE_ID (انظر docs/whatsapp/README.md)."],
+        }
+    from scripts.whatsapp_setup import check_setup
+
+    waba_id = os.getenv("WHATSAPP_WABA_ID", "").strip()
+    try:
+        return check_setup(token, phone_id, waba_id)
+    except Exception as exc:  # شبكة/JSON/مهلة — لا نكسر الحصاد أبدًا
+        return {
+            "configured": True,
+            "ready": False,
+            "templates": {},
+            "reason": "network_error",
+            "error": str(exc),
+            "nextSteps": ["تعذر الاتصال بـ Meta — سيتحقق التشغيل التالي تلقائيًا."],
+        }
+
+
+def _summary_path() -> str | None:
+    """مسار ملخص الخطوة في GitHub Actions — أو None خارج CI (طباعة عادية)."""
+    return os.getenv("GITHUB_STEP_SUMMARY") or None
+
+
+def _emit(line: str) -> None:
+    path = _summary_path()
+    if path:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    else:
+        print(line)
+
+
+def write_readiness_summary(report: dict) -> None:
+    """توثيق حالة جاهزية واتساب في ملخص التشغيل (أو stdout خارج CI)."""
+    _emit("### جاهزية تنبيهات واتساب (الوكيل اليومي)")
+    if not report.get("configured"):
+        _emit("- ❌ الأسرار غير مضبوطة — WHATSAPP_TOKEN / WHATSAPP_PHONE_ID مطلوبان.")
+        _emit("- التنبيهات تتراكم في الجرس داخل التطبيق (لا إرسال واتساب حتى ضبط الأسرار).")
+        _emit("- الخطوة التالية: docs/whatsapp/README.md")
+        return
+    if report.get("error"):
+        _emit(f"- ❌ تعذر الاتصال بـ Meta: {report['error']}")
+        _emit("- سيتحقق التشغيل التالي تلقائيًا — الحصاد لم يتأثر.")
+        return
+    phone = report.get("phone") or {}
+    waba = report.get("waba") or {}
+    _emit(
+        f"- الرقم المرسِل: {phone.get('phone') or '—'} · الاسم الموثق: "
+        f"{phone.get('verifiedName') or '—'} · جودة المرسل: {phone.get('quality') or '—'}"
+    )
+    _emit(f"- WABA: {phone.get('wabaName') or '—'} (معرّف: {waba.get('id') or '—'})")
+    for name, row in (report.get("templates") or {}).items():
+        status = row.get("status") or "غير موجود"
+        icon = "✅" if status == "APPROVED" else ("⏳" if status else "❌")
+        _emit(f"- القالب `{name}`: {icon} {status}")
+    if report.get("ready"):
+        _emit("- ✅ القوالب الثلاثة معتمدة — تُرسل تنبيهات الوكيل عبر واتساب.")
+    else:
+        _emit("- ⏳ غير جاهز — التنبيهات تُكتب في الجرس ولا يُرسل واتساب حتى اعتماد القوالب الثلاثة.")
+        for step in report.get("nextSteps", []):
+            _emit(f"  - {step}")
 
 
 if __name__ == "__main__":

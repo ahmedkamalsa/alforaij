@@ -151,6 +151,8 @@ def build_alert_rows(
                     "opportunity_code": change["opportunity_code"],
                     "area": change.get("area"),
                     "price": change.get("price"),
+                    "oldPrice": change.get("oldPrice"),
+                    "oldPriceText": change.get("oldPriceText") or "",
                     "change": change["change"],
                     "message": build_alert_message(change, search),
                     "url": change.get("url") or "",
