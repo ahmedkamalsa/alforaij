@@ -9,6 +9,10 @@ Meta يدويًا، تُنشئ الأداة القالبين المعتمدين 
     python scripts/whatsapp_setup.py --create-alert             # قالب تنبيه الفرصة (UTILITY)
     python scripts/whatsapp_setup.py --send-test +96555512345   # إرسال رمز تجريبي فعلي لرقمك
 
+اختياري: WHATSAPP_WABA_ID — معرّف حساب الأعمال (WhatsApp Business Account)
+مباشر يُستعمل عند إنشاء القوالب وفحصها بدل استنتاجه من رقم الهاتف (يفيد
+حين يكون رقم الهاتف مرتبطًا بعدة حسابات أو يتعذر حل WABA منه).
+
 قواعد تصميم القوالب (مؤكدة من وثائق Meta الرسمية):
 - قوالب التوثيق (OTP): نص ثابت تُولّده Meta تلقائيًا بكل اللغات (بما فيها
   العربية) بمتغير واحد {{1}} — لا يمكن تخصيصه، ولهذا تُنشأ عبر
@@ -148,8 +152,12 @@ def fetch_template_statuses(token: str, waba_id: str) -> dict[str, dict]:
     return statuses
 
 
-def check_setup(token: str, phone_id: str) -> dict:
-    """تقرير الجاهزية الكامل — يُرجع dict ويطبع التقرير (صالح للاختبار بلا شبكة)."""
+def check_setup(token: str, phone_id: str, waba_id: str = "") -> dict:
+    """تقرير الجاهزية الكامل — يُرجع dict ويطبع التقرير (صالح للاختبار بلا شبكة).
+
+    waba_id اختياري: عند ضبطه يُستعمل مباشرة لفحص القوالب بدل استنتاجه من
+    رقم الهاتف (fetch_waba يبقى لتقرير الرقم/الجودة فقط).
+    """
     configured = bool(token and phone_id)
     report: dict = {
         "configured": configured,
@@ -174,15 +182,17 @@ def check_setup(token: str, phone_id: str) -> dict:
         ]
         return report
     report["phone"] = info
-    statuses = fetch_template_statuses(token, info.get("wabaId") or "")
+    effective_waba = waba_id or info.get("wabaId") or ""
+    report["waba"] = {"id": effective_waba, "source": "env" if waba_id else "phone"}
+    statuses = fetch_template_statuses(token, effective_waba)
     report["templates"] = statuses
     otp = statuses.get(OTP_TEMPLATE_NAME, {}).get("status")
     alert = statuses.get(ALERT_TEMPLATE_NAME, {}).get("status")
-    ready = info.get("wabaId") and otp == "APPROVED" and alert == "APPROVED"
+    ready = effective_waba and otp == "APPROVED" and alert == "APPROVED"
     report["ready"] = bool(ready)
     next_steps: list[str] = []
-    if not info.get("wabaId"):
-        next_steps.append("لم يُعثر على حساب WhatsApp Business — تحقق من رقم الهاتف.")
+    if not effective_waba:
+        next_steps.append("لم يُعثر على حساب WhatsApp Business — تحقق من رقم الهاتف أو اضبط WHATSAPP_WABA_ID.")
     if otp != "APPROVED":
         next_steps.append("شغّل: python scripts/whatsapp_setup.py --create-otp (ثم انتظر الاعتماد).")
     if alert != "APPROVED":
@@ -226,20 +236,28 @@ def print_report(report: dict) -> None:
         print("\n✅ النظام جاهز للإرسال الفعلي على الهاتف.")
 
 
-def _upsert_template(token: str, phone_id: str, payload: dict) -> dict:
-    """إنشاء/تحديث قالب عبر upsert_message_templates — يعيد النتيجة أو يرمي السبب."""
-    info = fetch_waba(token, phone_id)
-    if not info.get("wabaId"):
-        raise RuntimeError("لا يمكن تحديد حساب WhatsApp Business من رقم الهاتف.")
+def _upsert_template(token: str, phone_id: str, payload: dict, waba_id: str = "") -> dict:
+    """إنشاء/تحديث قالب عبر upsert_message_templates — يعيد النتيجة أو يرمي السبب.
+
+    waba_id اختياري: عند ضبطه يُستعمل مباشرة (بلا استنتاج من رقم الهاتف)،
+    وإلا يُحل من fetch_waba كالسابق.
+    """
+    if waba_id:
+        info_waba = waba_id
+    else:
+        info = fetch_waba(token, phone_id)
+        if not info.get("wabaId"):
+            raise RuntimeError("لا يمكن تحديد حساب WhatsApp Business من رقم الهاتف.")
+        info_waba = info["wabaId"]
     result = _graph(
         "POST",
-        f"{info['wabaId']}/upsert_message_templates",
+        f"{info_waba}/upsert_message_templates",
         token,
         payload,
     )
     rows = result.get("data") or []
     statuses = {str(row.get("language") or ""): str(row.get("status") or "") for row in rows}
-    return {"wabaId": info["wabaId"], "languages": statuses, "raw": result}
+    return {"wabaId": info_waba, "languages": statuses, "raw": result}
 
 
 def send_test_otp(token: str, phone_id: str, to_phone: str) -> dict:
@@ -254,10 +272,11 @@ def send_test_otp(token: str, phone_id: str, to_phone: str) -> dict:
     return result
 
 
-def _env() -> tuple[str, str]:
+def _env() -> tuple[str, str, str]:
     token = str(os.getenv("WHATSAPP_TOKEN", "")).strip()
     phone_id = str(os.getenv("WHATSAPP_PHONE_ID", "")).strip()
-    return token, phone_id
+    waba_id = str(os.getenv("WHATSAPP_WABA_ID", "")).strip()
+    return token, phone_id, waba_id
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -265,11 +284,11 @@ def main(argv: list[str] | None = None) -> int:
     if not args or args[0] in ("-h", "--help"):
         print(__doc__)
         return 0 if args else 1
-    token, phone_id = _env()
+    token, phone_id, waba_id = _env()
     command = args[0]
     if command == "--check":
-        print_report(check_setup(token, phone_id))
-        return 0 if check_setup(token, phone_id).get("ready") else 1
+        print_report(check_setup(token, phone_id, waba_id))
+        return 0 if check_setup(token, phone_id, waba_id).get("ready") else 1
     if command in ("--create-otp", "--create-alert"):
         if not token or not phone_id:
             print("❌ WHATSAPP_TOKEN و WHATSAPP_PHONE_ID مطلوبان.", file=sys.stderr)
@@ -277,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = build_otp_payload() if command == "--create-otp" else build_alert_payload()
         print(f"إنشاء/تحديث قالب «{payload['name']}»...")
         try:
-            result = _upsert_template(token, phone_id, payload)
+            result = _upsert_template(token, phone_id, payload, waba_id)
         except RuntimeError as exc:
             print(f"❌ فشل الإنشاء: {exc}", file=sys.stderr)
             return 1

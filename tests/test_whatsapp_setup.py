@@ -15,6 +15,7 @@ from scripts.send_opportunity_alerts import _alert_template_params
 from scripts.whatsapp_setup import (
     ALERT_TEMPLATE_NAME,
     OTP_TEMPLATE_NAME,
+    _upsert_template,
     build_alert_payload,
     build_otp_payload,
     check_setup,
@@ -120,6 +121,82 @@ class TestCheckReport(unittest.TestCase):
             statuses = fetch_template_statuses("tok", "WABA")
         self.assertEqual(statuses[OTP_TEMPLATE_NAME]["status"], None)
         self.assertEqual(statuses[ALERT_TEMPLATE_NAME]["status"], "PENDING")
+
+
+class TestWabaIdOverride(unittest.TestCase):
+    """WHATSAPP_WABA_ID الاختياري: يُستعمل مباشرة بدل الاستنتاج من رقم الهاتف."""
+
+    def test_upsert_uses_explicit_waba_directly(self) -> None:
+        """إنشاء القالب يذهب إلى معرّف WABA الصريح بلا أي نداء لحل WABA من الهاتف."""
+        paths: list[str] = []
+
+        def fake_graph(method: str, path: str, token: str, body: dict | None = None) -> dict:
+            paths.append(path)
+            return {"data": [{"language": "ar", "status": "APPROVED"}]}
+
+        with mock.patch("scripts.whatsapp_setup._graph", side_effect=fake_graph):
+            result = _upsert_template("tok", "123", build_otp_payload(), "WABA_EXPLICIT")
+        self.assertEqual(result["wabaId"], "WABA_EXPLICIT")
+        self.assertEqual(paths, ["WABA_EXPLICIT/upsert_message_templates"])
+
+    def test_upsert_without_waba_still_infers_from_phone(self) -> None:
+        """بدون WHATSAPP_WABA_ID يبقى الاستنتاج من رقم الهاتف (السلوك السابق)."""
+        paths: list[str] = []
+
+        def fake_graph(method: str, path: str, token: str, body: dict | None = None) -> dict:
+            paths.append(path)
+            if "fields=display_phone_number" in path:
+                return {"whatsapp_business_account": {"id": "WABA_INFERRED"}}
+            return {"data": [{"language": "ar", "status": "PENDING"}]}
+
+        with mock.patch("scripts.whatsapp_setup._graph", side_effect=fake_graph):
+            result = _upsert_template("tok", "123", build_otp_payload())
+        self.assertEqual(result["wabaId"], "WABA_INFERRED")
+        self.assertIn("fields=display_phone_number", paths[0])
+        self.assertIn("WABA_INFERRED/upsert_message_templates", paths[1])
+
+    def test_check_uses_explicit_waba_for_templates(self) -> None:
+        """فحص القوالب يمر عبر WABA الصريح حتى لو حلّ الهاتف معرّفًا مختلفًا."""
+        template_paths: list[str] = []
+
+        def fake_graph(method: str, path: str, token: str, body: dict | None = None) -> dict:
+            if "message_templates" in path and "upsert" not in path:
+                template_paths.append(path)
+                return {"data": []}
+            if "fields=display_phone_number" in path:
+                return {
+                    "display_phone_number": "96555550000",
+                    "verified_name": "الفريج العقاري",
+                    "quality_rating": "HIGH",
+                    "whatsapp_business_account": {"id": "WABA_INFERRED", "name": "Alforaij"},
+                }
+            raise AssertionError(f"unexpected path: {path}")
+
+        with mock.patch("scripts.whatsapp_setup._graph", side_effect=fake_graph):
+            report = check_setup("tok", "123", "WABA_EXPLICIT")
+        self.assertEqual(template_paths, ["WABA_EXPLICIT/message_templates?limit=100"])
+        self.assertEqual(report["waba"]["source"], "env")
+        self.assertEqual(report["waba"]["id"], "WABA_EXPLICIT")
+        # تقرير الهاتف ما زال يعرض المعرّف المستنتج للتوثيق
+        self.assertEqual(report["phone"]["wabaId"], "WABA_INFERRED")
+
+    def test_check_without_waba_uses_inferred(self) -> None:
+        with mock.patch(
+            "scripts.whatsapp_setup._graph",
+            side_effect=lambda method, path, token, body=None: (
+                {"data": []}
+                if "message_templates" in path
+                else {
+                    "display_phone_number": "96555550000",
+                    "verified_name": "الفريج العقاري",
+                    "quality_rating": "HIGH",
+                    "whatsapp_business_account": {"id": "WABA_INFERRED", "name": "Alforaij"},
+                }
+            ),
+        ):
+            report = check_setup("tok", "123")
+        self.assertEqual(report["waba"]["source"], "phone")
+        self.assertEqual(report["waba"]["id"], "WABA_INFERRED")
 
 
 class TestAlertParams(unittest.TestCase):

@@ -48,6 +48,7 @@ PYTHONIOENCODING=utf-8 python -m backend.main
 | `SUPABASE_ANON_KEY` | المفتاح العام (anon) للواجهة المرفوعة — تُقدَّم عبر `/api/live-db` |
 | `WHATSAPP_TOKEN` (اختياري) | رمز واجهة Meta Cloud API — غيابه: رمز OTP يظهر على الشاشة والتنبيهات تتراكم في الجرس فقط |
 | `WHATSAPP_PHONE_ID` (اختياري) | رقم الهاتف المرسِل في Cloud API (منفصل عن رقمك الشخصي) |
+| `WHATSAPP_WABA_ID` (اختياري) | معرّف حساب الأعمال (WABA) — عند ضبطه يُستعمل مباشرة عند إنشاء/فحص القوالب بدل استنتاجه من رقم الهاتف |
 | `WHATSAPP_OTP_TEMPLATE` (اختياري) | اسم قالب رمز التحقق المعتمد في Meta (افتراضي `alforaij_otp`) |
 | `WHATSAPP_ALERT_TEMPLATE` (اختياري) | اسم قالب تنبيه الفرصة (3 متغيرات: رمز/منطقة/سعر — بلا رابط، افتراضي `alforaij_alert`) |
 

@@ -17,6 +17,7 @@
 | **رقم هاتف مرسِل** | داخل منتج WhatsApp → API Setup | رقم منفصل عن رقمك الشخصي (رقم اختبار مجاني يكفي للبدء) |
 | **معرّف رقم الهاتف** `WHATSAPP_PHONE_ID` | API Setup → Phone number ID | يرسل منه النظام الرسائل |
 | **توكن دائم** `WHATSAPP_TOKEN` | Business Settings → System Users → Generate token | صلاحيات: `whatsapp_business_messaging` + `whatsapp_business_management` |
+| **حساب الأعمال** `WHATSAPP_WABA_ID` *(اختياري)* | WhatsApp Manager → Account tools → WABA ID | عند ضبطه تُستخدم هويته مباشرة عند إنشاء/فحص القوالب بدل استنتاجها من رقم الهاتف (يفيد حين يرتبط الرقم بعدة حسابات) |
 
 > **التوكن الدائم هو المفتاح:** توكن التطبيق المؤقت (24 ساعة) يكفي للتجربة،
 > لكن سير العمل اليومي في GitHub يحتاج توكن System User دائمًا.
@@ -35,6 +36,7 @@
 ```bash
 WHATSAPP_TOKEN=EAAG...   # توكن System User الدائم
 WHATSAPP_PHONE_ID=123456789012345   # Phone number ID
+# WHATSAPP_WABA_ID=123456789012345  # اختياري — معرّف حساب الأعمال مباشر بدل الاستنتاج
 # اختيارية — للأسف الافتراضيات سليمة:
 # WHATSAPP_OTP_TEMPLATE=alforaij_otp
 # WHATSAPP_ALERT_TEMPLATE=alforaij_alert
@@ -98,6 +100,7 @@ python scripts/whatsapp_setup.py --send-test +965XXXXXXXX
 ```bash
 gh secret set WHATSAPP_TOKEN
 gh secret set WHATSAPP_PHONE_ID
+gh secret set WHATSAPP_WABA_ID   # اختياري — معرّف حساب الأعمال مباشر (بخلافه يُستنتج من الهاتف)
 gh secret set WHATSAPP_ALERT_TEMPLATE   # اختياري — الافتراضي alforaij_alert
 ```
 
