@@ -9,7 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import asdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from backend.config import SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL
@@ -76,6 +76,29 @@ def _post(table: str, rows: list[dict[str, Any]], *, upsert: bool = False, confl
             raise
 
 
+def _patch(table: str, filters: dict[str, str], payload: dict[str, Any]) -> None:
+    """تحديث صفوف حسب فلاتر REST (مثل status=neq.stale&last_seen_at=lt.ISO)."""
+    if not is_configured():
+        return
+    query = "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in filters.items())
+    endpoint = f"{SUPABASE_URL}/rest/v1/{table}?{query}"
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        method="PATCH",
+        headers=_headers("count=exact"),
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            if response.status not in {200, 204}:
+                raise RuntimeError(f"Supabase PATCH {table} returned HTTP {response.status}")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        logger.exception("Supabase %s update failed: HTTP %s %s", table, exc.code, detail)
+        raise RuntimeError(f"Supabase {table} update failed: HTTP {exc.code} {detail}") from exc
+    except (TimeoutError, urllib.error.URLError, ConnectionError, OSError) as exc:
+        logger.exception("Supabase %s update failed", table)
+        raise
 def listing_row(listing: Listing) -> dict[str, Any]:
     published_date = listing.published_date or None
     return {
@@ -441,6 +464,8 @@ def save_market_ads(rows: list[dict[str, Any]]) -> None:
 def save_market_listings(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """حفظ إعلانات السوق الخارجية المحصودة في جدول market_listings (upsert على code).
 
+    كل إعلان يظهر في الحصاد يُختم بـ last_seen_at=now() و status=active — فيردّ
+    الإعلان الذي عاد بعد كسح سابق إلى النشط تلقائيًا (الكسح يوسم stale فقط).
     متسامح تمامًا: غياب الجدول أو تعذر الكتابة لا يكسر التشغيل اليومي — يُسجَّل السبب
     ويعود status حتى يظهر في تقرير الوكيل (خطوة persist_market_listings).
     """
@@ -448,16 +473,49 @@ def save_market_listings(rows: list[dict[str, Any]]) -> dict[str, Any]:
         return {"status": "empty", "count": 0, "error": ""}
     if not is_configured():
         return {"status": "not_configured", "count": 0, "error": ""}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    stamped = [{**row, "last_seen_at": now_iso, "status": "active"} for row in rows]
     try:
-        for index in range(0, len(rows), 250):
-            _post("market_listings", rows[index:index + 250], upsert=True, conflict="code")
-        return {"status": "saved", "count": len(rows), "error": ""}
+        for index in range(0, len(stamped), 250):
+            _post("market_listings", stamped[index:index + 250], upsert=True, conflict="code")
+        return {"status": "saved", "count": len(stamped), "error": ""}
     except RuntimeError as exc:
         logger.warning("market_listings save failed: %s", exc)
         return {"status": "failed", "count": 0, "error": str(exc)}
     except Exception:
         logger.exception("market_listings save failed")
         return {"status": "failed", "count": 0, "error": "unexpected error"}
+
+
+def _stale_cutoff(days: int) -> str:
+    """حد الكسح: الآن ناقص days — بصيغة ISO توقيت عالمي (تُقارن مع timestamptz)."""
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+
+def mark_stale_market_listings(days: int = 14) -> dict[str, Any]:
+    """كسح الإعلانات القديمة: يوسم stale كل صف لم يُرَ منذ days يومًا.
+
+    لا يحذف شيئًا — يبقى الصف في قاعدة المعرفة للتاريخ/التقييم، لكن اللوحة
+    والفرص والمؤشرات تقرأ active فقط. يَعود active تلقائيًا عند ظهور الإعلان
+    مجددًا في حصاد لاحق (ختم save_market_listings). متسامح تمامًا مثل بقية
+    الحفظ: الفشل يُسجَّل ولا يكسر التشغيل اليومي.
+    """
+    if not is_configured():
+        return {"status": "not_configured", "count": 0, "error": ""}
+    cutoff = _stale_cutoff(days)
+    try:
+        _patch(
+            "market_listings",
+            {"status": "neq.stale", "last_seen_at": f"lt.{cutoff}"},
+            {"status": "stale"},
+        )
+        return {"status": "swept", "days": days, "cutoff": cutoff, "error": "", "count": None}
+    except RuntimeError as exc:
+        logger.warning("market_listings stale sweep failed: %s", exc)
+        return {"status": "failed", "days": days, "error": str(exc)}
+    except Exception:
+        logger.exception("market_listings stale sweep failed")
+        return {"status": "failed", "days": days, "error": "unexpected error"}
 
 
 # ─── price_trends (اتجاهات الأسعار الشهرية من الحصاد) ────────────────
@@ -582,14 +640,19 @@ def fetch_market_listings(
     property_type: str | None = None,
     source: str | None = None,
     limit: int = 500,
+    status: str | None = "active",
 ) -> list[dict[str, Any]]:
     """قراءة إعلانات السوق الخارجية المحصودة من جدول market_listings.
 
     الفلاتر اختيارية وتُطبق في REST API لتقليل البيانات المنقولة.
+    الافتراضي status='active' يستبعد الإعلانات المباعة/المنتهية (stale) من
+    اللوحة والفرص؛ مرِّر status=None لقراءة كامل قاعدة المعرفة.
     """
     if not is_configured():
         return []
     params: list[str] = [f"limit={int(limit)}"]
+    if status:
+        params.append(f"status=eq.{urllib.parse.quote(status)}")
     if area:
         params.append(f"area=ilike.*{urllib.parse.quote(area)}*")
     if transaction:
@@ -670,7 +733,8 @@ def _analysis_rows(limit: int, table: str) -> list[dict[str, Any]]:
     """
     rows: list[dict[str, Any]] = []
     if market_listings_table_available():
-        endpoint = f"{SUPABASE_URL}/rest/v1/{table}?select=*&order=fetched_at.desc&limit={int(limit)}"
+        # active فقط: الإعلانات المباعة/المنتهية (stale) لا تدخل المؤشرات ولا الوسيطات
+        endpoint = f"{SUPABASE_URL}/rest/v1/{table}?select=*&status=eq.active&order=fetched_at.desc&limit={int(limit)}"
         rows = _fetch_rows(endpoint) or []
     try:
         rows.extend(market_analysis.local_listings_to_rows(load_listings()))

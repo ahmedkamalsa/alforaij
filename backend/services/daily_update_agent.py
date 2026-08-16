@@ -20,6 +20,7 @@ from backend.services.source_registry import source_registry, sync_remote_regist
 from backend.services.supabase_store import (
     fetch_latest_opportunities,
     is_configured,
+    mark_stale_market_listings,
     save_listings,
     save_market_developments,
     save_market_listings,
@@ -254,6 +255,15 @@ def run_daily_update_agent(
             "persist_market_listings",
             harvest,
             "ok" if harvest.get("status") in ("saved", "empty", "not_configured") else "needs_table",
+        )
+
+        # كسح الإعلانات القديمة/المباعة: يوسم stale كل إعلان لم يُرَ منذ 14 يومًا
+        # (يبقى في قاعدة المعرفة للتاريخ ولا يُعرض في اللوحة/الفرص/المؤشرات).
+        stale = mark_stale_market_listings(days=14)
+        step(
+            "sweep_stale_market_listings",
+            stale,
+            "ok" if stale.get("status") in ("swept", "not_configured") else "needs_table",
         )
 
         # اتجاهات الأسعار الشهرية: وسيط لكل (منطقة × نوع × شهر × معاملة) من الحصاد
