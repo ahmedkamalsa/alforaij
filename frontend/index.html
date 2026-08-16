@@ -198,6 +198,20 @@
         <div class="empty">جاري تحميل الخريطة الحرارية...</div>
       </div>
       <div id="insightsLeafletMap" class="insights-leaflet-map" hidden></div>
+      <div id="mapListingFilters" class="map-listing-filters" hidden>
+        <div class="map-filter-head">
+          <span class="map-filter-title">📌 نقاط الإعلانات — دوائر صغيرة بدرجة الفرصة</span>
+          <span id="mapListingCount" class="map-filter-count"></span>
+          <button type="button" class="map-filter-clear" id="mapFilterClearBtn" data-map-filter-clear hidden>✕ مسح الفلاتر</button>
+        </div>
+        <div class="map-filter-groups" id="mapFilterGroups"></div>
+        <div class="map-filter-legend">
+          <i class="legend-swatch" style="background:hsl(120 68% 40% / .85)"></i>فرصة قوية
+          <i class="legend-swatch" style="background:hsl(60 68% 40% / .85)"></i>متوسطة
+          <i class="legend-swatch" style="background:hsl(0 68% 40% / .85)"></i>منخفضة
+          <i class="legend-swatch" style="background:hsl(220 15% 50% / .62)"></i>غير مقيّم
+        </div>
+      </div>
       <div id="watchedAreasInsights" class="watched-areas"></div>
       <div id="insightsRoot" class="insights-root">
         <div class="empty">جاري تحميل تحليلات السوق...</div>

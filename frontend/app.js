@@ -1723,6 +1723,10 @@ let insightsMap = null;
 let insightsMapMarkers = [];
 let kuwaitCoords = null;
 let leafletPromise = null;
+// نقاط الإعلانات على الخريطة: سجلات اللوحة (بدرجة الفرصة) + فلاتر المصدر/النوع
+let mapListingsCache = null;
+let mapListingFilters = { sources: [], types: [] };
+let insightsMapListingsLayer = null;
 
 function loadLeaflet() {
   if (window.L) return Promise.resolve(window.L);
@@ -1762,6 +1766,125 @@ function areaCoord(areaName, governorate) {
   const govEntry = coords.governorates[gov] || coords.governorates[normalizeArabic(gov)];
   if (govEntry) return { lat: govEntry.lat, lng: govEntry.lng, governorate: gov };
   return null;
+}
+
+// درجة الفرصة (0-100) → لون الدائرة: أخضر (فرصة قوية) عبر كهرماني إلى أحمر (منخفضة)، وغير المقيّم رمادي
+function oppColor(score) {
+  if (score == null) return "hsl(220 15% 50% / .62)";
+  const t = Math.max(0, Math.min(1, Number(score) / 100));
+  const hue = Math.round(120 * t); // 0 أحمر → 120 أخضر
+  return `hsl(${hue} 68% 40% / .85)`;
+}
+
+function oppLabel(score) {
+  if (score == null) return "غير مقيّم";
+  const s = Number(score);
+  return s >= 75 ? "فرصة قوية" : s >= 60 ? "مناسبة" : "تحتاج مراجعة";
+}
+
+// سجلات اللوحة (نفس مصدر /api/dashboard/summary) تُجلب مرة واحدة وتُخزَّن مؤقتًا لنقاط الخريطة
+async function loadMapListings() {
+  if (mapListingsCache) return mapListingsCache;
+  try {
+    const data = await getJson("/api/dashboard/summary");
+    mapListingsCache = (data && data.records) || [];
+  } catch {
+    mapListingsCache = [];
+  }
+  return mapListingsCache;
+}
+
+function plottableMapListings() {
+  return (mapListingsCache || []).filter((record) => areaCoord(record.area, record.governorate));
+}
+
+function mapListingMatchesFilters(record) {
+  const bySource = mapListingFilters.sources;
+  if (bySource.length) {
+    const src = normalizeArabic(String(record.source || "").trim());
+    if (!bySource.includes(src)) return false;
+  }
+  const byType = mapListingFilters.types;
+  if (byType.length) {
+    const type = normalizeArabic(String(record.propertyType || "").trim());
+    if (!byType.includes(type)) return false;
+  }
+  return true;
+}
+
+// رقائق «المصدر / نوع العقار» تُبنى من الإعلانات القابلة للرسم (ذات إحداثي) مع عدّادات
+function renderMapListingFilters() {
+  const root = $("mapFilterGroups");
+  if (!root) return;
+  const plottable = plottableMapListings();
+  const sourceCounts = {};
+  const typeCounts = {};
+  for (const record of plottable) {
+    const src = String(record.source || "غير محدد").trim();
+    const srcKey = normalizeArabic(src);
+    sourceCounts[srcKey] = sourceCounts[srcKey] || { label: src, n: 0 };
+    sourceCounts[srcKey].n += 1;
+    const type = String(record.propertyType || "").trim();
+    if (type) {
+      const typeKey = normalizeArabic(type);
+      typeCounts[typeKey] = typeCounts[typeKey] || { label: type, n: 0 };
+      typeCounts[typeKey].n += 1;
+    }
+  }
+  const groupHtml = (title, counts, field) => {
+    const chips = Object.values(counts)
+      .sort((a, b) => b.n - a.n)
+      .map((entry) => {
+        const key = normalizeArabic(entry.label);
+        const active = mapListingFilters[field].includes(key);
+        return `<button type="button" class="map-filter-chip${active ? " active" : ""}" data-map-filter="${field}" data-map-filter-key="${escapeHtml(key)}" title="${escapeHtml(entry.label)} — ${entry.n} إعلان">${escapeHtml(entry.label)} <small>${entry.n}</small></button>`;
+      })
+      .join("");
+    return `<div class="map-filter-group"><span class="map-filter-group-title">${escapeHtml(title)}</span><div class="map-filter-chips">${chips || '<span class="map-filter-empty">لا خيارات</span>'}</div></div>`;
+  };
+  root.innerHTML = groupHtml("المصدر", sourceCounts, "sources") + groupHtml("نوع العقار", typeCounts, "types");
+}
+
+// دوائر صغيرة لكل إعلان (بإحداثي منطقة) ملونة بدرجة الفرصة — تحترم فلاتر المصدر/النوع
+function renderMapListingPoints() {
+  const L = window.L;
+  if (!L || !insightsMap) return;
+  if (!insightsMapListingsLayer) {
+    insightsMapListingsLayer = L.layerGroup().addTo(insightsMap);
+  }
+  insightsMapListingsLayer.clearLayers();
+  const plottable = plottableMapListings();
+  const visible = plottable.filter(mapListingMatchesFilters);
+  for (const record of visible) {
+    const coord = areaCoord(record.area, record.governorate);
+    if (!coord) continue;
+    const score = record.opportunityScore != null ? Number(record.opportunityScore) : null;
+    const price = record.priceText || (record.price != null ? `${Number(record.price).toLocaleString("en-US")} د.ك` : "—");
+    const marker = L.circleMarker([coord.lat, coord.lng], {
+      radius: score != null ? 5 : 4,
+      color: "#fff",
+      weight: 1,
+      fillColor: oppColor(score),
+      fillOpacity: 0.9,
+    });
+    marker.bindTooltip(`${escapeHtml(record.area || "")} — ${escapeHtml(record.propertyType || "")} · ${escapeHtml(price)}`, {
+      direction: "top",
+      opacity: 0.95,
+      className: "map-tip",
+    });
+    marker.bindPopup(`
+      <b>${escapeHtml(record.area || "—")}</b> <span class="map-popup-gov">${escapeHtml(coord.governorate || "")}</span><br>
+      <span>${escapeHtml(record.propertyType || "")} · ${escapeHtml(record.source || "")}</span><br>
+      <span class="map-popup-sub">السعر: <strong>${escapeHtml(price)}</strong></span><br>
+      <span class="map-popup-sub">درجة الفرصة: <strong style="color:${oppColor(score)}">${oppLabel(score)}${score != null ? ` (${Math.round(score)}/100)` : ""}</strong></span><br>
+      ${record.originalUrl ? `<a class="map-popup-link" href="${escapeHtml(record.originalUrl)}" target="_blank" rel="noopener">فتح الإعلان الأصلي ↗</a>` : ""}
+    `);
+    marker.addTo(insightsMapListingsLayer);
+  }
+  const countEl = $("mapListingCount");
+  if (countEl) countEl.textContent = `نقاط ظاهرة: ${visible.length} من ${plottable.length}`;
+  const clearBtn = $("mapFilterClearBtn");
+  if (clearBtn) clearBtn.hidden = !(mapListingFilters.sources.length || mapListingFilters.types.length);
 }
 
 function renderInsightsMap(areas) {
@@ -1822,11 +1945,15 @@ function renderInsightsMap(areas) {
       renderInsightsHeatmap(insightsState.data);
     });
   });
+  // نقاط الإعلانات + رقائق الفلترة (المصدر/النوع) — تُعاد عند كل إعادة رسم
+  renderMapListingFilters();
+  renderMapListingPoints();
 }
 
 async function setHeatmapView(view) {
   const grid = $("insightsHeatmap");
   const map = $("insightsLeafletMap");
+  const filtersBar = $("mapListingFilters");
   if (!grid || !map) return;
   heatmapView = view === "map" ? "map" : "grid";
   document.querySelectorAll(".heatmap-view-switch .view-btn").forEach((btn) => {
@@ -1834,10 +1961,11 @@ async function setHeatmapView(view) {
   });
   grid.hidden = heatmapView === "map";
   map.hidden = heatmapView !== "map";
+  if (filtersBar) filtersBar.hidden = heatmapView !== "map";
   if (heatmapView === "map") {
     map.innerHTML = '<div class="empty map-loading">جاري تحميل الخريطة...</div>';
     try {
-      await Promise.all([loadLeaflet(), loadKuwaitCoords()]);
+      await Promise.all([loadLeaflet(), loadKuwaitCoords(), loadMapListings()]);
     } catch {
       map.innerHTML = '<div class="empty">تعذر تحميل الخريطة التفاعلية — تحقق من الاتصال بالإنترنت، أو استخدم «شبكة المناطق».</div>';
       return;
@@ -1849,6 +1977,7 @@ async function setHeatmapView(view) {
     insightsMap.remove();
     insightsMap = null;
     insightsMapMarkers = [];
+    insightsMapListingsLayer = null;
   }
 }
 
@@ -5488,6 +5617,29 @@ function bind() {
     if (viewBtn) {
       ev.preventDefault();
       setHeatmapView(viewBtn.dataset.heatView);
+      return;
+    }
+    const mapFilterClear = ev.target.closest?.("[data-map-filter-clear]");
+    if (mapFilterClear) {
+      ev.preventDefault();
+      mapListingFilters.sources = [];
+      mapListingFilters.types = [];
+      renderMapListingFilters();
+      renderMapListingPoints();
+      return;
+    }
+    const mapFilterChip = ev.target.closest?.("[data-map-filter]");
+    if (mapFilterChip) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const field = mapFilterChip.dataset.mapFilter; // "sources" | "types"
+      const key = mapFilterChip.dataset.mapFilterKey || "";
+      const arr = mapListingFilters[field] || [];
+      const idx = arr.indexOf(key);
+      if (idx >= 0) arr.splice(idx, 1);
+      else arr.push(key);
+      renderMapListingFilters();
+      renderMapListingPoints();
       return;
     }
     const watchBtn = ev.target.closest?.("[data-watch-area]");
