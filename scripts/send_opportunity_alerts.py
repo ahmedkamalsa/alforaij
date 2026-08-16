@@ -110,24 +110,32 @@ def _send_whatsapp(rows: list[dict]) -> int:
     sent = 0
     # كل صف يخص مستخدمًا — رقمه من جدول users (الجرس يخزن السرّ لا الهاتف)
     phones = fetch_user_phones()
-    # متغيرات القالب: opportunity / area / price / link.
     for row in rows:
         phone = phones.get(str(row.get("user_secret") or ""))
         if not phone:
             continue
-        result = send_template_message(
-            phone,
-            template,
-            [
-                str(row.get("opportunity_code") or ""),
-                str(row.get("area") or ""),
-                str(row.get("price") or ""),
-                str(row.get("url") or ""),
-            ],
-        )
+        result = send_template_message(phone, template, _alert_template_params(row))
         if result:
             sent += 1
     return sent
+
+
+def _alert_template_params(row: dict) -> list[str]:
+    """متغيرات قالب التنبيه بالترتيب المعتمد في Meta: الرمز ثم المنطقة ثم السعر المنسق.
+
+    الرابط مستبعد عمدًا — Meta تمنع الروابط داخل متغيرات نصوص القوالب (مؤكدة
+    في وثائق القوالب الرسمية)؛ الرابط متاح داخل التطبيق في الجرس.
+    """
+    price = row.get("price")
+    try:
+        price_text = f"{int(float(price)):,}"
+    except (TypeError, ValueError):
+        price_text = str(price or "")
+    return [
+        str(row.get("opportunity_code") or ""),
+        str(row.get("area") or ""),
+        price_text,
+    ]
 
 
 def _template_name() -> str:

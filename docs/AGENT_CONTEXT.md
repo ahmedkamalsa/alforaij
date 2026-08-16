@@ -49,7 +49,12 @@ PYTHONIOENCODING=utf-8 python -m backend.main
 | `WHATSAPP_TOKEN` (اختياري) | رمز واجهة Meta Cloud API — غيابه: رمز OTP يظهر على الشاشة والتنبيهات تتراكم في الجرس فقط |
 | `WHATSAPP_PHONE_ID` (اختياري) | رقم الهاتف المرسِل في Cloud API (منفصل عن رقمك الشخصي) |
 | `WHATSAPP_OTP_TEMPLATE` (اختياري) | اسم قالب رمز التحقق المعتمد في Meta (افتراضي `alforaij_otp`) |
-| `WHATSAPP_ALERT_TEMPLATE` (اختياري) | اسم قالب تنبيه الفرصة (متغيرات: فرصة/منطقة/سعر/رابط — افتراضي `alforaij_alert`) |
+| `WHATSAPP_ALERT_TEMPLATE` (اختياري) | اسم قالب تنبيه الفرصة (3 متغيرات: رمز/منطقة/سعر — بلا رابط، افتراضي `alforaij_alert`) |
+
+> **إعداد واتساب الكامل** (الحساب → القوالب المعتمدة → إثبات التسليم):
+> `docs/whatsapp/README.md` — والأداة `scripts/whatsapp_setup.py` تنشئ القالبين
+> برمجيًا (`--create-otp`/`--create-alert`) وتفحص الجاهزية (`--check`)
+> وتجرّب إرسالًا فعليًا (`--send-test +965XXXXXXXX`).
 
 ---
 
