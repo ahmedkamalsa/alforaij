@@ -92,6 +92,11 @@ class FetchStatusTests(unittest.TestCase):
         endpoint = self._fetch(limit=10, status="stale")
         self.assertIn("status=eq.stale", endpoint)
 
+    def test_offset_pagination(self) -> None:
+        endpoint = self._fetch(limit=1000, offset=1000)
+        self.assertIn("limit=1000", endpoint)
+        self.assertIn("offset=1000", endpoint)
+
 
 class AnalysisRowsTests(unittest.TestCase):
     def test_analysis_excludes_stale(self) -> None:

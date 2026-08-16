@@ -18,6 +18,7 @@ from backend.services.official_source_agent import check_candidate_platforms, ch
 from backend.services.opportunities import build_opportunities
 from backend.services.source_registry import source_registry, sync_remote_registry as sync_source_registry
 from backend.services.supabase_store import (
+    dedupe_market_listings,
     fetch_latest_opportunities,
     is_configured,
     mark_stale_market_listings,
@@ -264,6 +265,15 @@ def run_daily_update_agent(
             "sweep_stale_market_listings",
             stale,
             "ok" if stale.get("status") in ("swept", "not_configured") else "needs_table",
+        )
+
+        # كسح شبه التكرار بحذر: الإعلان المُعاد جلبه برمز مختلف يُوسم duplicate
+        # ويُحال إلى نظيره (مصدر+منطقة+نوع+سعر+عنوان مطبع + بوابات هاتف/مساحة).
+        dedup = dedupe_market_listings()
+        step(
+            "dedupe_market_listings",
+            dedup,
+            "ok" if dedup.get("status") in ("deduped", "not_configured") else "needs_table",
         )
 
         # اتجاهات الأسعار الشهرية: وسيط لكل (منطقة × نوع × شهر × معاملة) من الحصاد

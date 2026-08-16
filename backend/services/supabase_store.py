@@ -634,6 +634,49 @@ def market_listings_table_available() -> bool:
         return False
 
 
+def dedupe_market_listings(min_title_len: int = 12) -> dict[str, Any]:
+    """كسح شبه التكرار بحذر: يوسم duplicate كل إعلان مطابق (مصدر+منطقة+نوع+سعر+
+    عنوان مطبع) لنظيره المحتفظ به — مع بوابات دقة (هاتف/مساحة/طول عنوان).
+
+    لا يحذف شيئًا: يضبط status=duplicate و duplicate_of على غير النظير فقط،
+    ويبقى التاريخ كاملًا. متسامح تمامًا مثل بقية الحفظ: أي فشل يُسجَّل ولا يكسر
+    التشغيل اليومي.
+    """
+    if not is_configured():
+        return {"status": "not_configured", "count": 0, "error": ""}
+    try:
+        # ترقيم صفحات كامل (Supabase يسقف عند 1000 صف/طلب) — يشمل كل النشط
+        rows: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            page = fetch_market_listings(limit=1000, offset=offset) or []
+            rows.extend(page)
+            if len(page) < 1000:
+                break
+            offset += 1000
+        if not rows:
+            return {"status": "deduped", "groups": 0, "marked": 0, "error": ""}
+        from backend.services.listing_dedupe import build_dedupe_groups, duplicate_marks
+
+        groups = build_dedupe_groups(rows, min_title_len=min_title_len)
+        marks = duplicate_marks(groups)
+        marked = 0
+        for mark in marks:
+            _patch(
+                "market_listings",
+                {"code": f"eq.{mark['code']}"},
+                {"status": "duplicate", "duplicate_of": mark["duplicate_of"]},
+            )
+            marked += 1
+        return {"status": "deduped", "groups": len(groups), "marked": marked, "error": ""}
+    except RuntimeError as exc:
+        logger.warning("market_listings dedupe failed: %s", exc)
+        return {"status": "failed", "error": str(exc)}
+    except Exception:
+        logger.exception("market_listings dedupe failed")
+        return {"status": "failed", "error": "unexpected error"}
+
+
 def fetch_market_listings(
     area: str | None = None,
     transaction: str | None = None,
@@ -641,16 +684,20 @@ def fetch_market_listings(
     source: str | None = None,
     limit: int = 500,
     status: str | None = "active",
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     """قراءة إعلانات السوق الخارجية المحصودة من جدول market_listings.
 
     الفلاتر اختيارية وتُطبق في REST API لتقليل البيانات المنقولة.
     الافتراضي status='active' يستبعد الإعلانات المباعة/المنتهية (stale) من
     اللوحة والفرص؛ مرِّر status=None لقراءة كامل قاعدة المعرفة.
+    offset يسمح بترقيم الصفحات (Supabase يسقف النتيجة عند 1000 صف/طلب).
     """
     if not is_configured():
         return []
     params: list[str] = [f"limit={int(limit)}"]
+    if offset:
+        params.append(f"offset={int(offset)}")
     if status:
         params.append(f"status=eq.{urllib.parse.quote(status)}")
     if area:
