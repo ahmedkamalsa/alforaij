@@ -7,6 +7,7 @@ Meta يدويًا، تُنشئ الأداة القالبين المعتمدين 
     python scripts/whatsapp_setup.py --check                    # تقرير جاهزية كامل
     python scripts/whatsapp_setup.py --create-otp               # قالب رمز التحقق (AUTHENTICATION)
     python scripts/whatsapp_setup.py --create-alert             # قالب تنبيه الفرصة (UTILITY)
+    python scripts/whatsapp_setup.py --create-price-drop        # قالب انخفاض السعر (UTILITY)
     python scripts/whatsapp_setup.py --send-test +96555512345   # إرسال رمز تجريبي فعلي لرقمك
 
 اختياري: WHATSAPP_WABA_ID — معرّف حساب الأعمال (WhatsApp Business Account)
@@ -35,6 +36,7 @@ GRAPH_API = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
 OTP_TEMPLATE_NAME = "alforaij_otp"
 ALERT_TEMPLATE_NAME = "alforaij_alert"
+PRICE_DROP_TEMPLATE_NAME = "alforaij_price_drop"
 
 # نص قالب تنبيه الفرصة — 3 متغيرات بالترتيب الذي يمرره send_opportunity_alerts:
 # {{1}} رمز الفرصة · {{2}} المنطقة · {{3}} السعر (الرابط مستبعد عمدًا — قاعدة Meta).
@@ -43,6 +45,16 @@ ALERT_BODY = (
     "الرمز: {{1}}\n"
     "المنطقة: {{2}}\n"
     "السعر: {{3}} د.ك\n"
+    "افتح المنصة لعرض التفاصيل والمصادر"
+)
+# قالب انخفاض السعر — 4 متغيرات بالترتيب الذي يمرره whatsapp_sender:
+# {{1}} رمز الفرصة · {{2}} المنطقة · {{3}} السعر الجديد · {{4}} السعر السابق
+PRICE_DROP_BODY = (
+    "انخفاض سعر من منصة الفريج العقاري\n"
+    "الرمز: {{1}}\n"
+    "المنطقة: {{2}}\n"
+    "السعر الجديد: {{3}} د.ك\n"
+    "السعر السابق: {{4}} د.ك\n"
     "افتح المنصة لعرض التفاصيل والمصادر"
 )
 ALERT_FOOTER = "منصة الفريج — فرص وتقييم عقاري"
@@ -74,6 +86,19 @@ def build_alert_payload() -> dict:
         "category": "UTILITY",
         "components": [
             {"type": "BODY", "text": ALERT_BODY},
+            {"type": "FOOTER", "text": ALERT_FOOTER},
+        ],
+    }
+
+
+def build_price_drop_payload() -> dict:
+    """حمولة إنشاء قالب انخفاض السعر (UTILITY) بأربعة متغيرات نصية."""
+    return {
+        "name": PRICE_DROP_TEMPLATE_NAME,
+        "languages": ["ar"],
+        "category": "UTILITY",
+        "components": [
+            {"type": "BODY", "text": PRICE_DROP_BODY},
             {"type": "FOOTER", "text": ALERT_FOOTER},
         ],
     }
@@ -137,6 +162,7 @@ def fetch_template_statuses(token: str, waba_id: str) -> dict[str, dict]:
     statuses: dict[str, dict] = {
         OTP_TEMPLATE_NAME: {"status": None, "id": ""},
         ALERT_TEMPLATE_NAME: {"status": None, "id": ""},
+        PRICE_DROP_TEMPLATE_NAME: {"status": None, "id": ""},
     }
     if not waba_id:
         return statuses
@@ -188,7 +214,8 @@ def check_setup(token: str, phone_id: str, waba_id: str = "") -> dict:
     report["templates"] = statuses
     otp = statuses.get(OTP_TEMPLATE_NAME, {}).get("status")
     alert = statuses.get(ALERT_TEMPLATE_NAME, {}).get("status")
-    ready = effective_waba and otp == "APPROVED" and alert == "APPROVED"
+    price_drop = statuses.get(PRICE_DROP_TEMPLATE_NAME, {}).get("status")
+    ready = effective_waba and otp == "APPROVED" and alert == "APPROVED" and price_drop == "APPROVED"
     report["ready"] = bool(ready)
     next_steps: list[str] = []
     if not effective_waba:
@@ -197,6 +224,8 @@ def check_setup(token: str, phone_id: str, waba_id: str = "") -> dict:
         next_steps.append("شغّل: python scripts/whatsapp_setup.py --create-otp (ثم انتظر الاعتماد).")
     if alert != "APPROVED":
         next_steps.append("شغّل: python scripts/whatsapp_setup.py --create-alert (ثم انتظر الاعتماد).")
+    if price_drop != "APPROVED":
+        next_steps.append("شغّل: python scripts/whatsapp_setup.py --create-price-drop (ثم انتظر الاعتماد).")
     if ready:
         next_steps.append("كل شيء جاهز — جرّب إرسالًا فعليًا: --send-test +965XXXXXXXX.")
     report["nextSteps"] = next_steps
@@ -289,11 +318,15 @@ def main(argv: list[str] | None = None) -> int:
     if command == "--check":
         print_report(check_setup(token, phone_id, waba_id))
         return 0 if check_setup(token, phone_id, waba_id).get("ready") else 1
-    if command in ("--create-otp", "--create-alert"):
+    if command in ("--create-otp", "--create-alert", "--create-price-drop"):
         if not token or not phone_id:
             print("❌ WHATSAPP_TOKEN و WHATSAPP_PHONE_ID مطلوبان.", file=sys.stderr)
             return 1
-        payload = build_otp_payload() if command == "--create-otp" else build_alert_payload()
+        payload = {
+            "--create-otp": build_otp_payload,
+            "--create-alert": build_alert_payload,
+            "--create-price-drop": build_price_drop_payload,
+        }[command]()
         print(f"إنشاء/تحديث قالب «{payload['name']}»...")
         try:
             result = _upsert_template(token, phone_id, payload, waba_id)

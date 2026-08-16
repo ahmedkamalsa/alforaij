@@ -15,9 +15,11 @@ from scripts.send_opportunity_alerts import _alert_template_params
 from scripts.whatsapp_setup import (
     ALERT_TEMPLATE_NAME,
     OTP_TEMPLATE_NAME,
+    PRICE_DROP_TEMPLATE_NAME,
     _upsert_template,
     build_alert_payload,
     build_otp_payload,
+    build_price_drop_payload,
     check_setup,
     fetch_template_statuses,
 )
@@ -54,6 +56,21 @@ class TestTemplatePayloads(unittest.TestCase):
         self.assertNotIn("http", body)
         self.assertNotIn("http", components["FOOTER"]["text"])
 
+    def test_price_drop_payload_four_variables_no_url(self) -> None:
+        payload = build_price_drop_payload()
+        self.assertEqual(payload["name"], PRICE_DROP_TEMPLATE_NAME)
+        self.assertEqual(payload["category"], "UTILITY")
+        self.assertEqual(payload["languages"], ["ar"])
+        components = {c["type"]: c for c in payload["components"]}
+        body = components["BODY"]["text"]
+        # أربعة متغيرات بالترتيب: رمز/منطقة/سعر جديد/سعر سابق
+        self.assertEqual(body.count("{{"), 4)
+        self.assertLess(body.index("{{1}}"), body.index("{{2}}"))
+        self.assertLess(body.index("{{2}}"), body.index("{{3}}"))
+        self.assertLess(body.index("{{3}}"), body.index("{{4}}"))
+        self.assertNotIn("http", body)
+        self.assertNotIn("http", components["FOOTER"]["text"])
+
 
 class TestCheckReport(unittest.TestCase):
     """تقرير الجاهزية من استجابات وهمية — لا شبكة."""
@@ -87,19 +104,30 @@ class TestCheckReport(unittest.TestCase):
         self.assertFalse(report["ready"])
         self.assertEqual(report["phone"]["wabaId"], "WABA123")
         self.assertEqual(report["templates"][OTP_TEMPLATE_NAME]["status"], None)
-        # خطوة إنشاء القالبين في التوصيات
+        # خطوة إنشاء القوالب الثلاثة في التوصيات
         joined = "\n".join(report["nextSteps"])
         self.assertIn("--create-otp", joined)
         self.assertIn("--create-alert", joined)
+        self.assertIn("--create-price-drop", joined)
 
-    def test_ready_when_both_approved(self) -> None:
+    def test_ready_when_all_three_approved(self) -> None:
+        with self._mock_graph(templates=[
+            {"name": OTP_TEMPLATE_NAME, "status": "APPROVED", "id": "t1", "category": "AUTHENTICATION"},
+            {"name": ALERT_TEMPLATE_NAME, "status": "APPROVED", "id": "t2", "category": "UTILITY"},
+            {"name": PRICE_DROP_TEMPLATE_NAME, "status": "APPROVED", "id": "t3", "category": "UTILITY"},
+        ]):
+            report = check_setup("tok", "123")
+        self.assertTrue(report["ready"])
+        self.assertIn("--send-test", "\n".join(report["nextSteps"]))
+
+    def test_not_ready_when_price_drop_missing(self) -> None:
         with self._mock_graph(templates=[
             {"name": OTP_TEMPLATE_NAME, "status": "APPROVED", "id": "t1", "category": "AUTHENTICATION"},
             {"name": ALERT_TEMPLATE_NAME, "status": "APPROVED", "id": "t2", "category": "UTILITY"},
         ]):
             report = check_setup("tok", "123")
-        self.assertTrue(report["ready"])
-        self.assertIn("--send-test", "\n".join(report["nextSteps"]))
+        self.assertFalse(report["ready"])
+        self.assertIn("--create-price-drop", "\n".join(report["nextSteps"]))
 
     def test_network_error_reported(self) -> None:
         with mock.patch(

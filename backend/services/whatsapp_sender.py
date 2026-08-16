@@ -1,8 +1,16 @@
-"""إرسال تنبيهات واتساب التلقائي عبر Meta Cloud API.
+"""إرسال تنبيهات واتساب التلقائي عبر Meta Cloud API — بقوالب UTILITY معتمدة.
 
 يرتبط بالوكيل اليومي: بعد بناء تنبيهات `build_whatsapp_alerts` (فرصة جديدة أو
-انخفاض سعر يطابق عميلًا مسجلًا) يُرسل رسالة فعلية لكل رقم عميل مطابق، مع:
+انخفاض سعر يطابق عميلًا مسجلًا) يُرسل رسالة قالب فعلية لكل رقم عميل مطابق.
 
+**لماذا قوالب وليست نصًا حرًا؟** الرسالة النصية الحرة تعمل فقط داخل نافذة
+الرد 24 ساعة (من آخر رسالة للمستخدم). التنبيهات اليومية تصل خارج تلك النافذة
+بالضرورة، ولا تسمح Meta بها إلا عبر قالب UTILITY معتمد — لذلك كل إرسال هنا
+يُبنى من قالب معتمد (alforaij_alert للفرص الجديدة، alforaij_price_drop
+لانخفاض السعر) بمتغيرات نصية محددة، ويتسق مع أداة إنشاء القوالب
+(whatsapp_setup.py --create-alert / --create-price-drop).
+
+مع الحفاظ على:
 - **عدم تكرار**: سجل محلي `data/whatsapp_send_log.json` يمنع إعادة إرسال نفس
   (إعلان × رقم × نوع التغيير) في نفس اليوم — حتى لو أُعيد تشغيل الوكيل.
 - **تتبع موحّد**: كل إرسال يُسجَّل اختياريًا في `outreach_clicks` (Supabase)
@@ -32,6 +40,41 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parents[2]
 SEND_LOG_PATH = ROOT / "data" / "whatsapp_send_log.json"
 GRAPH_API = "https://graph.facebook.com/v19.0"
+
+# قوالب UTILITY المعتمدة — أسماؤها تطابق ما تنشئه أداة الإعداد (whatsapp_setup.py)
+ALERT_TEMPLATE_NAME = "alforaij_alert"            # فرصة جديدة: {{1}} رمز {{2}} منطقة {{3}} سعر
+PRICE_DROP_TEMPLATE_NAME = "alforaij_price_drop"  # انخفاض سعر: {{1}} رمز {{2}} منطقة {{3}} جديد {{4}} سابق
+
+
+def _format_price(value: Any) -> str:
+    """تنسيق سعر كمتغير قالب: رقم مفصول الآلاف بلا عملة — القالب يضيف «د.ك»."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if f != f or abs(f) == float("inf"):  # NaN/inf
+        return ""
+    return f"{f:,.0f}"
+
+
+def alert_template_params(alert: dict[str, Any]) -> tuple[str, list[str]]:
+    """تعيين قالب UTILITY ومتغيراته حسب نوع التغيير — دالة نقية قابلة للاختبار.
+
+    - new:        alforaij_alert        [الرمز، المنطقة، السعر]
+    - price_drop: alforaij_price_drop   [الرمز، المنطقة، السعر الجديد، السعر السابق]
+    السعر يُنسَّق رقمًا بلا عملة ({{N}} د.ك داخل نص القالب)، والسقوط إلى
+    priceText منزوعًا من «د.ك» عند غياب القيمة الرقمية.
+    """
+    code = str(alert.get("code") or "")
+    area = str(alert.get("area") or "")
+    price = _format_price(alert.get("price"))
+    if not price:
+        price = str(alert.get("priceText") or "").replace(" د.ك", "").strip()
+    change = str(alert.get("change") or "")
+    if change == "price_drop":
+        old_price = _format_price(alert.get("oldPrice")) or "السعر السابق"
+        return PRICE_DROP_TEMPLATE_NAME, [code, area, price, old_price]
+    return ALERT_TEMPLATE_NAME, [code, area, price]
 
 
 def is_configured() -> bool:
@@ -86,11 +129,16 @@ def _already_sent(code: str, phone: str, change: str, today: str) -> bool:
     return False
 
 
-def send_whatsapp_message(phone: Any, message: str) -> dict[str, Any]:
-    """إرسال رسالة نصية واحدة عبر Meta Cloud API.
+def send_whatsapp_template(
+    phone: Any,
+    template_name: str,
+    params: list[str] | None = None,
+) -> dict[str, Any]:
+    """إرسال رسالة قالب UTILITY معتمد واحدة عبر Meta Cloud API.
 
-    يعيد {"status": "sent", "messageId": ...} عند النجاح، أو
-    {"status": "failed", "error": ...} مع سبب واضح.
+    القوالب وحدها تعمل خارج نافذة الرد 24 ساعة (التنبيهات اليومية) — هذا
+    بديل النص الحر القديم. يعيد {"status": "sent", "messageId": ...} عند
+    النجاح، أو {"status": "failed", "error": ...} مع سبب واضح.
     """
     to = normalize_meta_phone(phone)
     if not to:
@@ -104,9 +152,16 @@ def send_whatsapp_message(phone: Any, message: str) -> dict[str, Any]:
     payload = {
         "messaging_product": "whatsapp",
         "to": to,
-        "type": "text",
-        "text": {"body": message},
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": {"code": "ar"},
+        },
     }
+    if params:
+        payload["template"]["components"] = [
+            {"type": "body", "parameters": [{"type": "text", "text": str(p)} for p in params]}
+        ]
     request = urllib.request.Request(
         f"{GRAPH_API}/{WHATSAPP_PHONE_ID}/messages",
         data=json.dumps(payload).encode("utf-8"),
@@ -123,10 +178,10 @@ def send_whatsapp_message(phone: Any, message: str) -> dict[str, Any]:
         messages = body.get("messages") or []
         if messages:
             message_id = str(messages[0].get("id") or "")
-        return {"status": "sent", "messageId": message_id, "to": to}
+        return {"status": "sent", "messageId": message_id, "to": to, "template": template_name}
     except Exception as exc:
-        logger.warning("WhatsApp send failed for %s: %s", to, exc)
-        return {"status": "failed", "error": str(exc), "to": to}
+        logger.warning("WhatsApp template send failed for %s (%s): %s", to, template_name, exc)
+        return {"status": "failed", "error": str(exc), "to": to, "template": template_name}
 
 
 def send_whatsapp_alerts(
@@ -134,9 +189,11 @@ def send_whatsapp_alerts(
     *,
     sender_name: str | None = None,
 ) -> dict[str, Any]:
-    """إرسال تنبيهات الوكيل اليومي (جديد/انخفاض) لكل عميل مطابق.
+    """إرسال تنبيهات الوكيل اليومي (جديد/انخفاض) لكل عميل مطابق — بقوالب معتمدة.
 
-    - يطبع الرسالة: يستبدل [اسمك] باسم المرسل المُضبوط (WHATSAPP_SENDER_NAME).
+    - يختار لكل تنبيه قالب UTILITY ومتغيراته (alert_template_params): الفرص
+      الجديدة عبر alforaij_alert، وانخفاض السعر عبر alforaij_price_drop —
+      فيعمل خارج نافذة 24 ساعة.
     - يمنع التكرار اليومي لنفس (إعلان × رقم × نوع التغيير) عبر السجل المحلي.
     - يسجّل كل إرسال ناجح في outreach_clicks (Supabase) إن وُجد الجدول.
     - يعيد ملخصًا شفافًا: مرسل/فشل/مكرر/غير مفعّل — دون كسر الوكيل أبدًا.
@@ -157,9 +214,7 @@ def send_whatsapp_alerts(
     for alert in alerts:
         code = str(alert.get("code") or "")
         change = str(alert.get("change") or "")
-        message = str(alert.get("message") or "").replace("[اسمك]", name)
-        if not message:
-            continue
+        template_name, params = alert_template_params(alert)
         phones = alert.get("phones") or []
         for raw_phone in phones:
             phone = normalize_meta_phone(raw_phone)
@@ -169,13 +224,14 @@ def send_whatsapp_alerts(
                 skipped += 1
                 results.append({"code": code, "phone": phone, "status": "duplicate"})
                 continue
-            outcome = send_whatsapp_message(phone, message)
+            outcome = send_whatsapp_template(phone, template_name, params)
             entry = {
                 "date": today,
                 "time": datetime.now().strftime("%H:%M:%S"),
                 "code": code,
                 "phone": phone,
                 "change": change,
+                "template": template_name,
                 "status": outcome.get("status"),
                 "messageId": outcome.get("messageId", ""),
                 "error": outcome.get("error", ""),

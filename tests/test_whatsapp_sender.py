@@ -33,16 +33,16 @@ class TestWhatsAppSender(unittest.TestCase):
         self.assertEqual(normalize_meta_phone(""), "")
         self.assertEqual(normalize_meta_phone(None), "")
 
-    def test_send_message_not_configured(self) -> None:
-        from backend.services.whatsapp_sender import send_whatsapp_message
+    def test_send_template_not_configured(self) -> None:
+        from backend.services.whatsapp_sender import send_whatsapp_template
 
         # عند غياب الضبط لا يُرسل أي شيء ولا يرمي استثناء
-        result = send_whatsapp_message("96555559950", "رسالة تجريبية")
+        result = send_whatsapp_template("96555559950", "alforaij_alert", ["X", "النهضة", "400,000"])
         self.assertEqual(result["status"], "skipped")
         self.assertEqual(result["reason"], "not_configured")
 
-    def test_send_message_success(self) -> None:
-        from backend.services.whatsapp_sender import send_whatsapp_message
+    def test_send_template_success(self) -> None:
+        from backend.services.whatsapp_sender import send_whatsapp_template
 
         class FakeResponse:
             status = 200
@@ -60,31 +60,61 @@ class TestWhatsAppSender(unittest.TestCase):
             "backend.services.whatsapp_sender.urllib.request.urlopen",
             return_value=FakeResponse(),
         ) as urlopen:
-            result = send_whatsapp_message("+96555559950", "السلام عليكم")
+            result = send_whatsapp_template("+96555559950", "alforaij_alert", ["WA-1", "النهضة", "400,000"])
         self.assertEqual(result["status"], "sent")
         self.assertEqual(result["messageId"], "wamid.ABC123")
         request = urlopen.call_args.args[0]
         payload = json.loads(request.data.decode("utf-8"))
         self.assertEqual(payload["to"], "96555559950")
-        self.assertEqual(payload["text"]["body"], "السلام عليكم")
+        # قالب UTILITY وليس نصًا حرًا — هذا ما يجعله يعمل خارج نافذة 24 ساعة
+        self.assertEqual(payload["type"], "template")
+        self.assertEqual(payload["template"]["name"], "alforaij_alert")
+        self.assertEqual(payload["template"]["language"]["code"], "ar")
+        params = payload["template"]["components"][0]["parameters"]
+        self.assertEqual([p["text"] for p in params], ["WA-1", "النهضة", "400,000"])
 
-    def test_send_message_invalid_phone(self) -> None:
-        from backend.services.whatsapp_sender import send_whatsapp_message
+    def test_send_template_invalid_phone(self) -> None:
+        from backend.services.whatsapp_sender import send_whatsapp_template
 
         with self._configured():
-            result = send_whatsapp_message("22260016", "رسالة")
+            result = send_whatsapp_template("22260016", "alforaij_alert", ["X"])
         self.assertEqual(result["status"], "failed")
 
-    def test_send_message_failure_reported(self) -> None:
-        from backend.services.whatsapp_sender import send_whatsapp_message
+    def test_send_template_failure_reported(self) -> None:
+        from backend.services.whatsapp_sender import send_whatsapp_template
 
         with self._configured(), mock.patch(
             "backend.services.whatsapp_sender.urllib.request.urlopen",
             side_effect=RuntimeError("HTTP 401"),
         ):
-            result = send_whatsapp_message("96555559950", "رسالة")
+            result = send_whatsapp_template("96555559950", "alforaij_alert", ["X"])
         self.assertEqual(result["status"], "failed")
         self.assertIn("401", result["error"])
+
+    def test_alert_template_params_new(self) -> None:
+        from backend.services.whatsapp_sender import alert_template_params
+
+        template, params = alert_template_params(self._alert("WA-1"))
+        self.assertEqual(template, "alforaij_alert")
+        self.assertEqual(params, ["WA-1", "النهضة", "400,000"])
+
+    def test_alert_template_params_price_drop(self) -> None:
+        from backend.services.whatsapp_sender import alert_template_params
+
+        alert = self._alert("WA-2", change="price_drop")
+        alert["oldPrice"] = 450000
+        template, params = alert_template_params(alert)
+        self.assertEqual(template, "alforaij_price_drop")
+        self.assertEqual(params, ["WA-2", "النهضة", "400,000", "450,000"])
+
+    def test_alert_template_params_price_text_fallback(self) -> None:
+        from backend.services.whatsapp_sender import alert_template_params
+
+        alert = self._alert("WA-3")
+        alert["price"] = None
+        template, params = alert_template_params(alert)
+        # السقوط إلى priceText منزوعًا من «د.ك»
+        self.assertEqual(params, ["WA-3", "النهضة", "400,000"])
 
     def _alert(self, code: str, change: str = "new") -> dict:
         return {
@@ -108,7 +138,7 @@ class TestWhatsAppSender(unittest.TestCase):
         self.assertEqual(result["sent"], 0)
         self.assertIn("WHATSAPP_TOKEN", result["note"])
 
-    def test_send_alerts_replaces_sender_name_and_sends(self) -> None:
+    def test_send_alerts_sends_approved_template(self) -> None:
         from backend.services import whatsapp_sender
 
         class FakeResponse:
@@ -136,19 +166,55 @@ class TestWhatsAppSender(unittest.TestCase):
             self.assertEqual(result["status"], "sent")
             self.assertEqual(result["sent"], 1)
             self.assertEqual(result["failed"], 0)
-            # اسم المرسل استُبدل في الرسالة الفعلية
-            sent_body = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))["text"]["body"]
-            self.assertNotIn("[اسمك]", sent_body)
-            self.assertIn("فريق الفريج العقاري", sent_body)
+            # الحمولة قالب UTILITY معتمد — لا نص حر ولا [اسمك]
+            sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+            self.assertEqual(sent["type"], "template")
+            self.assertEqual(sent["template"]["name"], "alforaij_alert")
+            body = json.dumps(sent, ensure_ascii=False)
+            self.assertNotIn("[اسمك]", body)
             # التتبع الموحّد سُجّل
             self.assertEqual(track.call_args.args[0]["action"], "send")
             self.assertEqual(track.call_args.args[0]["channel"], "whatsapp_agent")
             self.assertEqual(track.call_args.args[0]["opportunityCode"], "WA-1")
-            # السجل المحلي كُتب
+            # السجل المحلي كُتب مع اسم القالب
             log = json.loads(whatsapp_sender.SEND_LOG_PATH.read_text(encoding="utf-8"))
             self.assertEqual(log[0]["code"], "WA-1")
             self.assertEqual(log[0]["phone"], "96555559950")
+            self.assertEqual(log[0]["template"], "alforaij_alert")
             self.assertEqual(log[0]["status"], "sent")
+
+    def test_send_alerts_price_drop_uses_price_drop_template(self) -> None:
+        from backend.services import whatsapp_sender
+
+        class FakeResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return json.dumps({"messages": [{"id": "wamid.PD"}]}).encode("utf-8")
+
+        alert = self._alert("WA-4", change="price_drop")
+        alert["oldPrice"] = 450000
+        with tempfile.TemporaryDirectory() as tmp:
+            whatsapp_sender.SEND_LOG_PATH = Path(tmp) / "send_log.json"
+            with self._configured(), mock.patch(
+                "backend.services.whatsapp_sender.urllib.request.urlopen",
+                return_value=FakeResponse(),
+            ) as urlopen, mock.patch(
+                "backend.services.supabase_store.save_outreach_click",
+                return_value={"status": "saved"},
+            ):
+                result = whatsapp_sender.send_whatsapp_alerts([alert])
+        self.assertEqual(result["sent"], 1)
+        sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+        self.assertEqual(sent["template"]["name"], "alforaij_price_drop")
+        params = [p["text"] for p in sent["template"]["components"][0]["parameters"]]
+        self.assertEqual(params, ["WA-4", "النهضة", "400,000", "450,000"])
 
     def test_send_alerts_dedup_same_day(self) -> None:
         from backend.services import whatsapp_sender
