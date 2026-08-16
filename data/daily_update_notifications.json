@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-15T03:31:57",
+  "generatedAt": "2026-08-16T03:40:54",
   "hasPrevious": true,
   "counts": {
-    "added": 2,
-    "removed": 2,
+    "added": 6,
+    "removed": 6,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -64,57 +64,83 @@
     "priceDrops": [],
     "added": [
       {
-        "code": "AF-106",
-        "area": "سعد العبدالله",
+        "code": "AF-278",
+        "area": "بيان",
         "propertyType": "بيت",
-        "price": 330000.0,
-        "priceText": "330 ألف د.ك",
+        "price": 270000.0,
+        "priceText": "270 ألف د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
         "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/106",
+        "url": "https://front.alforaij.com/Listing/Detail/278",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       },
       {
-        "code": "OS-285431740",
+        "code": "BU3-7212",
         "area": "",
-        "propertyType": "عقارات",
-        "price": 100000.0,
-        "priceText": "100,000 د.ك",
+        "propertyType": "أرض",
+        "price": 300000.0,
+        "priceText": "300,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285431740",
+        "source": "بوعقار / بوشملان (Bu3qar)",
+        "url": "https://www.bu3qar.com/product-details/7212/%D8%A7%D8%B1%D8%B6-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D8%A8%D8%A7%D9%84%D8%A8%D8%AD%D8%B1%D9%8A%D8%A9-%D8%A7%D9%84%D8%AE%D8%A7%D9%85%D8%B3%D8%A9-%D8%B5%D9%81-%D8%A7%D9%88%D9%84-%D9%88%D8%A7%D8%B1%D8%AA%D8%AF%D8%A7%D8%AF",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
+        "code": "BU3-7229",
+        "area": "صباح الأحمد",
+        "propertyType": "بيت",
+        "price": 205000.0,
+        "priceText": "205,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "بوعقار / بوشملان (Bu3qar)",
+        "url": "https://www.bu3qar.com/product-details/7229/%D8%A8%D9%8A%D8%AA-%D8%AD%D9%83%D9%88%D9%85%D9%8A-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%89-%D8%B5%D8%A8%D8%A7%D8%AD-%D8%A7%D9%84%D8%A7%D8%AD%D9%85%D8%AF-%D9%82%D8%B7%D8%B9%D8%A9-1",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       }
     ],
     "removed": [
       {
-        "code": "OS-285335034",
-        "area": "الفروانية",
-        "propertyType": "عمارة",
-        "price": 285000.0,
-        "priceText": "285,000 د.ك",
+        "code": "BU3-7211",
+        "area": "القصور",
+        "propertyType": "بيت",
+        "price": 300000.0,
+        "priceText": "300,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "بوعقار / بوشملان (Bu3qar)",
+        "url": "https://www.bu3qar.com/product-details/7211/%D8%A8%D9%8A%D8%AA-%D8%AD%D9%83%D9%88%D9%85%D9%87-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%8A-%D8%A7%D9%84%D9%82%D8%B5%D9%88%D8%B1-%D8%B4%D8%A7%D8%B1%D8%B9-%D9%88%D8%B3%D9%83%D8%A9",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "BU3-7235",
+        "area": "الخيران",
+        "propertyType": "بيت",
+        "price": 260000.0,
+        "priceText": "260,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "بوعقار / بوشملان (Bu3qar)",
+        "url": "https://www.bu3qar.com/product-details/7235/%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%8A%D9%84%D8%A7-%D9%81%D9%89-%D8%A7%D9%84%D8%AE%D9%8A%D8%B1%D8%A7%D9%86-%D8%A7%D9%84%D8%B3%D9%83%D9%86%D9%89-%D9%82%D8%B7%D8%B9%D8%A9-2",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "OS-285501166",
+        "area": "الجابرية",
+        "propertyType": "عقارات",
+        "price": 27000.0,
+        "priceText": "27,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
         "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285335034",
-        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
-      },
-      {
-        "code": "AF-105",
-        "area": "جليب الشيوخ - الحساوي",
-        "propertyType": "عمارة",
-        "price": 800000.0,
-        "priceText": "800 ألف د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/105",
+        "url": "https://kw.opensooq.com/search/285501166",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       }
     ]

@@ -1,8 +1,8 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-15T03:29:53",
-  "finishedAt": "2026-08-15T03:31:57",
+  "startedAt": "2026-08-16T03:38:41",
+  "finishedAt": "2026-08-16T03:40:54",
   "steps": [
     {
       "name": "sync_source_registry",
@@ -57,7 +57,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 414,
+        "totalScored": 411,
         "includeExternal": true
       }
     },
@@ -66,7 +66,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 469,
+        "count": 470,
         "error": ""
       }
     },
@@ -75,7 +75,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 252,
+        "count": 249,
         "error": ""
       }
     },
@@ -84,18 +84,18 @@
       "status": "ok",
       "result": {
         "status": "success",
-        "count": 7,
+        "count": 8,
         "local": "saved",
         "database": "saved",
-        "note": "جمع 7 تطورًا، 3/11 مصادر عقارية"
+        "note": "جمع 8 تطورًا، 3/11 مصادر عقارية"
       }
     },
     {
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 2,
-        "removed": 2,
+        "added": 6,
+        "removed": 6,
         "priceDrops": 0
       }
     },
@@ -114,11 +114,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "marketListingsHarvested": 469,
-    "opportunitiesScored": 414,
+    "marketListingsHarvested": 470,
+    "opportunitiesScored": 411,
     "notificationCounts": {
-      "added": 2,
-      "removed": 2,
+      "added": 6,
+      "removed": 6,
       "priceDrops": 0
     },
     "whatsappAlerts": {
@@ -255,13 +255,13 @@
         "market_listings": {
           "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
           "available": true,
-          "count": 1270,
+          "count": 1383,
           "status": "ok"
         },
         "price_trends": {
           "label": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
           "available": true,
-          "count": 323,
+          "count": 333,
           "status": "ok"
         },
         "market_ads": {
@@ -285,19 +285,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 675,
+          "count": 703,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 4506,
+          "count": 5038,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 64336,
+          "count": 66388,
           "status": "ok"
         },
         "client_leads": {
@@ -315,13 +315,13 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 379,
+          "count": 381,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 408,
+          "count": 436,
           "status": "ok"
         }
       },
