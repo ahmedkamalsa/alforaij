@@ -1,8 +1,8 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-16T03:38:41",
-  "finishedAt": "2026-08-16T03:40:54",
+  "startedAt": "2026-08-16T15:40:35",
+  "finishedAt": "2026-08-16T15:43:03",
   "steps": [
     {
       "name": "sync_source_registry",
@@ -25,7 +25,7 @@
       "status": "ok",
       "result": {
         "count": 6,
-        "reachable": 3
+        "reachable": 2
       }
     },
     {
@@ -57,7 +57,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 411,
+        "totalScored": 416,
         "includeExternal": true
       }
     },
@@ -66,7 +66,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 470,
+        "count": 467,
         "error": ""
       }
     },
@@ -75,7 +75,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 249,
+        "count": 251,
         "error": ""
       }
     },
@@ -84,18 +84,18 @@
       "status": "ok",
       "result": {
         "status": "success",
-        "count": 8,
+        "count": 6,
         "local": "saved",
         "database": "saved",
-        "note": "جمع 8 تطورًا، 3/11 مصادر عقارية"
+        "note": "جمع 6 تطورًا، 2/11 مصادر عقارية"
       }
     },
     {
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 6,
-        "removed": 6,
+        "added": 20,
+        "removed": 20,
         "priceDrops": 0
       }
     },
@@ -114,11 +114,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "marketListingsHarvested": 470,
-    "opportunitiesScored": 411,
+    "marketListingsHarvested": 467,
+    "opportunitiesScored": 416,
     "notificationCounts": {
-      "added": 6,
-      "removed": 6,
+      "added": 20,
+      "removed": 20,
       "priceDrops": 0
     },
     "whatsappAlerts": {
@@ -129,7 +129,7 @@
     },
     "officialReferenceSources": {
       "count": 6,
-      "reachable": 3,
+      "reachable": 2,
       "sources": [
         {
           "id": "nbk_housing_loan",
@@ -146,15 +146,6 @@
           "url": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports.html",
           "role": "مؤشرات سوقية مرجعية عند غياب صفقات كافية.",
           "dataUse": "market_indicators",
-          "status": "reachable",
-          "detail": ""
-        },
-        {
-          "id": "moj_sale_deals",
-          "name": "وزارة العدل - صفقات التسجيل العقاري",
-          "url": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx",
-          "role": "مصدر الصفقات الرسمية عند توفر ملف/جدول قابل للاستيراد.",
-          "dataUse": "official_transactions",
           "status": "reachable",
           "detail": ""
         },
@@ -184,6 +175,15 @@
           "dataUse": "legal_verification",
           "status": "unreachable",
           "detail": "HTTP Error 403: Forbidden"
+        },
+        {
+          "id": "moj_sale_deals",
+          "name": "وزارة العدل - صفقات التسجيل العقاري",
+          "url": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx",
+          "role": "مصدر الصفقات الرسمية عند توفر ملف/جدول قابل للاستيراد.",
+          "dataUse": "official_transactions",
+          "status": "unreachable",
+          "detail": "<urlopen error timed out>"
         }
       ],
       "note": "هذه مصادر مرجعية مجانية. لا تدخل أرقامها في التقييم إلا عند استخراج بيانات منظمة أو إدخال CSV/JSON موثق."
@@ -255,13 +255,13 @@
         "market_listings": {
           "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
           "available": true,
-          "count": 1383,
+          "count": 1482,
           "status": "ok"
         },
         "price_trends": {
           "label": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
           "available": true,
-          "count": 333,
+          "count": 345,
           "status": "ok"
         },
         "market_ads": {
@@ -285,19 +285,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 703,
+          "count": 705,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 5038,
+          "count": 5076,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 66388,
+          "count": 66540,
           "status": "ok"
         },
         "client_leads": {
@@ -315,13 +315,13 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 381,
+          "count": 382,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 436,
+          "count": 438,
           "status": "ok"
         }
       },
