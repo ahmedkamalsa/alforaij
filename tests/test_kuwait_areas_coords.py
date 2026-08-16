@@ -71,6 +71,24 @@ class KuwaitCoordsTests(unittest.TestCase):
         for name in ("السالمية", "الفروانية", "الرميثية", "الفحيحيل", "الجهراء", "مبارك الكبير"):
             self.assertIn(_norm(name), self.areas, name)
 
+    def test_new_residential_cities_sourced(self) -> None:
+        # الأراضي السكنية الجديدة بمصادر رسمية موثقة (حقل source) — إحداثيات دقيقة
+        # تمنع انحدار قيم التخمين القديمة الخاطئة (كانت تبعد 15-35 كم عن الواقع)
+        expected = {
+            "المطلاع": (29.49, 47.59),          # ويكيبيديا/PAHW — مدينة المطلاع السكنية
+            "صباح الأحمد": (28.782, 48.064),      # OSM/Mapcarta + Wikimapia — المدينة السكنية
+            "صباح الأحمد البحرية": (28.6447, 48.3419),  # GeoNames/GNS عبر Wikidata — الخيران
+            "الوفرة": (28.55833, 48.04333),      # ويكيبيديا — أقصى جنوب الأحمدي
+        }
+        for name, (lat, lng) in expected.items():
+            entry = self.areas.get(_norm(name))
+            self.assertIsNotNone(entry, f"منطقة {name} غير مفهرسة")
+            self.assertAlmostEqual(entry["lat"], lat, delta=0.01, msg=name)
+            self.assertAlmostEqual(entry["lng"], lng, delta=0.01, msg=name)
+            self.assertTrue(entry.get("source"), f"منطقة {name} بلا مصدر موثق")
+        # جنوب المطلاع = المدينة السكنية نفسها (اسم شائع في الإعلانات)
+        self.assertEqual(self.areas["جنوب المطلاع"]["lat"], 29.49)
+
 
 if __name__ == "__main__":
     unittest.main()
