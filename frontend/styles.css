@@ -5978,6 +5978,8 @@ body.drill-open {
   color: inherit;
   border-radius: var(--radius-sm);
   padding: 8px 12px;
+  min-height: 44px;
+  box-sizing: border-box;
   cursor: pointer;
   font-size: 13px;
   transition: border-color .15s ease, color .15s ease;
