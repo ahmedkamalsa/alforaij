@@ -1,0 +1,69 @@
+name: WhatsApp live readiness check
+
+# اختبار حي يدوي: يشغّل scripts/whatsapp_setup.py --check بالأسرار الحقيقية
+# (WHATSAPP_TOKEN + WHATSAPP_PHONE_ID من أسرار المستودع) ويعيد التقرير كأثر
+# (نص مقروء + JSON منظّم) — إثبات أن التسليم الفعلي على الهاتف جاهز فعلًا.
+#
+# الاستخدام: تبويب Actions ← «WhatsApp live readiness check» ← Run workflow.
+# يبقى التشغيل أحمر حتى تكتمل الجاهزية (الرقم + القالبان معتمدين) — والأثر
+# يُرفع دائمًا مهما كانت النتيجة.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run WhatsApp readiness check (real secrets)
+        id: check
+        env:
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
+        run: |
+          set +e
+          # التقرير النصي: يُحفظ في ملف (للأثر) ويُطبع في السجل معًا
+          python scripts/whatsapp_setup.py --check > whatsapp-report.txt 2>&1
+          check_exit=$?
+          cat whatsapp-report.txt
+          # التقرير المنظّم (JSON): نفس الدالة النقية بلا طباعة — للأثر والقراءة الآلية
+          python - <<'EOF'
+          import json, os
+          from scripts.whatsapp_setup import check_setup
+          report = check_setup(os.getenv("WHATSAPP_TOKEN", ""), os.getenv("WHATSAPP_PHONE_ID", ""))
+          with open("whatsapp-report.json", "w", encoding="utf-8") as fh:
+              json.dump(report, fh, ensure_ascii=False, indent=2)
+          EOF
+          echo "check_exit=$check_exit" >> "$GITHUB_OUTPUT"
+          echo "check_exit=$check_exit"
+          # لا نفشل هذه الخطوة: الأثر (التقرير) يجب أن يُرفع دائمًا، والبوابة الحمراء
+          # تأتي في خطوة أخيرة واضحة حتى لا يختفي السبب داخل سجل الخطوة الفاشلة.
+          exit 0
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whatsapp-readiness-report
+          path: |
+            whatsapp-report.txt
+            whatsapp-report.json
+          if-no-files-found: error
+
+      - name: Report readiness status
+        if: always()
+        run: |
+          if [ "${{ steps.check.outputs.check_exit }}" = "0" ]; then
+            echo "✅ WhatsApp جاهز للإرسال الفعلي على الهاتف." >> "$GITHUB_STEP_SUMMARY"
+            echo "التقرير الكامل في الأثر: whatsapp-readiness-report (whatsapp-report.txt / .json)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "⚠️ WhatsApp غير جاهز بعد — التفاصيل في أثر whatsapp-readiness-report." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            cat whatsapp-report.txt >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
