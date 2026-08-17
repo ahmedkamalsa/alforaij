@@ -22,6 +22,7 @@ from backend.services.supabase_store import (
     fetch_latest_opportunities,
     is_configured,
     mark_stale_market_listings,
+    record_listing_price_history,
     save_listings,
     save_market_developments,
     save_market_listings,
@@ -256,6 +257,19 @@ def run_daily_update_agent(
             "persist_market_listings",
             harvest,
             "ok" if harvest.get("status") in ("saved", "empty", "not_configured") else "needs_table",
+        )
+
+        # سجل سعر العقار: خط زمني لسعر كل إعلان عند ظهوره (محصود خارجي + محلي
+        # بسعر صالح) — يُطوى التكرار داخل الدفعة وتُتجاهل بلا سعر. يتراكم يوميًا
+        # في listing_price_observations ويكشف التذبذب الوهمي ويمدّ تنبيهات الانخفاض.
+        history_rows = list(external_rows) + [
+            getattr(listing, "__dict__", listing) for listing in listings
+        ]
+        price_history = record_listing_price_history(history_rows)
+        step(
+            "record_listing_price_history",
+            price_history,
+            "ok" if price_history.get("status") in ("saved", "empty", "not_configured") else "needs_table",
         )
 
         # كسح الإعلانات القديمة/المباعة: يوسم stale كل إعلان لم يُرَ منذ 14 يومًا

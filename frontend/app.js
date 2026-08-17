@@ -3102,6 +3102,108 @@ function applySimpleFilters() {
   note.textContent = `معروض ${shown} من ${all.length} نتيجة حسب الفلاتر.`;
 }
 
+// ─── سجل سعر العقار: خط زمني لسعر كل إعلان عند كل ظهور (من الحصاد اليومي) ───
+const _priceHistoryCache = {};
+
+function phShortDate(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function priceTimelineHtml(rows) {
+  // تجميع الملاحظات المتتالية ذات السعر نفسه في مقاطع (سعر + فترة ظهور) —
+  // يُظهر «كم ظل السعر» بدل تكرار نفس السعر يوميًا.
+  const segments = [];
+  for (const row of rows) {
+    const price = Number(row.price);
+    if (!price || price <= 0) continue;
+    const last = segments[segments.length - 1];
+    if (last && last.price === price) {
+      last.last = row.seen_at;
+      last.count += 1;
+    } else {
+      segments.push({ price, first: row.seen_at, last: row.seen_at, count: 1 });
+    }
+  }
+  if (!segments.length) return "";
+  const enriched = segments.map((seg, index) => ({
+    ...seg,
+    prev: index > 0 ? segments[index - 1].price : null,
+  }));
+  const first = enriched[0].price;
+  const final = enriched[enriched.length - 1].price;
+  const overall = final - first;
+  const overallPct = first ? Math.round((overall / first) * 1000) / 10 : 0;
+  let meta;
+  if (overall < 0) meta = `انخفض من ${formatMoney(first)} إلى ${formatMoney(final)} (${overallPct}%)`;
+  else if (overall > 0) meta = `ارتفع من ${formatMoney(first)} إلى ${formatMoney(final)} (+${overallPct}%)`;
+  else meta = `السعر ثابت عند ${formatMoney(first)} منذ أول ظهور`;
+  // آخر 8 مقاطع (الأحدث أولوية الرؤية) + ملاحظة بالأقدم إن وُجدت
+  const LIMIT = 8;
+  const recent = enriched.slice(-LIMIT);
+  const older = enriched.length - recent.length;
+  const rowsHtml = recent.map((seg) => {
+    const delta = seg.prev !== null ? seg.price - seg.prev : null;
+    const pct = seg.prev ? Math.round((delta / seg.prev) * 1000) / 10 : null;
+    const deltaClass = delta < 0 ? "ph-down" : delta > 0 ? "ph-up" : "";
+    const deltaIcon = delta < 0 ? "📉" : delta > 0 ? "📈" : "➖";
+    const range = seg.last !== seg.first
+      ? `${phShortDate(seg.first)} ← ${phShortDate(seg.last)}`
+      : phShortDate(seg.first);
+    const times = seg.count > 1
+      ? ` (شوهد ${seg.count} ${seg.count === 2 ? "مرتين" : "مرات"})`
+      : "";
+    return `
+      <div class="ph-row">
+        <span class="ph-price">${escapeHtml(formatMoney(seg.price))}</span>
+        <span class="ph-range">${escapeHtml(range)}${escapeHtml(times)}</span>
+        ${delta !== null ? `<span class="ph-delta ${deltaClass}">${deltaIcon} ${delta > 0 ? "+" : ""}${Number(delta).toLocaleString("en-US")} (${pct > 0 ? "+" : ""}${pct}%)</span>` : ""}
+      </div>
+    `;
+  }).join("");
+  const olderNote = older > 0
+    ? `<div class="ph-more">… +${older} مستوى سعر أقدم قبل التاريخ الموضح</div>`
+    : "";
+  return `
+    <h4 class="price-history-title">📈 سجل سعر العقار</h4>
+    <p class="price-history-meta">${escapeHtml(meta)} · ${enriched.length} مستوى سعر منذ ${escapeHtml(phShortDate(segments[0].first))}</p>
+    <div class="price-history-list">${rowsHtml}${olderNote}</div>
+  `;
+}
+
+async function loadListingPriceHistory(code, slot) {
+  // جلب محروس مباشرة من القاعدة الحية (نمط shareCountsBase): أي فشل يُبتلع صامتًا
+  // — صفر أخطاء كونسول (درس فحص الجوال). يعمل على الخادم الحي والموقع الثابت معًا.
+  if (!code || code === "STATIC" || !slot) return;
+  if (code in _priceHistoryCache) {
+    renderPriceHistory(slot, _priceHistoryCache[code]);
+    return;
+  }
+  _priceHistoryCache[code] = [];
+  try {
+    const base = await supabaseBase();
+    if (!base) return;
+    const res = await fetch(
+      `${base.url}/rest/v1/listing_price_observations?select=price,seen_at&code=eq.${encodeURIComponent(code)}&order=seen_at.asc`,
+      { headers: { apikey: base.key, Authorization: `Bearer ${base.key}` } },
+    );
+    if (!res.ok) return;
+    const rows = await res.json();
+    _priceHistoryCache[code] = Array.isArray(rows) ? rows : [];
+    renderPriceHistory(slot, _priceHistoryCache[code]);
+  } catch {
+    /* ignore */
+  }
+}
+
+function renderPriceHistory(slot, rows) {
+  if (!slot) return;
+  const html = priceTimelineHtml(rows || []);
+  if (!html) return;
+  slot.hidden = false;
+  slot.innerHTML = html;
+}
+
 function renderReport(report) {
   const summaryEl = $("summaryText");
   const summary = report.summary || "";
@@ -3170,6 +3272,8 @@ function renderReport(report) {
       cardNode.dataset.stype = normalizeArabic(item.propertyType || item.detailClass || "");
       cardNode.dataset.stx = normalizeArabic(item.transaction || "");
     }
+    // فتحة سجل السعر تُلتقط قبل appendChild (المقتطف يفرغ بعد الإلحاق)
+    const priceHistorySlot = node.querySelector(".price-history");
     // كتلة البطاقة المبسطة: السعر كبير + منطقة + نوع + تاريخ (تظهر في وضع مبسّط فقط)
     const simplePrice = node.querySelector(".simple-price");
     if (simplePrice) simplePrice.textContent = item.priceText || (item.price ? formatMoney(item.price) : "غير معلن");
@@ -3433,6 +3537,8 @@ function renderReport(report) {
     shareChip.innerHTML = "🔄 <b>0</b>";
     shareLink.after(shareChip);
     root.appendChild(node);
+    // سجل سعر العقار: خط زمني للسعر عند كل ظهور يُجلب محروسًا ويظهر في بطاقة التحليل
+    loadListingPriceHistory(item.code, priceHistorySlot);
   };
 
   exactResults.forEach(renderItem);

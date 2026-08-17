@@ -487,6 +487,55 @@ def save_market_listings(rows: list[dict[str, Any]]) -> dict[str, Any]:
         return {"status": "failed", "count": 0, "error": "unexpected error"}
 
 
+def record_listing_price_history(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """تسجيل سعر كل إعلان عند ظهوره في الحصاد (سجل سعر العقار، append-only).
+
+    يكتب صفًا واحدًا لكل إعلان يحمل سعرًا صالحًا — خط زمني يتراكم يوميًا عبر
+    الوكيل (بعد persist_market_listings). الصفوف المتكررة داخل الدفعة نفسها
+    (نفس code) تُطوى على آخرها، والصفوف بلا كود أو بلا سعر تُتجاهل. متسامح
+    تمامًا كبقية الحفظ: غياب الجدول أو تعذر الكتابة يُسجَّل ولا يكسر اليومي.
+    """
+    if not rows:
+        return {"status": "empty", "count": 0, "error": ""}
+    if not is_configured():
+        return {"status": "not_configured", "count": 0, "error": ""}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    by_code: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        code = str(row.get("code") or "").strip()
+        if not code or code == "STATIC":
+            continue
+        try:
+            price = float(row.get("price"))
+        except (TypeError, ValueError):
+            continue
+        if not price or price <= 0:
+            continue
+        by_code[code] = {
+            "code": code,
+            "source": row.get("source"),
+            "area": row.get("area"),
+            "property_type": row.get("property_type"),
+            "transaction": row.get("transaction"),
+            "price": price,
+            "price_text": row.get("price_text"),
+            "seen_at": now_iso,
+        }
+    clean = list(by_code.values())
+    if not clean:
+        return {"status": "empty", "count": 0, "error": ""}
+    try:
+        for index in range(0, len(clean), 250):
+            _post("listing_price_observations", clean[index:index + 250])
+        return {"status": "saved", "count": len(clean), "error": ""}
+    except RuntimeError as exc:
+        logger.warning("listing_price_history save failed: %s", exc)
+        return {"status": "failed", "count": 0, "error": str(exc)}
+    except Exception:
+        logger.exception("listing_price_history save failed")
+        return {"status": "failed", "count": 0, "error": "unexpected error"}
+
+
 def _stale_cutoff(days: int) -> str:
     """حد الكسح: الآن ناقص days — بصيغة ISO توقيت عالمي (تُقارن مع timestamptz)."""
     return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
