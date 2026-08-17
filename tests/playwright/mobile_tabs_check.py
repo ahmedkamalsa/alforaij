@@ -25,7 +25,9 @@ with sync_playwright() as p:
     page = browser.new_page(viewport=VIEWPORT)
     page.on("console", lambda msg: errors.append(f"{msg.type}: {msg.text}") if msg.type == "error" else None)
     page.on("pageerror", lambda exc: errors.append(f"pageerror: {exc}"))
-    page.goto(BASE, wait_until="networkidle", timeout=60000)
+    page.goto(BASE, wait_until="load", timeout=60000)
+    page.wait_for_selector(".main-tab", timeout=30000)
+    page.wait_for_timeout(1500)
 
     tabs = page.locator(".main-tab")
     count = tabs.count()
