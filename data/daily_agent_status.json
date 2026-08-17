@@ -1,8 +1,8 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-16T15:40:35",
-  "finishedAt": "2026-08-16T15:43:03",
+  "startedAt": "2026-08-17T03:40:20",
+  "finishedAt": "2026-08-17T03:42:15",
   "steps": [
     {
       "name": "sync_source_registry",
@@ -25,7 +25,7 @@
       "status": "ok",
       "result": {
         "count": 6,
-        "reachable": 2
+        "reachable": 3
       }
     },
     {
@@ -57,7 +57,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 416,
+        "totalScored": 411,
         "includeExternal": true
       }
     },
@@ -66,7 +66,37 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 467,
+        "count": 475,
+        "error": ""
+      }
+    },
+    {
+      "name": "record_listing_price_history",
+      "status": "ok",
+      "result": {
+        "status": "saved",
+        "count": 485,
+        "error": ""
+      }
+    },
+    {
+      "name": "sweep_stale_market_listings",
+      "status": "ok",
+      "result": {
+        "status": "swept",
+        "days": 14,
+        "cutoff": "2026-08-03T03:41:26.701504+00:00",
+        "error": "",
+        "count": null
+      }
+    },
+    {
+      "name": "dedupe_market_listings",
+      "status": "ok",
+      "result": {
+        "status": "deduped",
+        "groups": 2,
+        "marked": 2,
         "error": ""
       }
     },
@@ -75,7 +105,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 251,
+        "count": 252,
         "error": ""
       }
     },
@@ -84,18 +114,18 @@
       "status": "ok",
       "result": {
         "status": "success",
-        "count": 6,
+        "count": 7,
         "local": "saved",
         "database": "saved",
-        "note": "جمع 6 تطورًا، 2/11 مصادر عقارية"
+        "note": "جمع 7 تطورًا، 3/11 مصادر عقارية"
       }
     },
     {
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 20,
-        "removed": 20,
+        "added": 2,
+        "removed": 1,
         "priceDrops": 0
       }
     },
@@ -114,11 +144,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "marketListingsHarvested": 467,
-    "opportunitiesScored": 416,
+    "marketListingsHarvested": 475,
+    "opportunitiesScored": 411,
     "notificationCounts": {
-      "added": 20,
-      "removed": 20,
+      "added": 2,
+      "removed": 1,
       "priceDrops": 0
     },
     "whatsappAlerts": {
@@ -129,7 +159,7 @@
     },
     "officialReferenceSources": {
       "count": 6,
-      "reachable": 2,
+      "reachable": 3,
       "sources": [
         {
           "id": "nbk_housing_loan",
@@ -146,6 +176,15 @@
           "url": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports.html",
           "role": "مؤشرات سوقية مرجعية عند غياب صفقات كافية.",
           "dataUse": "market_indicators",
+          "status": "reachable",
+          "detail": ""
+        },
+        {
+          "id": "moj_sale_deals",
+          "name": "وزارة العدل - صفقات التسجيل العقاري",
+          "url": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx",
+          "role": "مصدر الصفقات الرسمية عند توفر ملف/جدول قابل للاستيراد.",
+          "dataUse": "official_transactions",
           "status": "reachable",
           "detail": ""
         },
@@ -175,15 +214,6 @@
           "dataUse": "legal_verification",
           "status": "unreachable",
           "detail": "HTTP Error 403: Forbidden"
-        },
-        {
-          "id": "moj_sale_deals",
-          "name": "وزارة العدل - صفقات التسجيل العقاري",
-          "url": "https://www.moj.gov.kw/EN/Apps/Pages/Realestate.aspx",
-          "role": "مصدر الصفقات الرسمية عند توفر ملف/جدول قابل للاستيراد.",
-          "dataUse": "official_transactions",
-          "status": "unreachable",
-          "detail": "<urlopen error timed out>"
         }
       ],
       "note": "هذه مصادر مرجعية مجانية. لا تدخل أرقامها في التقييم إلا عند استخراج بيانات منظمة أو إدخال CSV/JSON موثق."
@@ -255,13 +285,13 @@
         "market_listings": {
           "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
           "available": true,
-          "count": 1482,
+          "count": 1616,
           "status": "ok"
         },
         "price_trends": {
           "label": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
           "available": true,
-          "count": 345,
+          "count": 361,
           "status": "ok"
         },
         "market_ads": {
@@ -285,19 +315,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 705,
+          "count": 726,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 5076,
+          "count": 5475,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 66540,
+          "count": 68032,
           "status": "ok"
         },
         "client_leads": {
@@ -315,13 +345,13 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 382,
+          "count": 386,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 438,
+          "count": 459,
           "status": "ok"
         }
       },
