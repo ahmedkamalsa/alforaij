@@ -468,7 +468,9 @@ function setStatus(text) {
 // وجداول RLS العامة — فيعرض الترويسة أرقامًا حية فعلًا بدل أرقام اللقطة، مع سقوط آمن.
 async function liveDbConfig() {
   try {
-    const cfg = await fetchStaticJson("/api/live-db");
+    // getJson: على الخادم الحي تجلب /api/live-db الفعلية (لا 404 في نسخة نظيفة بلا
+    // لقطة)، وعلى الموقع المنشور تسقط على اللقطة الثابتة — نفس النمط المحروس.
+    const cfg = await getJson("/api/live-db");
     return cfg && cfg.url && cfg.anonKey ? cfg : null;
   } catch {
     return null;
@@ -493,7 +495,7 @@ async function fetchLivePriceTrends() {
 
 async function applyLiveDbCounts(statusEl) {
   try {
-    const cfg = await fetchStaticJson("/api/live-db");
+    const cfg = await getJson("/api/live-db");
     if (!cfg || !cfg.url || !cfg.anonKey) return;
     const headers = { apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}` };
     const base = cfg.url.replace(/\/$/, "");
@@ -3981,7 +3983,7 @@ const shareState = { counts: {}, base: null, loaded: false };
 async function shareCountsBase() {
   if (shareState.base) return shareState.base;
   try {
-    const cfg = await fetchStaticJson("/api/live-db");
+    const cfg = await getJson("/api/live-db");
     if (cfg && cfg.url && cfg.anonKey) {
       shareState.base = { url: String(cfg.url).replace(/\/$/, ""), key: cfg.anonKey };
     }
@@ -4097,7 +4099,7 @@ let _supabaseBaseCache = null;
 async function supabaseBase() {
   if (_supabaseBaseCache) return _supabaseBaseCache;
   try {
-    const cfg = await fetchStaticJson("/api/live-db");
+    const cfg = await getJson("/api/live-db");
     if (cfg && cfg.url && cfg.anonKey) {
       _supabaseBaseCache = { url: String(cfg.url).replace(/\/$/, ""), key: cfg.anonKey };
     }
