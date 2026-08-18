@@ -1492,6 +1492,67 @@ class Handler(BaseHTTPRequestHandler):
             from backend.services.tier import list_tiers
             json_response(self, {"tiers": list_tiers()})
             return
+        if path == "/api/admin/dashboard":
+            # لوحة تحكم الأدمن: إحصائيات شاملة (يتطلب صلاحية admin)
+            from backend.services.admin_analytics import get_admin_dashboard
+            from backend.services.server_tier import extract_user_from_token
+            token = self.headers.get("Authorization", "").replace("Bearer ", "")
+            user = extract_user_from_token(token)
+            if not user or user.get("tier") not in ("pro", "enterprise"):
+                json_response(self, {"error": "يتطلب صلاحية Pro أو Enterprise"}, status=403)
+                return
+            json_response(self, get_admin_dashboard())
+            return
+        if path == "/api/invest/calculate":
+            # حاسبة العائد الاستثماري
+            from backend.services.investment_calculator import calculate_roi
+            buy_price = float(payload.get("buy_price") or 0)
+            monthly_rent = float(payload.get("monthly_rent") or 0)
+            renovation = float(payload.get("renovation") or 0)
+            if buy_price <= 0 or monthly_rent <= 0:
+                json_response(self, {"error": "أدخل سعر الشراء والإيجار الشهري"}, status=400)
+                return
+            result = calculate_roi(buy_price, monthly_rent, renovation)
+            json_response(self, result)
+            return
+        if path == "/api/invest/mortgage":
+            # حاسبة التمويل العقاري
+            from backend.services.investment_calculator import calculate_mortgage
+            price = float(payload.get("price") or 0)
+            down_pct = float(payload.get("down_payment_pct") or 20)
+            rate = float(payload.get("interest_rate") or 5.5)
+            years = int(payload.get("years") or 20)
+            rent = float(payload.get("monthly_rent") or 0)
+            if price <= 0:
+                json_response(self, {"error": "أدخل سعر العقار"}, status=400)
+                return
+            result = calculate_mortgage(price, down_pct, rate, years, rent)
+            json_response(self, result)
+            return
+        if path == "/api/invest/compare":
+            # مقارنة أحياء
+            from backend.services.investment_calculator import compare_neighborhoods
+            areas = payload.get("areas") or []
+            if not areas:
+                json_response(self, {"error": "حدد مناطق للمقارنة"}, status=400)
+                return
+            result = compare_neighborhoods(areas)
+            json_response(self, result)
+            return
+        if path == "/api/invest/forecast":
+            # توقع العائد المستقبلي
+            from backend.services.investment_calculator import forecast_return
+            price = float(payload.get("buy_price") or 0)
+            rent = float(payload.get("monthly_rent") or 0)
+            years = int(payload.get("years") or 5)
+            rent_growth = float(payload.get("rent_growth") or 3)
+            price_growth = float(payload.get("price_growth") or 4)
+            if price <= 0 or rent <= 0:
+                json_response(self, {"error": "أدخل سعر الشراء والإيجار"}, status=400)
+                return
+            result = forecast_return(price, rent, years, rent_growth, price_growth)
+            json_response(self, result)
+            return
         json_response(self, {"error": "Unknown endpoint"}, status=404)
 
     def log_message(self, format: str, *args) -> None:
