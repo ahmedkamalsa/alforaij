@@ -9,6 +9,10 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
   <meta name="theme-color" content="#0F172A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="الفريج">
+  <link rel="manifest" href="manifest.json">
   <title>منصة الفريج للفرص والتقييم العقاري</title>
   <link rel="stylesheet" href="styles.css?v=20260816-why-free-share-fix">
   <script src="config.js?v=20260811-trends"></script>
@@ -839,6 +843,36 @@
     if (window.LucideIcons) {
       LucideIcons.loadScript().then(() => {
         LucideIcons.replaceAll();
+      });
+    }
+  </script>
+  <script>
+    /* تسجيل Service Worker للتخزين المؤقت */
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+          console.log('[App] SW registered:', registration.scope);
+          
+          // مراقبة التحديثات
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'activated') {
+                // إشعار المستخدم بوجود تحديث
+                if (document.hidden) return;
+                const toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#b7a13a;color:#fff;padding:12px 24px;border-radius:8px;font-size:14px;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3);cursor:pointer;';
+                toast.textContent = '🔄 تحديث متاح — اضغط للتحديث';
+                toast.onclick = () => { newWorker.postMessage({ type: 'SKIP_WAITING' }); window.location.reload(); };
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 8000);
+              }
+            });
+          });
+        } catch (err) {
+          console.warn('[App] SW registration failed:', err);
+        }
       });
     }
   </script>

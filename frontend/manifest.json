@@ -1,0 +1,62 @@
+{
+  "name": "منصة الفريج العقارية",
+  "short_name": "الفريج",
+  "description": "بحث وتقييم وفرص عقارية مبنية على الأدلة — الكويت",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "ar",
+  "dir": "rtl",
+  "scope": "/",
+  "categories": ["business", "finance", "utilities"],
+  "icons": [
+    {
+      "src": "/assets/alforaij-official-symbol.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/alforaij_logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "بحث وتقييم",
+      "short_name": "بحث",
+      "url": "/?tab=search",
+      "description": "ابدأ بحثاً جديداً عن عقار"
+    },
+    {
+      "name": "أفضل الفرص",
+      "short_name": "فرص",
+      "url": "/?tab=opportunities",
+      "description": "عرض أفضل الفرص الاستثمارية"
+    },
+    {
+      "name": "لوحة السوق",
+      "short_name": "السوق",
+      "url": "/?tab=board",
+      "description": "عرض إحصائيات السوق الحية"
+    },
+    {
+      "name": "تحليلات السوق",
+      "short_name": "تحليلات",
+      "url": "/?tab=insights",
+      "description": "تحليلات وتقارير السوق"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
