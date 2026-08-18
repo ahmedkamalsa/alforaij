@@ -1,8 +1,8 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-17T03:40:20",
-  "finishedAt": "2026-08-17T03:42:15",
+  "startedAt": "2026-08-18T03:35:25",
+  "finishedAt": "2026-08-18T03:37:40",
   "steps": [
     {
       "name": "sync_source_registry",
@@ -57,7 +57,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 411,
+        "totalScored": 418,
         "includeExternal": true
       }
     },
@@ -66,7 +66,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 475,
+        "count": 474,
         "error": ""
       }
     },
@@ -75,7 +75,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 485,
+        "count": 494,
         "error": ""
       }
     },
@@ -85,7 +85,7 @@
       "result": {
         "status": "swept",
         "days": 14,
-        "cutoff": "2026-08-03T03:41:26.701504+00:00",
+        "cutoff": "2026-08-04T03:36:45.237991+00:00",
         "error": "",
         "count": null
       }
@@ -95,8 +95,8 @@
       "status": "ok",
       "result": {
         "status": "deduped",
-        "groups": 2,
-        "marked": 2,
+        "groups": 1,
+        "marked": 1,
         "error": ""
       }
     },
@@ -105,7 +105,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 252,
+        "count": 254,
         "error": ""
       }
     },
@@ -114,18 +114,18 @@
       "status": "ok",
       "result": {
         "status": "success",
-        "count": 7,
+        "count": 9,
         "local": "saved",
         "database": "saved",
-        "note": "جمع 7 تطورًا، 3/11 مصادر عقارية"
+        "note": "جمع 9 تطورًا، 5/11 مصادر عقارية"
       }
     },
     {
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 2,
-        "removed": 1,
+        "added": 16,
+        "removed": 17,
         "priceDrops": 0
       }
     },
@@ -144,11 +144,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "marketListingsHarvested": 475,
-    "opportunitiesScored": 411,
+    "marketListingsHarvested": 474,
+    "opportunitiesScored": 418,
     "notificationCounts": {
-      "added": 2,
-      "removed": 1,
+      "added": 16,
+      "removed": 17,
       "priceDrops": 0
     },
     "whatsappAlerts": {
@@ -285,13 +285,13 @@
         "market_listings": {
           "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
           "available": true,
-          "count": 1616,
+          "count": 1721,
           "status": "ok"
         },
         "price_trends": {
           "label": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
           "available": true,
-          "count": 361,
+          "count": 363,
           "status": "ok"
         },
         "market_ads": {
@@ -315,19 +315,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 726,
+          "count": 728,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 5475,
+          "count": 5513,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 68032,
+          "count": 68423,
           "status": "ok"
         },
         "client_leads": {
@@ -345,13 +345,13 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 386,
+          "count": 390,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 459,
+          "count": 461,
           "status": "ok"
         }
       },

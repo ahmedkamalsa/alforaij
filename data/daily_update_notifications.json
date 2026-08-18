@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-17T03:42:15",
+  "generatedAt": "2026-08-18T03:37:40",
   "hasPrevious": true,
   "counts": {
-    "added": 2,
-    "removed": 1,
+    "added": 16,
+    "removed": 17,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -64,44 +64,83 @@
     "priceDrops": [],
     "added": [
       {
-        "code": "AF-105",
-        "area": "جليب الشيوخ - الحساوي",
-        "propertyType": "عمارة",
-        "price": 800000.0,
-        "priceText": "800 ألف د.ك",
+        "code": "AF-278",
+        "area": "بيان",
+        "propertyType": "بيت",
+        "price": 270000.0,
+        "priceText": "270 ألف د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
         "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/105",
+        "url": "https://front.alforaij.com/Listing/Detail/278",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       },
       {
-        "code": "OS-285430950",
+        "code": "AF-115",
         "area": "الفروانية",
-        "propertyType": "أرض",
-        "price": 500000.0,
-        "priceText": "500,000 د.ك",
+        "propertyType": "عمارة",
+        "price": 1550000.0,
+        "priceText": "1,550 ألف د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
-        "source": "OpenSooq",
-        "url": "https://kw.opensooq.com/search/285430950",
+        "source": "الفريج",
+        "url": "https://front.alforaij.com/Listing/Detail/115",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
+        "code": "BU3-7038",
+        "area": "الصباحية",
+        "propertyType": "بيت",
+        "price": 240000.0,
+        "priceText": "240,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "بوعقار / بوشملان (Bu3qar)",
+        "url": "https://www.bu3qar.com/product-details/7038/%D8%A8%D9%8A%D8%AA-%D9%87%D8%AF%D8%A7%D9%85-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%89-%D8%A7%D9%84%D8%B5%D8%A8%D8%A7%D8%AD%D9%8A%D8%A9-%D8%A7%D9%84%D8%A7%D9%88%D8%B5%D8%A7%D9%81-%D8%AC%D8%A7%D9%87%D8%B2%D8%A9",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       }
     ],
     "removed": [
       {
-        "code": "BU3-6040",
-        "area": "الروضة",
-        "propertyType": "بيت",
-        "price": 680000.0,
-        "priceText": "680,000 د.ك",
+        "code": "BU3-6818",
+        "area": "المسايل",
+        "propertyType": "أرض",
+        "price": 390000.0,
+        "priceText": "390,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
         "source": "بوعقار / بوشملان (Bu3qar)",
-        "url": "https://www.bu3qar.com/product-details/6040/%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%87%D8%AF%D8%A7%D9%85-%D9%81%D9%8A-%D8%A7%D9%84%D8%B1%D9%88%D8%B6%D8%A9-%D9%82%D8%B7%D8%B9%D8%A9-1",
+        "url": "https://www.bu3qar.com/product-details/6818/%D8%A7%D8%B1%D8%B6-%D8%B2%D8%A7%D9%88%D9%8A%D8%A9-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%89-%D8%A7%D9%84%D9%85%D8%B3%D8%A7%D9%8A%D9%84",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "MJ-30071423",
+        "area": "السرة",
+        "propertyType": "بيت",
+        "price": 200000.0,
+        "priceText": "200,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "Mourjan",
+        "url": "https://www.mourjan.com/kw/kuwait/villas-and-houses/for-sale/30071423/",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "OS-285745590",
+        "area": "الفروانية",
+        "propertyType": "شقة",
+        "price": 750000.0,
+        "priceText": "750,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "OpenSooq",
+        "url": "https://kw.opensooq.com/search/285745590",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       }
     ]
