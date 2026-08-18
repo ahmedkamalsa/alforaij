@@ -78,7 +78,40 @@ const boardState = {
   expandedGovernorates: new Set(),
   activeMetric: "movement",
   selectedCell: null, // { governorate, area, metric } — الخلية المختارة في جدول المحافظات
+  govView: "grid", // شبكة كروت مكدسة أو جدول مضغوط — محفوظ بين الجلسات
 };
+
+// مفتاح موحّد لمبدّل شبكة/جدول: لوحة السوق وأفضل الفرص يشتركان في نفس التفضيل المحفوظ
+const viewModeKey = "alforaij_view_mode_v1";
+try {
+  // ترحيل من المفتاح القديم الخاص بلوحة السوق إن وُجد
+  if (!localStorage.getItem(viewModeKey)) {
+    const legacy = localStorage.getItem("alforaij_board_gov_view_v1");
+    if (legacy === "table" || legacy === "grid") localStorage.setItem(viewModeKey, legacy);
+  }
+  const savedView = localStorage.getItem(viewModeKey);
+  if (savedView === "table" || savedView === "grid") boardState.govView = savedView;
+} catch { /* تجاهل — نبقى على الوضع الافتراضي */ }
+
+// تبديل وضع العرض (شبكة/جدول) — يُطبَّق على اللوحة والفرص معًا ويُحفظ في مفتاح واحد
+function setViewMode(mode) {
+  const next = mode === "table" ? "table" : "grid";
+  boardState.govView = next;
+  oppState.view = next;
+  try {
+    localStorage.setItem(viewModeKey, next);
+  } catch { /* تجاهل — يبقى وضع الجلسة الحالية */ }
+  syncViewModeButtons();
+}
+
+// مزامنة أزرار المبدّل في كل الأماكن (لوحة السوق + أفضل الفرص) مع الوضع الحالي
+function syncViewModeButtons() {
+  const mode = oppState.view;
+  document.querySelectorAll("[data-gov-view], [data-opp-view]").forEach((btn) => {
+    const mine = btn.dataset.govView || btn.dataset.oppView;
+    btn.classList.toggle("active", mine === mode);
+  });
+}
 
 const boardMetricLabels = {
   movement: "حركة الدلال",
@@ -271,6 +304,22 @@ function canonicalGovernorate(value) {
   return GOVERNORATE_CANONICAL[key] || clean;
 }
 
+// دلو موقع سجل اللوحة: محافظة معروفة، أو «غير محددة» (تحمل اسم منطقة لكن محافظتها
+// غير محددة في البيانات)، أو «بلا موقع» (لا منطقة ولا محافظة — الإعلان لا يذكر موقعًا).
+// فصل «بلا موقع» في صف مستقل يمنع خلط السجلات بلا أي معلومة موقع مع «غير محددة»
+// التي تعني منطقة معروفة بمحافظة ناقصة.
+function boardLocationBucket(row) {
+  const gov = canonicalGovernorate(row.governorate);
+  if (gov) return gov;
+  return row.area ? "غير محددة" : "بلا موقع";
+}
+
+// سبب كل دلو — يُعرض في تلميح الصف حتى يفهم الموظف لماذا انفصلت هذه السجلات
+const LOCATION_BUCKET_TIPS = {
+  "بلا موقع": "«بلا موقع»: إعلانات لا تذكر منطقة ولا محافظة في نصها ولا رابطها (مثل «مطلوب مكاتب للايجار» أو إعلانات بعناوين عامة) — لا يمكن تحديد موقعها بصدق من البيانات المتاحة.",
+  "غير محددة": "«غير محددة»: إعلانات تحمل اسم منطقة معروفة لكن محافظتها غير محددة في البيانات المصدر — المنطقة معروفة والمحافظة ناقصة.",
+};
+
 function uniqueValues(values) {
   return [...new Set((values || []).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), "ar"));
 }
@@ -381,7 +430,7 @@ function syncPlatformSelect() {
 function rowMatchesBoardFilters(row, ignoreArea = false, ignoreGovernorate = false, ignoreMetric = false) {
   const filters = boardFilterValues();
   if (!ignoreMetric && !metricMatches(row, filters.metric)) return false;
-  if (!ignoreGovernorate && filters.governorate && (canonicalGovernorate(row.governorate) || "غير محددة") !== (canonicalGovernorate(filters.governorate) || "غير محددة")) return false;
+  if (!ignoreGovernorate && filters.governorate && boardLocationBucket(row) !== canonicalGovernorate(filters.governorate)) return false;
   if (!ignoreArea && filters.area && normalizeArabic(row.area) !== normalizeArabic(filters.area)) return false;
   if (filters.transaction && !normalizeArabic(row.transaction).includes(normalizeArabic(filters.transaction))) return false;
   if (filters.propertyType && normalizeArabic(row.propertyType) !== normalizeArabic(filters.propertyType)) return false;
@@ -814,6 +863,31 @@ function updateBoardSummary(rows) {
   el.textContent = `${parts.join(" - ") || "كل السجلات"} | ${rows.length} إعلان | ${opportunityCount} فرصة ظاهرة | ${totalScored} دخلت التقييم`;
 }
 
+// التغير اليومي لكل مقياس: آخر 24 ساعة مقابل الـ24 ساعة التي قبلها — من طوابع
+// السجلات الفعلية (fetchedAt للمواقع الخارجية، publishedDate للمحلي) بدون أي تخزين.
+function metricDailyDelta(rows, metric) {
+  const HOUR = 3600 * 1000;
+  const now = Date.now();
+  let today = 0;
+  let prev = 0;
+  for (const row of rows || []) {
+    if (!metricMatches(row, metric)) continue;
+    const raw = String(row.fetchedAt || row.publishedDate || "").trim();
+    if (!raw) continue;
+    const t = Date.parse(raw);
+    if (Number.isNaN(t)) continue;
+    const age = now - t;
+    if (age <= HOUR * 24) today += 1; // آخر 24 ساعة (أو مستقبلي بفارق توقيت بسيط)
+    else if (age <= HOUR * 48) prev += 1; // الـ24 ساعة التي قبلها
+  }
+  return { delta: today - prev, today, prev };
+}
+
+// نص شارة التغير اليومي الموحّد: +N / −N / ±0
+function formatDailyDelta(d) {
+  return d.delta > 0 ? `+${d.delta}` : d.delta < 0 ? `−${Math.abs(d.delta)}` : "±0";
+}
+
 function renderBoardMetricCards(rows) {
   const root = $("boardMetricCards");
   if (!root) return;
@@ -821,10 +895,16 @@ function renderBoardMetricCards(rows) {
   root.innerHTML = Object.entries(boardMetricLabels).map(([key, label]) => {
     const count = countMetric(rows, key);
     const active = key === activeMetric ? " active" : "";
+    const d = metricDailyDelta(rows, key);
+    const deltaClass = d.delta > 0 ? " up" : d.delta < 0 ? " down" : " flat";
+    const deltaText = d.delta > 0 ? `+${d.delta}` : d.delta < 0 ? `−${Math.abs(d.delta)}` : "±0";
+    const pct = d.prev > 0 ? ` (${d.delta > 0 ? "+" : ""}${Math.round((d.delta / d.prev) * 100)}%)` : "";
+    const tip = `التغير اليومي: ${d.today} إعلان في آخر 24 ساعة مقابل ${d.prev} في الـ24 ساعة قبلها — ${deltaText}${pct}`;
     return `
-      <button class="board-metric-card${active}" type="button" data-board-metric="${escapeHtml(key)}">
+      <button class="board-metric-card${active}" type="button" data-board-metric="${escapeHtml(key)}" title="${escapeHtml(tip)}">
         <span>${escapeHtml(label)}</span>
         <strong>${count.toLocaleString("en-US")}</strong>
+        <em class="board-metric-delta${deltaClass}">${escapeHtml(deltaText)}</em>
         <small>اضغط لعرض الإعلانات</small>
       </button>
     `;
@@ -959,7 +1039,7 @@ function goToMatchingTab() {
 
 function metricCells(rows, governorate = "", area = "") {
   const scope = rows.filter((row) => {
-    const rowGov = canonicalGovernorate(row.governorate) || "غير محددة";
+    const rowGov = boardLocationBucket(row);
     const targetGov = canonicalGovernorate(governorate) || "غير محددة";
     if (governorate && rowGov !== targetGov) return false;
     if (area && normalizeArabic(row.area) !== normalizeArabic(area)) return false;
@@ -974,16 +1054,29 @@ function metricCells(rows, governorate = "", area = "") {
 function renderGovernorateCards(rows) {
   const root = $("governorateCards");
   if (!root) return;
-  const governorates = uniqueValues(rows.map((row) => canonicalGovernorate(row.governorate) || "غير محددة"));
+  const governorates = uniqueValues(rows.map((row) => boardLocationBucket(row)));
   const activeMetric = boardState.activeMetric || "movement";
   const axisPill = $("govAxisPill");
   if (axisPill) axisPill.textContent = `المحور: ${boardMetricLabels[activeMetric] || "حركة الدلال"}`;
+  // مزامنة مبدّل شبكة/جدول وحالة العرض المحفوظة (قبل فحص البيانات الفارغة)
+  // ملاحظة: لا نضع data-gov-view على حاوية الكروت — سيصطدم بفحص closest("[data-gov-view]")
+  // في معالج النقرات ويمنع الأرقام من فتح الدرج التفصيلي.
+  syncViewModeButtons();
+  // زرا تصدير/نسخ CSV خاصان بالوضع المضغوط (جدول) — يصدّران الأرقام الحالية للمحافظات والمناطق
+  const exportBtn = $("govExportCsvBtn");
+  if (exportBtn) exportBtn.hidden = boardState.govView !== "table";
+  const copyBtn = $("govCopyBtn");
+  if (copyBtn) copyBtn.hidden = boardState.govView !== "table";
   if (!governorates.length) {
     root.innerHTML = '<div class="gov-empty">لا توجد بيانات حسب الفلاتر الحالية.</div>';
     return;
   }
   const metrics = ["movement", "opportunities", "saleOffers", "buyRequests", "rentOffers", "rentRequests"];
   const totals = metrics.map((metric) => ({ metric, count: countMetric(rows, metric) }));
+  if (boardState.govView === "table") {
+    root.innerHTML = renderGovTable(rows, governorates, activeMetric, totals);
+    return;
+  }
   const metricPill = (cell, extraCls) => `
     <button class="metric-pill${extraCls}" type="button" data-board-gov="${escapeHtml(cell.gov)}" ${cell.area ? `data-board-area-run="${escapeHtml(cell.area)}"` : ""} data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"} title="${escapeHtml(boardMetricLabels[cell.metric] || "")}">
       <span>${escapeHtml(boardMetricLabels[cell.metric] || "")}</span>
@@ -991,18 +1084,19 @@ function renderGovernorateCards(rows) {
     </button>`;
   const html = [];
   for (const governorate of governorates) {
-    const govRows = rows.filter((row) => (canonicalGovernorate(row.governorate) || "غير محددة") === governorate);
+    const govRows = rows.filter((row) => boardLocationBucket(row) === governorate);
     const cells = metricCells(rows, governorate);
     const expanded = boardState.expandedGovernorates.has(governorate);
     const sel = boardState.selectedCell;
     const areaCount = uniqueValues(govRows.map((row) => row.area).filter(Boolean)).length;
+    const bucketTip = LOCATION_BUCKET_TIPS[governorate] || "";
     const axisCell = cells.find((c) => c.metric === activeMetric) || cells[0] || { metric: "movement", count: 0 };
     html.push(`
       <section class="gov-card${expanded ? " expanded" : ""}" data-board-governorate="${escapeHtml(governorate)}">
         <header class="gov-card-head">
-          <button class="gov-toggle" type="button" data-board-toggle-gov="${escapeHtml(governorate)}" aria-label="${expanded ? "طي" : "فتح"} مناطق ${escapeHtml(governorate)}">${expanded ? "▲" : "▼"}</button>
-          <strong class="gov-card-name">${escapeHtml(governorate)}</strong>
-          <button class="gov-areas-badge" type="button" data-board-toggle-gov="${escapeHtml(governorate)}" title="${areaCount} منطقة — ${govRows.length} إعلان">
+          ${areaCount ? `<button class="gov-toggle" type="button" data-board-toggle-gov="${escapeHtml(governorate)}" aria-label="${expanded ? "طي" : "فتح"} مناطق ${escapeHtml(governorate)}">${expanded ? "▲" : "▼"}</button>` : ""}
+          <strong class="gov-card-name"${bucketTip ? ` title="${escapeHtml(bucketTip)}"` : ""}>${escapeHtml(governorate)}</strong>
+          <button class="gov-areas-badge" type="button" data-board-toggle-gov="${escapeHtml(governorate)}" title="${areaCount} منطقة — ${govRows.length} إعلان${bucketTip ? ` — ${bucketTip}` : ""}">
             <b>${areaCount}</b>
             <b>${govRows.length.toLocaleString("en-US")}</b>
             <small>مناطق</small>
@@ -1051,6 +1145,171 @@ function renderGovAreaCards(rows, governorate, govRows, sel, activeMetric, metri
           </div>`;
       }).join("")}
     </div>`;
+}
+
+// الجدول المضغوط لنفس أرقام كروت المحافظات — نفس معالجات النقر (فتح/درج تفاصيل)
+// مع صف مدمج قابل للتوسيع يكشف مناطق كل محافظة.
+function renderGovTable(rows, governorates, activeMetric, totals) {
+  const metrics = ["movement", "opportunities", "saleOffers", "buyRequests", "rentOffers", "rentRequests"];
+  const sel = boardState.selectedCell;
+  const numCell = (cell, gov, area, extraCls) => {
+    const isAxis = activeMetric === cell.metric;
+    const isSel = sel && sel.governorate === gov && sel.area === (area || "") && sel.metric === cell.metric;
+    return `
+      <td class="gov-table-cell${isAxis ? " axis" : ""}${isSel ? " selected" : ""}">
+        <button class="gov-table-num${extraCls || ""}" type="button" data-board-gov="${escapeHtml(gov)}" ${area ? `data-board-area-run="${escapeHtml(area)}"` : ""} data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"} title="${escapeHtml(boardMetricLabels[cell.metric] || "")}">${cell.count.toLocaleString("en-US")}</button>
+      </td>`;
+  };
+  // خلية التغير اليومي: فرق آخر 24 ساعة عن الـ24 ساعة السابقة لعمود المحور (المقياس النشط)
+  const deltaCell = (scopeRows, scopeLabel) => {
+    const d = metricDailyDelta(scopeRows, activeMetric);
+    const cls = d.delta > 0 ? " up" : d.delta < 0 ? " down" : " flat";
+    const text = formatDailyDelta(d);
+    const tip = `التغير اليومي لـ${boardMetricLabels[activeMetric] || "المحور"} في ${scopeLabel}: ${d.today} إعلان في آخر 24 ساعة مقابل ${d.prev} في الـ24 ساعة قبلها — ${text}`;
+    return `<td class="gov-table-delta${cls}" title="${escapeHtml(tip)}">${text}</td>`;
+  };
+  const head = `
+    <thead>
+      <tr>
+        <th class="gov-table-name-col">المحافظة</th>
+        <th class="gov-table-areas-col">المناطق</th>
+        <th class="gov-table-delta-col">التغير اليومي</th>
+        ${metrics.map((m) => `<th class="gov-table-head${activeMetric === m ? " axis" : ""}">${escapeHtml(boardMetricLabels[m] || "")}</th>`).join("")}
+      </tr>
+    </thead>`;
+  const body = governorates.map((governorate) => {
+    const govRows = rows.filter((row) => boardLocationBucket(row) === governorate);
+    const cells = metricCells(rows, governorate);
+    const expanded = boardState.expandedGovernorates.has(governorate);
+    const areaCount = uniqueValues(govRows.map((row) => row.area).filter(Boolean)).length;
+    const bucketTip = LOCATION_BUCKET_TIPS[governorate] || "";
+    const areaGroups = {};
+    for (const row of govRows) {
+      if (!row.area) continue;
+      const key = normalizeArabic(row.area);
+      if (!(key in areaGroups)) areaGroups[key] = row.area;
+    }
+    const areas = Object.values(areaGroups).sort((a, b) => String(a).localeCompare(String(b), "ar"));
+    return `
+      <tbody class="gov-table-gov${expanded ? " expanded" : ""}">
+        <tr class="gov-table-row">
+          <td class="gov-table-name-cell">
+            ${areaCount ? `<button class="gov-table-toggle" type="button" data-board-toggle-gov="${escapeHtml(governorate)}" aria-label="${expanded ? "طي" : "فتح"} مناطق ${escapeHtml(governorate)}">${expanded ? "▲" : "▼"}</button>` : ""}
+            <span class="gov-table-govname"${bucketTip ? ` title="${escapeHtml(bucketTip)}"` : ""}>${escapeHtml(governorate)}</span>
+          </td>
+          <td class="gov-table-areas-count">${areaCount}</td>
+          ${deltaCell(govRows, governorate)}
+          ${cells.map((cell) => numCell(cell, governorate, "", "")).join("")}
+        </tr>
+        ${expanded ? `
+          <tr class="gov-table-areas-row">
+            <td colspan="${3 + metrics.length}">
+              <table class="gov-area-table">
+                <thead><tr><th class="gov-table-name-col">المنطقة</th><th class="gov-table-delta-col">التغير</th>${metrics.map((m) => `<th class="gov-table-head">${escapeHtml(boardMetricLabels[m] || "")}</th>`).join("")}</tr></thead>
+                <tbody>
+                  ${areas.map((area) => {
+                    const areaRows = govRows.filter((row) => row.area === area);
+                    return `
+                    <tr>
+                      <td class="gov-area-name">${escapeHtml(area)}</td>
+                      ${deltaCell(areaRows, area)}
+                      ${metricCells(rows, governorate, area).map((cell) => numCell(cell, governorate, area, "")).join("")}
+                    </tr>`;
+                  }).join("")}
+                </tbody>
+              </table>
+            </td>
+          </tr>` : ""}
+      </tbody>`;
+  }).join("");
+  const totalRow = `
+    <tbody class="gov-table-total">
+      <tr>
+        <td class="gov-table-name-cell"><span class="gov-table-govname">الإجمالي</span></td>
+        <td class="gov-table-areas-count">—</td>
+        ${deltaCell(rows, "السوق كامل")}
+        ${totals.map((t) => `
+          <td class="gov-table-cell${activeMetric === t.metric ? " axis" : ""}">
+            <button class="gov-table-num total" type="button" data-board-total-run="${escapeHtml(t.metric)}" ${t.count ? "" : "disabled"} title="${escapeHtml(boardMetricLabels[t.metric] || "")}">${t.count.toLocaleString("en-US")}</button>
+          </td>`).join("")}
+      </tr>
+    </tbody>`;
+  return `
+    <div class="gov-table-wrap">
+      <table class="gov-table">
+        ${head}
+        ${body}
+        ${totalRow}
+      </table>
+    </div>`;
+}
+
+// ── أدوات تسلسل مشتركة لتصدير/نسخ أرقام الجداول ────────────────────────────────
+function csvSerialize(lines) {
+  const esc = (value) => {
+    const s = String(value ?? "");
+    return /[",\r\n;]/.test(s) ? `"${s.replace(/"/g, "\"\"")}"` : s;
+  };
+  return lines.map((row) => row.map(esc).join(",")).join("\r\n");
+}
+
+function tsvSerialize(lines) {
+  // TSV للصق المباشر في Excel: لا حاجة للاقتباس، نستبدل فقط أي تبويب/سطر داخل القيم
+  const esc = (value) => String(value ?? "").replace(/\t/g, " ").replace(/[\r\n]+/g, " ");
+  return lines.map((row) => row.map(esc).join("\t")).join("\r\n");
+}
+
+// بناء صفوف أرقام لوحة السوق الحالية (محافظات + إجمالي + مناطق) — مشترك بين CSV وTSV
+function buildGovExportRows() {
+  const rows = boardState.records.filter((row) => rowMatchesBoardFilters(row, false, false, true));
+  const governorates = uniqueValues(rows.map((row) => boardLocationBucket(row)));
+  const metrics = ["movement", "opportunities", "saleOffers", "buyRequests", "rentOffers", "rentRequests"];
+  const activeMetric = boardState.activeMetric || "movement";
+  const header = ["المحافظة", "المنطقة", `التغير اليومي (${boardMetricLabels[activeMetric] || "المحور"})`].concat(metrics.map((m) => boardMetricLabels[m] || m));
+  const govLines = [];
+  const areaLines = [];
+  for (const governorate of governorates) {
+    const govRows = rows.filter((row) => boardLocationBucket(row) === governorate);
+    const areaCount = uniqueValues(govRows.map((row) => row.area).filter(Boolean)).length;
+    govLines.push([governorate, `${areaCount} منطقة`, formatDailyDelta(metricDailyDelta(govRows, activeMetric)), ...metrics.map((m) => countMetric(govRows, m))]);
+    const areaGroups = {};
+    for (const row of govRows) {
+      if (!row.area) continue;
+      const key = normalizeArabic(row.area);
+      if (!(key in areaGroups)) areaGroups[key] = row.area;
+    }
+    Object.values(areaGroups).sort((a, b) => String(a).localeCompare(String(b), "ar")).forEach((area) => {
+      const areaRows = govRows.filter((row) => row.area === area);
+      areaLines.push([governorate, area, formatDailyDelta(metricDailyDelta(areaRows, activeMetric)), ...metrics.map((m) => countMetric(areaRows, m))]);
+    });
+  }
+  const totalLine = ["الإجمالي", "", formatDailyDelta(metricDailyDelta(rows, activeMetric)), ...metrics.map((m) => countMetric(rows, m))];
+  return { header, govLines, totalLine, areaLines };
+}
+
+function govExportLines() {
+  const { header, govLines, totalLine, areaLines } = buildGovExportRows();
+  return [header, ...govLines, totalLine, [], ["المناطق — تفصيل كل محافظة"], ...areaLines];
+}
+
+// تصدير أرقام المحافظات والمناطق الحالية إلى CSV (UTF-8 مع BOM) يعمل مع Excel مباشرة
+function exportGovTableCsv() {
+  const today = new Date().toISOString().slice(0, 10);
+  const csv = "\uFEFF" + csvSerialize(govExportLines()); // BOM حتى يفتح Excel العربي UTF-8 بشكل صحيح
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `لوحة-السوق-المحافظات-${today}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// نسخ نفس الأرقام إلى الحافظة بصيغة TSV — لصق مباشر في Excel بدون ملف
+function copyGovTableTsv(btn) {
+  copyText(tsvSerialize(govExportLines()), btn);
 }
 
 // ─── درج التفاصيل: أي رقم في اللوحة يفتح الإعلانات الفعلية خلفه بالأدلة والمصادر ───
@@ -1289,18 +1548,19 @@ function renderInsights() {
   const fetched = data.fetchedAt ? String(data.fetchedAt).replace("T", " ").slice(0, 16) : "";
   if (meta) meta.textContent = `آخر تحديث: ${fetched} · ${areas.length} منطقة · ${samples.sale || 0} بيع + ${samples.rent || 0} إيجار · ${samples.buyRequests || 0} طلب شراء + ${samples.rentRequests || 0} طلب إيجار · ${withYield.length} بعائد محسوب`;
 
-  // 0) بطاقات المؤشرات الرئيسية (KPI)
+  // 0) بطاقات المؤشرات الرئيسية (KPI) — نفس أسلوب بطاقات لوحة السوق: رقاقة أيقونة + لون تمييز
   const market = data.market || {};
   const dirClass = market.direction === "صاعد" ? "kpi-up" : market.direction === "هابط" ? "kpi-down" : "kpi-flat";
+  const trendTone = market.direction === "صاعد" ? "trend-up" : market.direction === "هابط" ? "trend-down" : "trend-flat";
   const kpis = `
     <div class="insight-kpis">
-      <div class="kpi-card"><span class="kpi-label">مناطق محللة</span><strong>${areas.length}</strong><small>من الحصاد المتراكم</small></div>
-      <div class="kpi-card"><span class="kpi-label">عينات بيع</span><strong>${samples.sale || 0}</strong><small>إعلان بيع</small></div>
-      <div class="kpi-card"><span class="kpi-label">عينات إيجار</span><strong>${samples.rent || 0}</strong><small>إعلان إيجار</small></div>
-      <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات شراء</span><strong>${samples.buyRequests || 0}</strong><small>مطلوب للشراء — من الفريج المحلي</small></div>
-      <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات إيجار</span><strong>${samples.rentRequests || 0}</strong><small>مطلوب للإيجار — من الفريج المحلي</small></div>
-      <div class="kpi-card"><span class="kpi-label">عائد محسوب</span><strong>${withYield.length}</strong><small>منطقة بيع + إيجار معًا</small></div>
-      <div class="kpi-card"><span class="kpi-label">اتجاه السوق</span><strong class="${dirClass}">${escapeHtml(market.direction || "—")}</strong><small>${market.changePct != null ? `${market.changePct > 0 ? "+" : ""}${market.changePct}% سعر المتر العام` : "يُبنى مع تراكم الأشهر"}</small></div>
+      <div class="kpi-card" data-insight-metric="areas"><span class="kpi-label">مناطق محللة</span><strong>${areas.length}</strong><small>من الحصاد المتراكم</small></div>
+      <div class="kpi-card" data-insight-metric="saleSamples"><span class="kpi-label">عينات بيع</span><strong>${samples.sale || 0}</strong><small>إعلان بيع</small></div>
+      <div class="kpi-card" data-insight-metric="rentSamples"><span class="kpi-label">عينات إيجار</span><strong>${samples.rent || 0}</strong><small>إعلان إيجار</small></div>
+      <div class="kpi-card" data-insight-metric="buyRequests"><span class="kpi-label">طلبات شراء</span><strong>${samples.buyRequests || 0}</strong><small>مطلوب للشراء — من الفريج المحلي</small></div>
+      <div class="kpi-card" data-insight-metric="rentRequests"><span class="kpi-label">طلبات إيجار</span><strong>${samples.rentRequests || 0}</strong><small>مطلوب للإيجار — من الفريج المحلي</small></div>
+      <div class="kpi-card" data-insight-metric="yieldCount"><span class="kpi-label">عائد محسوب</span><strong>${withYield.length}</strong><small>منطقة بيع + إيجار معًا</small></div>
+      <div class="kpi-card ${trendTone}" data-insight-metric="marketTrend"><span class="kpi-label">اتجاه السوق</span><strong class="${dirClass}">${escapeHtml(market.direction || "—")}</strong><small>${market.changePct != null ? `${market.changePct > 0 ? "+" : ""}${market.changePct}% سعر المتر العام` : "يُبنى مع تراكم الأشهر"}</small></div>
     </div>`;
 
   // 1) عائد الإيجار — أشرطة أفقية مع شارة موثوقية (أعلى المناطق أولًا)
@@ -1401,9 +1661,9 @@ function renderDemandIndicators(data) {
   const totals = data.totals || {};
   const chips = `
     <div class="insight-kpis">
-      <div class="kpi-card kpi-demand"><span class="kpi-label">إجمالي الطلبات</span><strong>${totals.total || 0}</strong><small>شراء + إيجار معًا</small></div>
-      <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات شراء</span><strong>${totals.buyRequests || 0}</strong><small>أشخاص يبحثون عن شراء</small></div>
-      <div class="kpi-card kpi-demand"><span class="kpi-label">طلبات إيجار</span><strong>${totals.rentRequests || 0}</strong><small>أشخاص يبحثون عن إيجار</small></div>
+      <div class="kpi-card" data-insight-metric="demandTotal"><span class="kpi-label">إجمالي الطلبات</span><strong>${totals.total || 0}</strong><small>شراء + إيجار معًا</small></div>
+      <div class="kpi-card" data-insight-metric="demandBuy"><span class="kpi-label">طلبات شراء</span><strong>${totals.buyRequests || 0}</strong><small>أشخاص يبحثون عن شراء</small></div>
+      <div class="kpi-card" data-insight-metric="demandRent"><span class="kpi-label">طلبات إيجار</span><strong>${totals.rentRequests || 0}</strong><small>أشخاص يبحثون عن إيجار</small></div>
     </div>
     <p class="demand-clarify">طلبات «مطلوب للشراء/للإيجار» منشورة في الفريج وفي قسم «مطلوب عقار» في 4Sale — بقية المنصات الخارجية تنشر عروضًا فقط. التوزيع حسب المنصة أدناه يوضح مصدر كل طلب بشفافية.</p>`;
   const areas = (data.areas || []).slice(0, 15);
@@ -2030,6 +2290,8 @@ function renderBoard() {
   renderCompanionAds(rows);
   renderBoardMatchingLink(rows);
   renderGovernorateCards(rows);
+  // تحديث البطاقات العائمة بعد إعادة رسم اللوحة
+  if (window.hoverCard) hoverCard.refresh();
 }
 
 async function loadDashboardBoard() {
@@ -2322,7 +2584,11 @@ function populateAdvancedOptions() {
   const boardAreas = uniqueValues([...readRecentAreas(), ...boardRows.map((r) => r.area).filter(Boolean)]);
   const boardTypes = uniqueValues(boardRows.map((r) => r.propertyType).filter(Boolean));
   const boardTx = uniqueValues(boardRows.map((r) => r.transaction).filter(Boolean));
-  const boardGovernorates = uniqueValues(boardRows.map((r) => r.governorate).filter(Boolean));
+  // دلاء الموقع أيضًا (بلا موقع/غير محددة) حتى يمكن فلترة اللوحة عليها مثل المحافظات
+  const boardGovernorates = uniqueValues([
+    ...boardRows.map((r) => r.governorate).filter(Boolean),
+    ...uniqueValues(boardRows.map(boardLocationBucket)).filter((b) => b === "بلا موقع" || b === "غير محددة"),
+  ]);
   fillAdvancedLists(boardAreas, boardTypes, boardTx, boardGovernorates);
   getJson("/api/search-options")
     .then((opts) => {
@@ -3558,6 +3824,8 @@ function renderReport(report) {
   state.simpleFilters = {};
   renderResultsFilterChips(results);
   applySimpleFilters();
+  // تحديث البطاقات العائمة بعد إعادة رسم النتائج
+  if (window.hoverCard) hoverCard.refresh();
 }
 
 function downloadReport() {
@@ -3741,9 +4009,18 @@ const oppState = {
   minPrice: null,
   maxPrice: null,
   minScore: null,
+  view: "grid", // شبكة/جدول — مفتاح موحّد مع لوحة السوق (viewModeKey)
 };
 
+try {
+  const savedView = localStorage.getItem(viewModeKey);
+  if (savedView === "table" || savedView === "grid") oppState.view = savedView;
+} catch { /* تجاهل — نبقى على الوضع الافتراضي */ }
+
 const OPP_TIER_LABELS = { best: "الأفضل", daily: "يومية", weekly: "أسبوعية", monthly: "شهرية", yearly: "سنوية" };
+
+// آخر مجموعة فرص معروضة في الجدول المضغوط — يستخدمها زر تصدير CSV
+let lastOppTableItems = [];
 
 function oppMoney(value) {
   if (value === null || value === undefined || value === "") return "—";
@@ -5337,12 +5614,118 @@ function renderDeltaTab(root) {
     + section(DELTA_ICONS["📉"] + " انخفاض الأسعار", data.priceDrops || [], "delta-drop");
 }
 
+// بناء صفوف الفرص الحالية (مع الفلاتر المطبقة) — مشترك بين CSV وTSV
+function buildOppExportRows() {
+  const items = lastOppTableItems || [];
+  const clientText = (item) => (item.clients || []).map((c) => {
+    const parts = [c.area || "", c.type || ""].filter(Boolean).join(" ");
+    const match = c.matchScore != null ? `تطابق ${c.matchScore}/100` : "";
+    return [parts, match, String(c.phones || "")].filter(Boolean).join(" — ");
+  }).join(" ؛ ");
+  const header = ["الكود", "المنطقة", "الفئة", "المصدر", "المحافظة", "نوع العقار", "المعاملة", "السعر", "سعر المتر", "العائد", "الثقة", "الدرجة", "الحكم", "العملاء المحتملون"];
+  const rows = items.map((item) => [
+    item.code || "",
+    item.area || "",
+    item.bestTier ? (OPP_TIER_LABELS[item.bestTier] || item.bestTier) : "",
+    item.source || "",
+    item.governorate || "",
+    item.propertyType || "",
+    item.transaction || "",
+    item.priceText || oppMoney(item.price),
+    item.pricePerSqm ? `${item.pricePerSqm} د.ك/م²` : "",
+    item.rentalYieldPercent != null ? `${item.rentalYieldPercent}%` : "",
+    item.confidence != null ? `${Math.round(Number(item.confidence) * 100)}%` : "",
+    item.score != null ? Math.round(Number(item.score)) : "",
+    item.valuationLabel || "",
+    clientText(item),
+  ]);
+  return { header, rows, tierLabel: OPP_TIER_LABELS[oppState.tier] || oppState.tier || "الفرص" };
+}
+
+// تصدير الفرص الحالية إلى CSV (UTF-8 مع BOM) — الكود والسعر والدرجة والثقة والعملاء المحتملين
+function exportOppTableCsv() {
+  const { header, rows, tierLabel } = buildOppExportRows();
+  const today = new Date().toISOString().slice(0, 10);
+  const csv = "\uFEFF" + csvSerialize([header, ...rows]); // BOM حتى يفتح Excel العربي UTF-8 بشكل صحيح
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `افضل-الفرص-${tierLabel}-${today}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// نسخ نفس الفرص إلى الحافظة بصيغة TSV — لصق مباشر في Excel بدون ملف
+function copyOppTableTsv(btn) {
+  const { header, rows } = buildOppExportRows();
+  copyText(tsvSerialize([header, ...rows]), btn);
+}
+
+// الجدول المضغوط لنفس فرص الكروت — نفس الصفوف بنفس الترتيب (نسخ/فتح تعمل كالكروت)
+function renderOppTable(items) {
+  const row = (item, i) => `
+    <tr class="opp-table-row">
+      <td class="opp-table-rank">${i + 1}</td>
+      <td class="opp-table-name">
+        <span class="opp-table-code">${escapeHtml(item.code || "—")}</span>
+        <small>${escapeHtml(item.area || "")}${item.listingType && item.listingType !== "غير محدد" ? ` · ${escapeHtml(item.listingType)}` : ""}</small>
+      </td>
+      <td>${item.bestTier ? `<span class="opp-badge opp-badge-tier">${escapeHtml(OPP_TIER_LABELS[item.bestTier] || item.bestTier)}</span>` : "—"}</td>
+      <td>${escapeHtml(item.source || "—")}</td>
+      <td>${escapeHtml(item.governorate || "—")}</td>
+      <td>${escapeHtml(item.propertyType || "—")}</td>
+      <td>${escapeHtml(item.priceText || oppMoney(item.price))}</td>
+      <td>${item.pricePerSqm ? `${escapeHtml(item.pricePerSqm)} د.ك/م²` : "—"}</td>
+      <td>${item.rentalYieldPercent != null ? `${escapeHtml(item.rentalYieldPercent)}%` : "—"}</td>
+      <td>${item.confidence != null ? `${Math.round(Number(item.confidence) * 100)}%` : "—"}</td>
+      <td class="opp-table-score"><b>${item.score != null ? `${Math.round(Number(item.score))}/100` : "—"}</b><small>${escapeHtml(item.valuationLabel || "")}</small></td>
+      <td class="opp-table-actions">
+        ${item.url ? `<a class="open-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">فتح</a>` : ""}
+        <button class="opp-copy-btn" type="button">نسخ</button>
+      </td>
+    </tr>`;
+  return `
+    <div class="gov-table-wrap opp-table-wrap">
+      <table class="gov-table opp-table">
+        <thead>
+          <tr>
+            <th class="opp-table-rank-col">#</th>
+            <th class="opp-table-name-col">الفرصة</th>
+            <th>الفئة</th>
+            <th>المصدر</th>
+            <th>المحافظة</th>
+            <th>نوع العقار</th>
+            <th>السعر</th>
+            <th>سعر المتر</th>
+            <th>العائد</th>
+            <th>الثقة</th>
+            <th class="opp-table-score-col">الدرجة</th>
+            <th>إجراءات</th>
+          </tr>
+        </thead>
+        <tbody>${items.map(row).join("")}</tbody>
+      </table>
+    </div>`;
+}
+
 function renderOppTier() {
   const root = $("oppList");
   if (!root || !oppState.data) return;
   // مرشّح المصدر ونوع الإعلان (مباشر/مكتب) خاص بتبويبات الفرص (الأفضل + الفئات الزمنية)
   const cardTiers = ["best", "daily", "weekly", "monthly", "yearly"];
-  setOppSourceRowVisible(cardTiers.includes(oppState.tier));
+  const isCardTier = cardTiers.includes(oppState.tier);
+  const viewSwitch = $("oppViewSwitch");
+  if (viewSwitch) viewSwitch.hidden = !isCardTier;
+  // زرا تصدير/نسخ CSV خاصان بالجدول المضغوط في فئات الفرص البطاقية فقط
+  const exportBtn = $("oppExportCsvBtn");
+  if (exportBtn) exportBtn.hidden = !(isCardTier && oppState.view === "table");
+  const oppCopyBtn = $("oppCopyBtn");
+  if (oppCopyBtn) oppCopyBtn.hidden = !(isCardTier && oppState.view === "table");
+  syncViewModeButtons();
+  setOppSourceRowVisible(isCardTier);
   const bar = $("oppSourcesBar");
   if (bar) bar.hidden = true;
   if (oppState.tier === "clients") { renderClientsTab(root); updateOppTabCount(); return; }
@@ -5403,11 +5786,14 @@ function renderOppTier() {
     items = oppFilteredItems(tier.items);
     note = `${tier.label} — ${tier.description} (يعرض ${items.length} من أصل ${(tier.items || []).length})`;
   }
+  lastOppTableItems = items; // للتصدير: نفس الفرص المعروضة حاليًا (مع الفلاتر المطبقة)
   root.innerHTML = `<p class="scope-note">${escapeHtml(note)}</p>` +
-    (items.length ? items.map(oppCard).join("") : '<div class="empty">لا توجد فرص مطابقة للفلاتر الحالية.</div>');
+    (items.length
+      ? (oppState.view === "table" ? renderOppTable(items) : items.map(oppCard).join(""))
+      : '<div class="empty">لا توجد فرص مطابقة للفلاتر الحالية.</div>');
   root.querySelectorAll(".opp-card .opp-reason").forEach(attachClampToggle);
-  // أزرار التسويق في كل بطاقة فرصة: نسخ/إرسال واتساب + إرسال شخصي لكل عميل — مع تتبع النقرات
-  root.querySelectorAll(".opp-card").forEach((card, i) => {
+  // أزرار التسويق في كل بطاقة/صف فرصة: نسخ/إرسال واتساب + إرسال شخصي لكل عميل — مع تتبع النقرات
+  root.querySelectorAll(".opp-card, .opp-table-row").forEach((card, i) => {
     const item = items[i] || {};
     const code = item.code || "";
     const clients = (item.clients || []).filter((c) => c.phones);
@@ -5436,6 +5822,8 @@ function renderOppTier() {
     });
   });
   updateOppTabCount();
+  // تحديث البطاقات العائمة بعد إعادة رسم الفرص
+  if (window.hoverCard) hoverCard.refresh();
 }
 
 function renderOppMeta() {
@@ -5568,6 +5956,10 @@ function bindOppEvents() {
   });
   const refreshBtn = $("oppRefreshBtn");
   if (refreshBtn) refreshBtn.addEventListener("click", () => loadOpportunities(true));
+  const oppExportBtn = $("oppExportCsvBtn");
+  if (oppExportBtn) oppExportBtn.addEventListener("click", exportOppTableCsv);
+  const oppCopyBtn = $("oppCopyBtn");
+  if (oppCopyBtn) oppCopyBtn.addEventListener("click", () => copyOppTableTsv(oppCopyBtn));
   ["oppGovFilter", "oppAreaFilter", "oppTypeFilter", "oppTransactionFilter", "oppMinPrice", "oppMaxPrice", "oppMinScore"].forEach((id) => {
     const el = $(id);
     if (el) el.addEventListener("change", () => { collectOppFilters(); renderOppTier(); });
@@ -5642,6 +6034,8 @@ function bind() {
   });
   on("boardClearFiltersBtn", clearBoardSelections);
   on("govClearSelectionsBtn", clearBoardSelections);
+  on("govExportCsvBtn", exportGovTableCsv);
+  on("govCopyBtn", () => copyGovTableTsv($("govCopyBtn")));
   ["boardMetricFilter", "boardGovernorateFilter", "boardTransactionFilter", "boardPropertyTypeFilter", "boardListingModeFilter", "boardAreaFilter"].forEach((id) => {
     const el = $(id);
     if (!el) return;
@@ -5777,6 +6171,23 @@ function bind() {
       runBoardAnalysis({ area, governorate: gov, metric: "movement" });
       return;
     }
+    // مبدّل عرض كروت المحافظات: شبكة/جدول — ذاكرة موحّدة مع أفضل الفرص
+    // (إعادة رسم القسمين معًا حتى يظهر التغيير فورًا في أي تبويب مفتوح)
+    const govViewBtn = ev.target.closest?.("[data-gov-view]");
+    if (govViewBtn) {
+      setViewMode(govViewBtn.dataset.govView);
+      renderBoard();
+      renderOppTier();
+      return;
+    }
+    // مبدّل عرض الفرص: شبكة/جدول — نفس الذاكرة الموحّدة
+    const oppViewBtn = ev.target.closest?.("[data-opp-view]");
+    if (oppViewBtn) {
+      setViewMode(oppViewBtn.dataset.oppView);
+      renderOppTier();
+      renderBoard();
+      return;
+    }
     const toggle = ev.target.closest?.("[data-board-toggle-gov]");
     if (toggle) {
       const gov = toggle.dataset.boardToggleGov || "";
@@ -5800,7 +6211,7 @@ function bind() {
       if (areaFilter) areaFilter.value = area;
       renderBoard();
       const rows = filteredBoardRows().filter((row) => {
-        const rowGov = canonicalGovernorate(row.governorate) || "غير محددة";
+        const rowGov = boardLocationBucket(row);
         const targetGov = canonicalGovernorate(gov) || "غير محددة";
         if (gov && rowGov !== targetGov) return false;
         if (area && row.area !== area) return false;
@@ -6202,6 +6613,754 @@ function sortBoardRows(rows) {
 }
 
 
+// ── سجل تعريفات المقاييس: توثيق كل رقم يظهر في المنصة (صيغة + مصدر + معتمد) ──
+// مرجع داخلي موحد — أي تعديل في منطق الحساب يجب أن يحدّث هذا السجل في نفس التعديل.
+const METRIC_REGISTRY = [
+  {
+    id: "governance",
+    title: "قواعد الحوكمة — تتحكم في كل الأرقام",
+    note: "قواعد معتمدة من فريق بيانات الفريج — أي رقم في المنصة يُحسب في إطارها.",
+    rows: [
+      {
+        name: "المساحة الصريحة فقط",
+        what: "لا يُعدّ «ارتداد» ولا «عرض الشارع» ولا «الواجهة» مساحة. المساحة تدخل أي حساب فقط كمذكورة صريحة: حقل مساحة أو نص مثل «المساحة: 300م²». مثال: إعلان AF-303 به «ارتداد 40 متر» فمساحته غير محددة.",
+        formula: "قاعدة تصنيف لا حساب — إن لم تُذكر المساحة صراحةً تظهر «غير محددة»",
+        source: "القواعد المعتمدة من فريق بيانات الفريج",
+        status: "approved",
+      },
+      {
+        name: "ميزانيات الطلب خارج أسعار العرض",
+        what: "طلبات «مطلوب للشراء/للإيجار» تُعدّ في مؤشرات الطلب فقط ولا تدخل وسيطات أسعار العرض حتى لا تشوّه سعر السوق (ميزانية المشتري ليست سعر عرض).",
+        formula: "—",
+        source: "منطق تحليلات السوق — تصنيف معاملات الطلب",
+        status: "approved",
+      },
+      {
+        name: "استبعاد القيم الشاذة قبل الوسيط",
+        what: "أي وسيط (سعر / إيجار / سعر المتر) يُحسب بعد استبعاد الشواذ بمعيار 3×IQR عندما تكون العينات ≥4 — الأسعار المهرطبة لا تشوّه الوسيط.",
+        formula: "الحدود = Q1 − 3×IQR و Q3 + 3×IQR — تُطبَّق فقط عند 4 عينات فأكثر",
+        source: "منطق تحليلات السوق — تنظيف القيم الشاذة",
+        status: "approved",
+      },
+      {
+        name: "شروط حساب العائد الإيجاري",
+        what: "يُحسب فقط عند عينتين على الأقل بيعًا وإيجارًا بعد التنظيف، وسعر البيع أكبر من الإيجار السنوي، والناتج ≤ 15% (أعلى من ذلك غالبًا خطأ بيانات لا فرصة حقيقية).",
+        formula: "(وسيط الإيجار × 12) ÷ وسيط سعر البيع × 100",
+        source: "قواعد حساب العائد الإيجاري — سقف 15% + حد أدنى عينتين",
+        status: "approved",
+      },
+      {
+        name: "خط البيع منفصل عن خط الإيجار",
+        what: "لا يُخلط سعر البيع مع الإيجار الشهري: خط البيع (سعر إجمالي، سعر المتر، وسيط، نسبة السعر) وخط الإيجار (شهري/سنوي، إيجار المتر، وسيط الإيجارات، العائد) كلٌّ بحساباته. العائد يُقاس لعروض البيع المؤجرة ولا يُطبَّق على عروض الإيجار.",
+        formula: "—",
+        source: "منطق التقييم — خط البيع مقابل خط الإيجار",
+        status: "approved",
+      },
+      {
+        name: "التصنيف القانوني/التمويلي من نص الإعلان فقط",
+        what: "تصنيف الملكية والاستخدام والحالة القانونية مستخرج من نص الإعلان فقط، ولا يتحول إلى حقيقة رسمية إلا بوجود وثيقة أو مصدر رسمي موثق داخل التقرير.",
+        formula: "—",
+        source: "ملف العقار — مستخرج من نص الإعلان",
+        status: "approved",
+      },
+    ],
+  },
+  {
+    id: "board",
+    title: "مقاييس لوحة السوق",
+    note: "الأرقام في تبويب «لوحة السوق» — عدّ مباشر على الإعلانات حسب الفلاتر الحالية.",
+    rows: [
+      {
+        name: "حركة الدلال",
+        what: "كل الإعلانات الظاهرة ضمن الاختيار الحالي — المحور الافتراضي للوحة والمحافظات.",
+        formula: "عدّ الصفوف المطابقة للفلاتر",
+        source: "بيانات الفريج + الحصاد الخارجي",
+        status: "auto",
+      },
+      {
+        name: "فرص محسوبة",
+        what: "الإعلانات التي حصلت على درجة فرصة أكبر من صفر (دخلت التقييم بفرصة فعلية).",
+        formula: "العد حيث درجة الفرصة أكبر من صفر",
+        source: "محرك تقييم الفرص",
+        status: "auto",
+      },
+      {
+        name: "عروض للبيع",
+        what: "إعلانات بيع فعلية (بدون طلبات شراء).",
+        formula: "المعاملة تحوي «بيع» ولا تحوي «مطلوب»",
+        source: "من معاملة الإعلان (بيع/شراء/إيجار)",
+        status: "auto",
+      },
+      {
+        name: "طلبات شراء",
+        what: "إعلانات «مطلوب للشراء» من الفريج أو قسم «مطلوب» في المواقع الخارجية — كل طلب عميل محتمل.",
+        formula: "المعاملة تحوي «مطلوب» و«شراء»",
+        source: "من معاملة الإعلان (بيع/شراء/إيجار)",
+        status: "auto",
+      },
+      {
+        name: "عروض الإيجار",
+        what: "إعلانات إيجار فعلية (بدون طلبات إيجار).",
+        formula: "المعاملة تحوي «إيجار/أجار» ولا تحوي «مطلوب»",
+        source: "من معاملة الإعلان (بيع/شراء/إيجار)",
+        status: "auto",
+      },
+      {
+        name: "طلبات الإيجار",
+        what: "إعلانات «مطلوب للإيجار».",
+        formula: "المعاملة تحوي «مطلوب» و«إيجار/أجار»",
+        source: "من معاملة الإعلان (بيع/شراء/إيجار)",
+        status: "auto",
+      },
+      {
+        name: "فرص ظاهرة / دخلت التقييم",
+        what: "«فرص ظاهرة»: الفرص المقيّمة ضمن الاختيار. «دخلت التقييم»: إجمالي الإعلانات المقيّمة حتى بلا فرصة.",
+        formula: "فرص ظاهرة: الفرص بدرجة > 0 · دخلت التقييم: كل الصفوف بدرجة محسوبة",
+        source: "محرك التقييم اليومي",
+        status: "auto",
+      },
+      {
+        name: "أدلة ومقارنات",
+        what: "مجموع الإعلانات التي تحمل أدلة أو مقارنات سعرية — يعكس عمق توثيق كل رقم.",
+        formula: "مجموع عدد الأدلة + عدد المقارنات",
+        source: "محرك التقييم — سجل الأدلة",
+        status: "auto",
+      },
+      {
+        name: "أسعار معلنة",
+        what: "الإعلانات التي يحمل صفها سعرًا صريحًا أكبر من صفر.",
+        formula: "العد حيث السعر المعلن أكبر من صفر",
+        source: "من سعر الإعلان المعلن",
+        status: "auto",
+      },
+      {
+        name: "مساحات موثقة",
+        what: "الإعلانات التي تحمل مساحة صريحة أكبر من صفر — بعد تطبيق قاعدة المساحة الصريحة فقط.",
+        formula: "العد حيث المساحة الصريحة أكبر من صفر",
+        source: "من مساحة الإعلان بعد تطبيق قاعدة الحوكمة",
+        status: "auto",
+      },
+      {
+        name: "مباشر / مكتب",
+        what: "تقسيم الإعلانات حسب نمط الإدراج: مباشر (المالك) أو مكتب (وساطة).",
+        formula: "العد حسب نمط الإعلان (مباشر/مكتب)",
+        source: "من نمط الإعلان (مباشر/مكتب)",
+        status: "auto",
+      },
+    ],
+  },
+  {
+    id: "market",
+    title: "مقاييس تحليلات السوق",
+    note: "الأرقام في تبويب «تحليلات السوق» — من الحصاد المتراكم للمنصات.",
+    rows: [
+      {
+        name: "وسيط سعر المتر (منطقة)",
+        what: "سعر المتر النموذجي لإعلانات البيع في المنطقة — أساس مقارنة أي عرض في التقييم.",
+        formula: "وسيط (السعر ÷ المساحة الصريحة) لإعلانات البيع بعد استبعاد الشواذ",
+        source: "الحصاد المتراكم من منصات السوق",
+        status: "auto",
+      },
+      {
+        name: "وسيط سعر المتر (محافظة)",
+        what: "وسيط وسيطات مناطق المحافظة — يُعرض كأشرطة في التحليلات وكمرجع للخريطة الحرارية.",
+        formula: "وسيط (وسيطات مناطق المحافظة)",
+        source: "مشتق من وسيطات المناطق",
+        status: "auto",
+      },
+      {
+        name: "العائد الإيجاري السنوي",
+        what: "العائد السنوي المتوقع لشراء عقار في المنطقة ثم تأجيره — يظهر فقط عند استيفاء شروط الحوكمة.",
+        formula: "(وسيط الإيجار × 12) ÷ وسيط سعر البيع × 100 — بحد أدنى عينتين لكل جانب وسقف 15%",
+        source: "منطق تحليلات السوق",
+        status: "auto",
+      },
+      {
+        name: "ثقة العائد",
+        what: "الشارة بجانب العائد: «ثقة عالية» عند وفرة العينات و«تقديري» عند قلتها.",
+        formula: "ثقة عالية: عينات بيع ≥ 5 وعينات إيجار ≥ 5 (بعد التنظيف) — وإلا تقديري",
+        source: "منطق تحليلات السوق — شارة موثوقية العائد",
+        status: "auto",
+      },
+      {
+        name: "اتجاه السوق",
+        what: "اتجاه وسيط سعر المتر العام بين أول وآخر شهر حصاد — بطاقة KPI في التحليلات.",
+        formula: "(آخر شهر − أول شهر) ÷ أول شهر × 100 — صاعد ≥ +3% · هابط ≤ −3% · وإلا مستقر",
+        source: "سلسلة وسيط السوق العام الشهرية",
+        status: "auto",
+      },
+      {
+        name: "وسيط السوق العام",
+        what: "الخط المتقطع في رسم الاتجاه — الوسيط العام لسعر المتر عبر كل أشهر الحصاد.",
+        formula: "وسيط (السعر ÷ المساحة) لكل صفوف البيع في كل الأشهر",
+        source: "سلسلة وسيط السوق العام الشهرية",
+        status: "auto",
+      },
+      {
+        name: "مؤشرات الطلب",
+        what: "عدّ طلبات الشراء والإيجار حسب المنطقة والمحافظة والمنصة مع الاتجاه الشهري — ميزانيات الطلب لا تدخل وسيطات العرض.",
+        formula: "عدّ معاملات «مطلوب للشراء/للإيجار»",
+        source: "الفريج المحلي + قسم «مطلوب» في 4Sale",
+        status: "auto",
+      },
+    ],
+  },
+  {
+    id: "valuation",
+    title: "مقاييس التقييم والترتيب",
+    note: "الأرقام في «النتائج المرتبة» و«أفضل الفرص» — تُحسب لكل نتيجة أو فرصة.",
+    rows: [
+      {
+        name: "درجة التوصية (0–100)",
+        what: "الترتيب النهائي في «النتائج المرتبة» — أعلى درجة أولًا.",
+        formula: "مطابقة الطلب ×62% + جاذبية السعر ×28% + الثقة ×10% − (3 نقاط لكل تحذير، حد أقصى 12)",
+        source: "منطق التقييم — درجة التوصية",
+        status: "approved",
+      },
+      {
+        name: "جاذبية السعر",
+        what: "عدالة السعر مقابل وسيط المقارنات (أو القيمة الرسمية عند توفرها) — نفس الحدود لخط الإيجار على الإيجار الشهري.",
+        formula: "نسبة السعر ≤0.82 → 100 ممتاز · ≤0.92 → 88 أقل من السوق · ≤1.08 → 74 عادل · ≤1.18 → 58 أعلى قليلًا · ≤1.35 → 38 غالي · >1.35 → 20 مبالغ فيه",
+        source: "منطق التقييم — جاذبية السعر",
+        status: "approved",
+      },
+      {
+        name: "نسبة السعر",
+        what: "مقارنة السعر المطلوب بسوق المنطقة — تظهر في بطاقة النتيجة (مثل 1.05 مقابل الوسيط).",
+        formula: "السعر المطلوب ÷ وسيط المقارنات (أو القيمة الرسمية عند توفرها)",
+        source: "منطق التقييم — نسبة السعر",
+        status: "auto",
+      },
+      {
+        name: "الثقة (%)",
+        what: "مدى اعتماد التقييم على بيانات فعلية — كلما زادت المقارنات أو توفرت مراجع رسمية ارتفعت.",
+        formula: "50% أساس + 6% لكل مقارنة سعرية (حد أقصى 90%) — 85% مع مؤشر رسمي · 90% مع صفقات رسمية مسجلة",
+        source: "منطق التقييم — جاذبية السعر",
+        status: "approved",
+      },
+      {
+        name: "سعر المتر",
+        what: "سعر المتر للمطلوب نفسه للمقارنة مع وسيط المنطقة — يُحسب فقط عند مساحة صريحة.",
+        formula: "السعر ÷ المساحة (الصريحة فقط)",
+        source: "منطق التقييم — سعر المتر",
+        status: "auto",
+      },
+      {
+        name: "العائد الإيجاري (بيع مؤجر)",
+        what: "حكم استثماري للعروض المؤجرة: قوي ≥6% · متوسط ≥4% · ضعيف — لا يُطبَّق على عروض الإيجار.",
+        formula: "(الدخل السنوي ÷ سعر البيع) × 100 — الدخل من الطلب أولًا ثم الإعلان",
+        source: "منطق التقييم — العائد للبيع المؤجر",
+        status: "approved",
+      },
+      {
+        name: "درجة الفرصة (0–100)",
+        what: "ترتيب الفرص في «أفضل الفرص» وشارة درجة الفرصة في اللوحة — بدون أي عنصر عشوائي.",
+        formula: "جاذبية السعر ×65% + الثقة ×35%",
+        source: "منطق تقييم الفرص — الدرجة",
+        status: "approved",
+      },
+      {
+        name: "ثقة الفرصة",
+        what: "ثقة مركبة لكل فرصة تجمع مصداقية المصدر وقوة التقييم والأدلة.",
+        formula: "مصداقية المصدر ×50% + ثقة التقييم ×30% + قوة الأدلة ×20%",
+        source: "منطق تقييم الفرص — الثقة",
+        status: "approved",
+      },
+      {
+        name: "نطاق المقارنة",
+        what: "داخل أي نطاق تتم المقارنات السعرية — يظهر في سبب التقييم وشفافية كل رقم.",
+        formula: "نفس المنطقة (≥3 مقارنات) → ثم توسعة محدودة → بدونه «لا توجد مقارنات كافية»",
+        source: "منطق التقييم — نطاق المقارنات",
+        status: "auto",
+      },
+    ],
+  },
+  {
+    id: "sources",
+    title: "مصادر الأرقام ومستويات الاعتماد",
+    note: "أي مصدر يدخل التقييم وكيف يظهر في التقرير — سياسة الاعتماد من القواعد المعتمدة.",
+    rows: [
+      {
+        name: "الفريج",
+        what: "المصدر المحلي الأساسي — بيانات الشركة من لوحة الفريج الداخلية.",
+        formula: "دخل التقييم",
+        source: "بيانات الفريج — السجلات المحلية",
+        status: "approved",
+      },
+      {
+        name: "الصفقات الرسمية",
+        what: "أعلى مصداقية — تدخل التقييم فقط عند توفر صفقات موثقة بمنطقة ونوع عقار وتاريخ ومساحة وسعر.",
+        formula: "دخل التقييم (مشروط بالبيانات المنظمة)",
+        source: "وزارة العدل / التسجيل العقاري عبر القاعدة",
+        status: "approved",
+      },
+      {
+        name: "المؤشرات الرسمية",
+        what: "مرجع أعلى عند توفر بيانات منظمة لسعر المتر في القاعدة أو الملفات المحلية.",
+        formula: "دخل التقييم (مشروط بالبيانات المنظمة)",
+        source: "PACI / Kuwait Finder / تقارير سوقية موثقة",
+        status: "approved",
+      },
+      {
+        name: "OpenSooq · Mourjan · 4Sale",
+        what: "تدخل المقارنات فقط عند نفس المنطقة ونفس نوع العقار ونفس العملية وبسعر قابل للقراءة — 4Sale يعيد المحاولة حتى 4 مرات ثم يلجأ لمصدر بديل مع إفصاح.",
+        formula: "دخل التقييم (عبر الجلب الحي أو البديل الموثق)",
+        source: "سياسة الحصاد الحي للمنصات",
+        status: "auto",
+      },
+      {
+        name: "Q8Aqar",
+        what: "يدخل فقط عندما يثبت رابط/نص الإعلان نفس الطلب — وإلا يظهر كمصدر مفحوص لا كمقارنة سعرية.",
+        formula: "دخل مشروط (بعد إثبات التطابق)",
+        source: "سياسة الحصاد الحي للمنصات",
+        status: "auto",
+      },
+      {
+        name: "Sakan",
+        what: "دليل توفر ورابط صفحة فقط حاليًا — لا يدخل التقييم حتى تتوفر واجهة بيانات تفاصيل قابلة للتحقق.",
+        formula: "مساعد فقط (لا يدخل التقييم)",
+        source: "سياسة الحصاد الحي للمنصات",
+        status: "auto",
+      },
+      {
+        name: "Waseet · NabdAqar · Bu3qar · Aqarat",
+        what: "حسب توفّر صفحاتها العامة أو بدائل البحث — تظهر كمساعد أو مشروط حتى تعيد بيانات منظمة.",
+        formula: "مساعد / مشروط حسب توفر البيانات",
+        source: "سياسة الحصاد الحي للمنصات",
+        status: "auto",
+      },
+      {
+        name: "مستويات الاعتماد في التقرير",
+        what: "كل مصدر يظهر في التقرير بأحد هذه المستويات — تُقرأ كما هي دون مبالغة.",
+        formula: "دخل التقييم · دخل عبر بديل · مساعد فقط · لا يدخل التقييم · فشل الاتصال",
+        source: "سياسة الاعتماد المعتمدة من فريق البيانات",
+        status: "approved",
+      },
+    ],
+  },
+];
+
+function registryRowHtml(row) {
+  const isApproved = row.status === "approved";
+  return `
+    <div class="registry-row ${isApproved ? "connected" : "live_conditional"}">
+      <strong>${escapeHtml(row.name)}</strong>
+      <p>${escapeHtml(row.what)}</p>
+      <p class="registry-formula"><em>${row.formula && row.formula !== "—" ? escapeHtml(row.formula) : "—"}</em></p>
+      <div class="registry-src">
+        <span>${escapeHtml(row.source)}</span>
+        <em class="registry-status ${isApproved ? "approved" : "auto"}">${escapeHtml(row.statusText || (isApproved ? "معتمد — فريق البيانات" : "محسوب تلقائيًا"))}</em>
+      </div>
+    </div>`;
+}
+
+// بيانات السجل: تبدأ من النسخة الثابتة كاحتياط، ويُستبدَل بها رد الخادم الحي عند توفره
+// (/api/metric-registry) — الصيغ الرقمية في الرد مبنية من ثوابت المحرك الفعلية.
+let metricsRegistryLive = null;   // { generatedAt, source, sections }
+let metricsRegistryLiveAt = "";  // نص آخر مزامنة حية مع الخادم
+
+function renderMetricsRegistry(query = "") {
+  const root = $("metricsRoot");
+  if (!root) return;
+  const q = String(query || "").trim().toLowerCase();
+  const source = metricsRegistryLive && Array.isArray(metricsRegistryLive.sections) ? metricsRegistryLive.sections : METRIC_REGISTRY;
+  let total = 0;
+  let matched = 0;
+  const sections = source.map((section) => {
+    const rows = (section.rows || []).filter((row) => {
+      if (!q) return true;
+      return [row.name, row.what, row.formula, row.source].join(" ").toLowerCase().includes(q);
+    });
+    total += (section.rows || []).length;
+    matched += rows.length;
+    if (!rows.length) return "";
+    return `
+      <section class="metrics-section">
+        <div class="section-title compact-title">
+          <div>
+            <h3>${escapeHtml(section.title)} <span class="metrics-section-count">${rows.length}</span></h3>
+            <span>${escapeHtml(section.note)}</span>
+          </div>
+        </div>
+        <div class="registry-table">
+          ${rows.map((row) => registryRowHtml(row)).join("")}
+        </div>
+      </section>`;
+  }).join("");
+  const meta = $("metricsMeta");
+  if (meta) {
+    meta.textContent = q ? `${matched} من ${total} مقياس مطابق للبحث` : `${total} مقياسًا موثقًا${metricsRegistryLive ? " · مصدر حي من الخادم" : ""}`;
+    if (metricsRegistryLive && metricsRegistryLiveAt) {
+      meta.title = `آخر مزامنة مع الخادم: ${metricsRegistryLiveAt} — الصيغ مبنية من ثوابت المحرك الفعلية`;
+    }
+  }
+  const countEl = $("tabCountMetrics");
+  if (countEl) countEl.textContent = q ? "" : String(total);
+  root.innerHTML = sections || '<div class="empty">لا توجد مقاييس مطابقة للبحث — جرّب كلمة أخرى.</div>';
+}
+
+async function initMetricsRegistry() {
+  const input = $("metricsFilter");
+  // عرض فوري من النسخة الثابتة ثم استبدالها بالمصدر الحي من الخادم عند توفره
+  renderMetricsRegistry(input ? input.value : "");
+  try {
+    const payload = await getJson("/api/metric-registry");
+    if (payload && Array.isArray(payload.sections)) {
+      metricsRegistryLive = payload;
+      metricsRegistryLiveAt = String(payload.generatedAt || "").replace("T", " ").slice(0, 16);
+      renderMetricsRegistry(input ? input.value : "");
+    }
+  } catch {
+    // الخادم غير متاح (وضع ثابت/لقطة) — تبقى النسخة الثابتة كما هي بلا خطأ ظاهر
+  }
+  if (input) {
+    input.addEventListener("input", () => renderMetricsRegistry(input.value));
+  }
+}
+
+// ── اسأل السوق: شات سريع فوق بيانات تحليلات السوق المتراكمة ──────────────────
+// يجيب مباشرة من /api/market-insights + /api/market-demand (المحمَّلة في insightsState)
+// بدون تشغيل بحث كامل — أسئلة مثل «متوسط سعر المتر في الجهراء».
+const MARKET_GOVERNORATES = ["العاصمة", "حولي", "الجهراء", "الفروانية", "الأحمدي", "مبارك الكبير"];
+const MARKET_CHAT_SUGGESTIONS = [
+  "متوسط سعر المتر في الجهراء",
+  "أعلى منطقة عائد إيجار",
+  "أرخص منطقة سعر متر",
+  "كم طلب شراء في الأحمدي",
+  "اتجاه سعر المتر العام",
+  "قارن بين العاصمة وحولي",
+];
+
+function marketChatNorm(value) {
+  // توحيد اسم المحافظة/المنطقة مع إزالة بادئة «محافظة» قبل التطبيع حتى تتطابق المقارنات
+  return normalizeArabic(String(value || "").replace(/^محافظة\s*/i, ""));
+}
+
+function marketChatMedian(values) {
+  const list = (values || []).filter((v) => v != null && isFinite(Number(v))).map(Number).sort((a, b) => a - b);
+  if (!list.length) return null;
+  const mid = Math.floor(list.length / 2);
+  return list.length % 2 ? list[mid] : (list[mid - 1] + list[mid]) / 2;
+}
+
+function marketChatNum(value, digits = 0) {
+  if (value == null || !isFinite(Number(value))) return "—";
+  return Number(value).toLocaleString("en-US", { maximumFractionDigits: digits });
+}
+
+function marketChatScopes(q) {
+  const data = insightsState.data || {};
+  const areas = data.areas || [];
+  // ذكر «محافظة» صراحةً يوجّه السؤال لمستوى المحافظة لا لمنطقة بنفس الاسم
+  const explicitGov = q.includes("محافظه");
+  // المحافظة المذكورة في السؤال (أطول اسم مطابق — لتفادي «الكبير» داخل «مبارك الكبير»)
+  const govs = MARKET_GOVERNORATES
+    .map((g) => ({ name: g, norm: marketChatNorm(g) }))
+    .filter((g) => g.norm && q.includes(g.norm))
+    .sort((a, b) => b.norm.length - a.norm.length);
+  const governorates = govs.map((g) => g.name);
+  // المنطقة المذكورة (أطول اسم مطابق في البيانات) — تُتجاهل مع ذكر «محافظة» صراحةً
+  const areaMatch = areas
+    .map((a) => ({ area: a, norm: marketChatNorm(a.area) }))
+    .filter((m) => m.norm && q.includes(m.norm))
+    .sort((a, b) => b.norm.length - a.norm.length)[0];
+  const area = explicitGov ? null : (areaMatch ? areaMatch.area : null);
+  return { governorates, area, explicitGov };
+}
+
+function marketChatScopeLabel(governorates, area) {
+  if (area) return area.area;
+  if (governorates.length === 1) return governorates[0];
+  if (governorates.length > 1) return governorates.join(" و");
+  return "";
+}
+
+function marketChatGovAreas(governorate) {
+  const target = marketChatNorm(governorate);
+  return ((insightsState.data || {}).areas || []).filter((a) => marketChatNorm(a.governorate) === target);
+}
+
+function marketChatPerM2Text(perM2, count) {
+  if (perM2 == null) return null;
+  return `${marketChatNum(perM2)} د.ك/م²${count != null ? ` (من ${count} عينة بيع)` : ""}`;
+}
+
+function answerMarketQuestion(rawText) {
+  const data = insightsState.data;
+  if (!data || !data.tableOk) {
+    return { text: "بيانات تحليلات السوق لم تُحمَّل بعد — أعد السؤال بعد اكتمال التحميل، أو افتح تبويب «تحليلات السوق» أولًا." };
+  }
+  const areas = data.areas || [];
+  const governorates = data.governorates || [];
+  const demand = insightsState.demand || {};
+  const q = normalizeArabic(rawText);
+  const { governorates: govMentions, area } = marketChatScopes(q);
+  const gov = govMentions[0] || null;
+  const scopeLabel = marketChatScopeLabel(govMentions, area);
+
+  // مقارنة محافظات: «قارن بين العاصمة وحولي»
+  if (govMentions.length >= 2 && (q.includes("قارن") || q.includes("مقارن"))) {
+    const rows = govMentions.map((name) => {
+      const g = governorates.find((x) => marketChatNorm(x.governorate) === marketChatNorm(name));
+      const gAreas = marketChatGovAreas(name);
+      const rentMed = marketChatMedian(gAreas.map((a) => a.medianRent));
+      const yieldMed = marketChatMedian(gAreas.map((a) => a.rentalYield));
+      return {
+        name,
+        perM2: g ? g.medianSalePerM2 : marketChatMedian(gAreas.map((a) => a.medianSalePerM2)),
+        rent: rentMed,
+        yield: yieldMed,
+        areas: gAreas.length,
+      };
+    });
+    const cells = rows.map((r) => `
+      <div class="market-compare-col">
+        <b>${escapeHtml(r.name)}</b>
+        <span>سعر المتر: ${marketChatPerM2Text(r.perM2, null) || "—"}</span>
+        <span>وسيط الإيجار: ${r.rent != null ? `${marketChatNum(r.rent)} د.ك/شهر` : "—"}</span>
+        <span>العائد: ${r.yield != null ? `${marketChatNum(r.yield, 1)}%` : "—"}</span>
+        <small>${r.areas} منطقة محللة</small>
+      </div>`).join("");
+    return { text: `<div class="market-compare">${cells}</div>` };
+  }
+
+  // أفضل/أعلى عائد — «أعلى» تصبح «اعلي» بعد تطبيع الألف المقصورة
+  if (q.includes("اعلي عائد") || q.includes("افضل عائد") || (q.includes("عائد") && (q.includes("افضل") || q.includes("اعلي منطقه")))) {
+    const pool = areas.filter((a) => a.rentalYield != null && (!gov || marketChatNorm(a.governorate) === marketChatNorm(gov)) && (!area || marketChatNorm(a.area) === marketChatNorm(area.area)));
+    if (!pool.length) return { text: "لا توجد مناطق بعائد إيجاري محسوب في هذا النطاق بعد — العائد يُحسب فقط عند توفر عينتين على الأقل بيعًا وإيجارًا." };
+    const sorted = pool.slice().sort((a, b) => Number(b.rentalYield) - Number(a.rentalYield)).slice(0, 5);
+    const rows = sorted.map((a) => `
+      <div class="market-chat-row-inline">
+        <b>${escapeHtml(a.area)}</b>
+        <span>${marketChatNum(a.rentalYield, 1)}% سنويًا</span>
+        <small>بيع ${marketChatNum(a.saleCount)} + إيجار ${marketChatNum(a.rentCount)} · ${a.yieldNote === "high" ? "ثقة عالية" : "تقديري"}</small>
+      </div>`).join("");
+    return { text: `${scopeLabel ? `أعلى عائد إيجاري ${scopeLabel ? `في ${escapeHtml(scopeLabel)}` : ""}:` : "أعلى عائد إيجاري سنوي (مناطق):"} <div class="market-chat-list">${rows}</div>` };
+  }
+
+  // أرخص منطقة (سعر متر)
+  if (q.includes("ارخص") || q.includes("اقل سعر") || q.includes("اقل منطقه")) {
+    const pool = areas.filter((a) => a.medianSalePerM2 != null && (!gov || marketChatNorm(a.governorate) === marketChatNorm(gov)));
+    if (!pool.length) return { text: "لا توجد مناطق بوسيط سعر متر محسوب في هذا النطاق بعد." };
+    const sorted = pool.slice().sort((a, b) => Number(a.medianSalePerM2) - Number(b.medianSalePerM2)).slice(0, 5);
+    const rows = sorted.map((a) => `
+      <div class="market-chat-row-inline">
+        <b>${escapeHtml(a.area)}</b>
+        <span>${marketChatPerM2Text(a.medianSalePerM2, a.saleCount)}</span>
+        <small>${escapeHtml(a.governorate || "")}</small>
+      </div>`).join("");
+    return { text: `${scopeLabel ? `أرخص المناطق ${`في ${escapeHtml(scopeLabel)}`}:` : "أرخص المناطق سعر متر (بيع):"} <div class="market-chat-list">${rows}</div>` };
+  }
+
+  // أغلى منطقة (سعر متر) — «أغلى/أعلى» تصبح «اغلي/اعلي» بعد تطبيع الألف المقصورة
+  if (q.includes("اغلي") || q.includes("اعلي سعر")) {
+    const pool = areas.filter((a) => a.medianSalePerM2 != null && (!gov || marketChatNorm(a.governorate) === marketChatNorm(gov)));
+    if (!pool.length) return { text: "لا توجد مناطق بوسيط سعر متر محسوب في هذا النطاق بعد." };
+    const sorted = pool.slice().sort((a, b) => Number(b.medianSalePerM2) - Number(a.medianSalePerM2)).slice(0, 5);
+    const rows = sorted.map((a) => `
+      <div class="market-chat-row-inline">
+        <b>${escapeHtml(a.area)}</b>
+        <span>${marketChatPerM2Text(a.medianSalePerM2, a.saleCount)}</span>
+        <small>${escapeHtml(a.governorate || "")}</small>
+      </div>`).join("");
+    return { text: `${scopeLabel ? `أغلى المناطق ${`في ${escapeHtml(scopeLabel)}`}:` : "أغلى المناطق سعر متر (بيع):"} <div class="market-chat-list">${rows}</div>` };
+  }
+
+  // اتجاه السوق — يُفحص قبل «سعر المتر» لأن «اتجاه سعر المتر العام» يحوي كلمة «سعر المتر»
+  if (q.includes("اتجاه") || q.includes("صاعد") || q.includes("هابط") || q.includes("مستقر") || q.includes("وضع السوق") || q.includes("كيف السوق")) {
+    const market = data.market || {};
+    const dir = market.direction || "—";
+    const change = market.changePct;
+    const mSeries = (market.series || []).filter((p) => p.perM2 != null);
+    const first = mSeries[0];
+    const last = mSeries[mSeries.length - 1];
+    const range = first && last && first.perM2 != null && last.perM2 != null
+      ? ` — سعر المتر العام ${marketChatNum(first.perM2)} ← ${marketChatNum(last.perM2)} د.ك/م² عبر الأشهر`
+      : "";
+    return { text: `اتجاه سعر المتر العام: <b>${escapeHtml(dir)}</b>${change != null ? ` — تغير ${change > 0 ? "+" : ""}${marketChatNum(change, 1)}% بين أول وآخر شهر حصاد.` : "."}${range}` };
+  }
+
+  // سعر المتر
+  if (q.includes("سعر المتر") || (q.includes("المتر") && (q.includes("سعر") || q.includes("كم")))) {
+    if (area && area.medianSalePerM2 != null) {
+      const gap = area.medianSalePerM2 != null && area.governorate ? (() => {
+        const g = governorates.find((x) => marketChatNorm(x.governorate) === marketChatNorm(area.governorate));
+        if (!g || !g.medianSalePerM2) return null;
+        return ((area.medianSalePerM2 - g.medianSalePerM2) / g.medianSalePerM2) * 100;
+      })() : null;
+      return { text: `وسيط سعر المتر في <b>${escapeHtml(area.area)}</b> هو <b>${marketChatPerM2Text(area.medianSalePerM2, area.saleCount)}</b>${gap != null ? ` — ${gap <= -8 ? "أقل من وسيط محافظته (فرصة)" : gap >= 8 ? "أعلى من وسيط محافظته (مضخم)" : "قريب من وسيط محافظته"}` : ""}.` };
+    }
+    if (gov) {
+      const g = governorates.find((x) => marketChatNorm(x.governorate) === marketChatNorm(gov));
+      const gAreas = marketChatGovAreas(gov);
+      if (g && g.medianSalePerM2 != null) {
+        return { text: `وسيط سعر المتر في <b>${escapeHtml(gov)}</b> هو <b>${marketChatPerM2Text(g.medianSalePerM2, gAreas.length ? gAreas.reduce((s, a) => s + Number(a.saleCount || 0), 0) : null)}</b> — وسيط وسيطات ${gAreas.length} منطقة محللة.` };
+      }
+      return { text: `لا توجد بيانات سعر متر كافية لمحافظة ${escapeHtml(gov)} بعد.` };
+    }
+    if (governorates.length) {
+      const rows = governorates.slice().sort((a, b) => Number(b.medianSalePerM2 || 0) - Number(a.medianSalePerM2 || 0)).map((g) => `
+        <div class="market-chat-row-inline">
+          <b>${escapeHtml(g.governorate)}</b>
+          <span>${marketChatPerM2Text(g.medianSalePerM2, null)}</span>
+        </div>`).join("");
+      return { text: `وسيط سعر المتر حسب المحافظات (تنازليًا): <div class="market-chat-list">${rows}</div>` };
+    }
+    const sortedGovs = governorates.slice().sort((a, b) => Number(b.medianSalePerM2 || 0) - Number(a.medianSalePerM2 || 0));
+    if (sortedGovs.length) {
+      const rows = sortedGovs.map((g) => `
+        <div class="market-chat-row-inline">
+          <b>${escapeHtml(g.governorate)}</b>
+          <span>${marketChatPerM2Text(g.medianSalePerM2, null)}</span>
+        </div>`).join("");
+      return { text: `وسيط سعر المتر حسب المحافظات (تنازليًا): <div class="market-chat-list">${rows}</div>` };
+    }
+    return { text: "لا توجد بيانات سعر متر محسوبة بعد — تتكوّن مع تراكم الحصاد اليومي." };
+  }
+
+  // متوسط سعر البيع (إجمالي)
+  if (q.includes("سعر البيع") || q.includes("متوسط سعر") || (q.includes("سعر") && !q.includes("ايجار"))) {
+    if (area && area.medianSalePrice != null) {
+      return { text: `وسيط سعر البيع في <b>${escapeHtml(area.area)}</b> هو <b>${formatKd(area.medianSalePrice)} د.ك</b> (من ${marketChatNum(area.saleCount)} عينة بيع).` };
+    }
+    if (gov) {
+      const gAreas = marketChatGovAreas(gov).filter((a) => a.medianSalePrice != null);
+      const med = marketChatMedian(gAreas.map((a) => a.medianSalePrice));
+      if (med != null) return { text: `وسيط سعر البيع في <b>${escapeHtml(gov)}</b> هو <b>${formatKd(med)} د.ك</b> (من ${gAreas.reduce((s, a) => s + Number(a.saleCount || 0), 0)} عينة بيع).` };
+      return { text: `لا توجد بيانات سعر بيع كافية لمحافظة ${escapeHtml(gov)} بعد.` };
+    }
+    const total = data.sampleTotals || {};
+    return { text: `الحصاد المتراكم يحوي <b>${marketChatNum(total.sale || 0)} إعلان بيع</b> و<b>${marketChatNum(total.rent || 0)} إعلان إيجار</b> — اذكر منطقة أو محافظة لأسألك عن وسيط سعرها.` };
+  }
+
+  // الإيجار — أسئلة «عائد إيجار» تمر لفرع العائد و«طلب إيجار» لفرع الطلبات أدناه
+  if ((q.includes("ايجار") || q.includes("الاجار")) && !q.includes("عائد") && !q.includes("طلب") && !q.includes("مطلوب")) {
+    if (area && area.medianRent != null) {
+      return { text: `وسيط الإيجار في <b>${escapeHtml(area.area)}</b> هو <b>${formatKd(area.medianRent)} د.ك/شهر</b>${area.rentalYield != null ? ` — والعائد الإيجاري السنوي المتوقع ${marketChatNum(area.rentalYield, 1)}%` : ""}.` };
+    }
+    if (gov) {
+      const gAreas = marketChatGovAreas(gov).filter((a) => a.medianRent != null);
+      const med = marketChatMedian(gAreas.map((a) => a.medianRent));
+      if (med != null) return { text: `وسيط الإيجار في <b>${escapeHtml(gov)}</b> هو <b>${formatKd(med)} د.ك/شهر</b> (من ${gAreas.reduce((s, a) => s + Number(a.rentCount || 0), 0)} عينة إيجار).` };
+      return { text: `لا توجد بيانات إيجار كافية لمحافظة ${escapeHtml(gov)} بعد.` };
+    }
+    return { text: "اذكر منطقة أو محافظة مع كلمة إيجار — مثال: «متوسط الإيجار في السالمية»." };
+  }
+
+  // العائد (بدون اسم منطقة — نظهر الأعلى)
+  if (q.includes("عائد")) {
+    const pool = areas.filter((a) => a.rentalYield != null && (!gov || marketChatNorm(a.governorate) === marketChatNorm(gov)));
+    if (!pool.length) return { text: "لا توجد مناطق بعائد محسوب بعد — العائد يُحسب عند توفر عينتين على الأقل بيعًا وإيجارًا." };
+    const sorted = pool.slice().sort((a, b) => Number(b.rentalYield) - Number(a.rentalYield)).slice(0, 5);
+    const rows = sorted.map((a) => `
+      <div class="market-chat-row-inline">
+        <b>${escapeHtml(a.area)}</b>
+        <span>${marketChatNum(a.rentalYield, 1)}%</span>
+        <small>${escapeHtml(a.governorate || "")} · ${a.yieldNote === "high" ? "ثقة عالية" : "تقديري"}</small>
+      </div>`).join("");
+    return { text: `${gov ? `أعلى عائد إيجاري في ${escapeHtml(gov)}:` : "أعلى عائد إيجاري سنوي (مناطق):"} <div class="market-chat-list">${rows}</div>` };
+  }
+
+  // مؤشرات الطلب — يُفضَّل مستوى المحافظة عندما لا تكون المنطقة نفسها مسجلة في بيانات الطلب
+  if (q.includes("طلب") || q.includes("مطلوب")) {
+    const totals = demand.totals || {};
+    const demandArea = area
+      ? (demand.areas || []).find((x) => marketChatNorm(x.area) === marketChatNorm(area.area))
+      : null;
+    if (demandArea && Number(demandArea.total || 0) > 0) {
+      return { text: `في <b>${escapeHtml(demandArea.area)}</b>: <b>${marketChatNum(demandArea.buy || 0)} طلب شراء</b> و<b>${marketChatNum(demandArea.rent || 0)} طلب إيجار</b> (الإجمالي ${marketChatNum(demandArea.total || 0)}).` };
+    }
+    if (gov) {
+      const g = (demand.governorates || []).find((x) => marketChatNorm(x.governorate) === marketChatNorm(gov));
+      if (g && Number(g.total || 0) > 0) {
+        const prefix = demandArea ? `لم تُسجَّل طلبات باسم منطقة ${escapeHtml(demandArea.area)} نفسها، لكن ` : "";
+        return { text: `${prefix}في <b>${escapeHtml(g.governorate)}</b>: <b>${marketChatNum(g.buy || 0)} طلب شراء</b> و<b>${marketChatNum(g.rent || 0)} طلب إيجار</b> (الإجمالي ${marketChatNum(g.total || 0)}).` };
+      }
+    }
+    if (demandArea) return { text: `لا توجد طلبات مسجلة في ${escapeHtml(demandArea.area)} بعد.` };
+    if (gov) return { text: `لا توجد طلبات مسجلة في ${escapeHtml(gov)} بعد.` };
+    if (demand.tableOk) {
+      return { text: `إجمالي الطلبات المتراكمة: <b>${marketChatNum(totals.total || 0)}</b> — منها <b>${marketChatNum(totals.buyRequests || 0)} طلب شراء</b> و<b>${marketChatNum(totals.rentRequests || 0)} طلب إيجار</b>. كل طلب عميل محتمل — افتح تبويب «أفضل الفرص» ← «العرض والطلب» للتفاصيل.` };
+    }
+    return { text: "لا توجد بيانات طلبات متراكمة بعد." };
+  }
+
+  // عينات/عدد الإعلانات
+  if (q.includes("عدد") || q.includes("عينات") || q.includes("كم اعلان")) {
+    const totals = data.sampleTotals || {};
+    if (area) return { text: `في <b>${escapeHtml(area.area)}</b>: ${marketChatNum(area.saleCount || 0)} إعلان بيع و${marketChatNum(area.rentCount || 0)} إعلان إيجار.` };
+    if (gov) {
+      const gAreas = marketChatGovAreas(gov);
+      return { text: `في <b>${escapeHtml(gov)}</b>: ${marketChatNum(gAreas.reduce((s, a) => s + Number(a.saleCount || 0), 0))} إعلان بيع و${marketChatNum(gAreas.reduce((s, a) => s + Number(a.rentCount || 0), 0))} إعلان إيجار عبر ${marketChatNum(gAreas.length)} منطقة محللة.` };
+    }
+    return { text: `الحصاد المتراكم: <b>${marketChatNum(totals.sale || 0)} إعلان بيع</b> + <b>${marketChatNum(totals.rent || 0)} إعلان إيجار</b> + <b>${marketChatNum(totals.buyRequests || 0)} طلب شراء</b> + <b>${marketChatNum(totals.rentRequests || 0)} طلب إيجار</b>.` };
+  }
+
+  // مصادر البيانات
+  if (q.includes("مصدر") || q.includes("من اين")) {
+    const sources = data.sources || [];
+    if (!sources.length) return { text: "لا توجد بيانات مصادر في هذه اللقطة بعد." };
+    const rows = sources.slice(0, 6).map((s) => `
+      <div class="market-chat-row-inline">
+        <b>${escapeHtml(s.source)}</b>
+        <span>${marketChatNum(s.count)} إعلان (${marketChatNum(s.sharePct, 1)}%)</span>
+      </div>`).join("");
+    return { text: `مصادر بيانات هذا التحليل (الأعلى تغذية): <div class="market-chat-list">${rows}</div>` };
+  }
+
+  // لم يُفهم السؤال — إرشاد + أمثلة
+  return {
+    text: `لم أتعرف على المطلوب من هذا السؤال ضمن بيانات تحليلات السوق. جرّب صيغة مثل: «متوسط سعر المتر في <منطقة/محافظة>»، «أعلى عائد إيجار»، «كم طلب شراء في <محافظة>»، «اتجاه السوق»، أو «قارن بين <محافظة> و<محافظة>».<br><span class="market-chat-hint">للحصول على تقييم كامل بترتيب النتائج والمصادر استخدم تبويب «البحث والتقييم».</span>`,
+  };
+}
+
+function appendMarketChat(role, html) {
+  const log = $("marketChatLog");
+  if (!log) return;
+  const el = document.createElement("div");
+  el.className = `market-chat-msg ${role}`;
+  el.innerHTML = html;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+function initMarketChat() {
+  const input = $("marketChatInput");
+  const send = $("marketChatSend");
+  const chips = $("marketChatChips");
+  const ask = async () => {
+    const text = input ? input.value.trim() : "";
+    if (!text) return;
+    if (input) input.value = "";
+    appendMarketChat("user", escapeHtml(text));
+    // إن لم تكن البيانات محمَّلة بعد (فتح التبويب لأول مرة) نحمّلها أولًا ثم نجيب
+    if (!insightsState.loaded) {
+      appendMarketChat("bot", "جاري تحميل بيانات تحليلات السوق...");
+      try {
+        await loadInsights();
+      } catch {
+        appendMarketChat("bot", "تعذر تحميل بيانات تحليلات السوق — حاول مجددًا بعد قليل.");
+        return;
+      }
+    }
+    const answer = answerMarketQuestion(text);
+    appendMarketChat("bot", answer.text);
+  };
+  if (send) send.addEventListener("click", ask);
+  if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter") ask(); });
+  if (chips) {
+    chips.innerHTML = MARKET_CHAT_SUGGESTIONS
+      .map((s) => `<button type="button" class="market-chat-chip" data-q="${escapeHtml(s)}">${escapeHtml(s)}</button>`)
+      .join("");
+    chips.querySelectorAll("[data-q]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (input) input.value = btn.dataset.q;
+        ask();
+      });
+    });
+  }
+}
+
 async function boot() {
   initTheme();
   applySimpleMode();
@@ -6213,6 +7372,8 @@ async function boot() {
   populateAdvancedOptions();
   initAreaChips();
   initDealSimulator();
+  initMetricsRegistry();
+  initMarketChat();
   // تفعيل أزرار تبديل الخريطة الحرارية وحالة الوضع المحفوظ عند الإقلاع
   // (النقر عبر المعالج المفوض [data-heat-mode] في bind)
   document.querySelectorAll(".heatmap-mode-switch .mode-btn").forEach((btn) => {

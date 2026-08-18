@@ -54,6 +54,7 @@
       <button class="main-tab" data-main-tab="insights" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg> <span class="tab-full">تحليلات السوق</span><span class="tab-short">التحليلات</span> <b class="main-tab-count" id="tabCountInsights"></b></button>
       <button class="main-tab" data-main-tab="developments" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg> <span class="tab-full">التطورات</span><span class="tab-short">التطورات</span> <b class="main-tab-count" id="tabCountDevelopments"></b></button>
       <button class="main-tab" data-main-tab="why-free" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16l4-6 3 3 5-7"/><path d="M14 6h5v5"/></svg> <span class="tab-full">لماذا مجاني وأدق</span><span class="tab-short">مجاني وأدق</span></button>
+      <button class="main-tab" data-main-tab="metrics" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg> <span class="tab-full">سجل المقاييس</span><span class="tab-short">المقاييس</span> <b class="main-tab-count" id="tabCountMetrics"></b></button>
     </nav>
 
     <section class="action-toolbar" data-main-panel="search">
@@ -155,6 +156,12 @@
               <span>اضغط المحافظة لفتح مناطقها، أو اضغط أي رقم لعرض الإعلانات الفعلية خلفه بأدلتها ومصادرها، أو أي إعلان لفتح تفاصيله الكاملة.</span>
             </div>
             <div class="gov-title-actions">
+              <div class="gov-view-switch" role="group" aria-label="طريقة عرض الأرقام حسب المحافظات">
+                <button type="button" class="gov-view-btn active" data-gov-view="grid">شبكة</button>
+                <button type="button" class="gov-view-btn" data-gov-view="table">جدول مضغوط</button>
+              </div>
+              <button id="govExportCsvBtn" class="board-mini-btn" type="button" title="تصدير أرقام المحافظات والمناطق الحالية إلى CSV بترميز UTF-8 يعمل مع Excel" hidden>⬇ تصدير CSV</button>
+              <button id="govCopyBtn" class="board-mini-btn" type="button" title="نسخ الأرقام الحالية إلى الحافظة بصيغة TSV — الصق مباشرة في Excel" hidden>📋 نسخ</button>
               <span id="govAxisPill" class="axis-pill">المحور: حركة الدلال</span>
               <button id="govClearSelectionsBtn" class="board-mini-btn" type="button">مسح اختيارات اللوحة</button>
             </div>
@@ -174,6 +181,22 @@
         </div>
         <span id="insightsMeta" class="filter-summary"></span>
       </div>
+
+      <div class="market-chat">
+        <div class="section-title compact-title market-chat-title">
+          <div>
+            <h3>اسأل السوق — إجابة فورية</h3>
+            <span>سؤال سريع عن الحصاد المتراكم (سعر المتر، الإيجار، العائد، الطلب) من تحليلات السوق نفسها — بدون تشغيل بحث كامل.</span>
+          </div>
+        </div>
+        <div class="market-chat-row">
+          <input id="marketChatInput" type="text" placeholder="مثال: متوسط سعر المتر في الجهراء · أعلى منطقة عائد · كم طلب شراء في الأحمدي" autocomplete="off">
+          <button id="marketChatSend" class="primary" type="button">اسأل</button>
+        </div>
+        <div class="market-chat-chips" id="marketChatChips" aria-label="أسئلة جاهزة"></div>
+        <div id="marketChatLog" class="market-chat-log" aria-live="polite"></div>
+      </div>
+
       <div class="section-title compact-title heatmap-title">
         <div>
           <h3>خريطة حرارية للمناطق</h3>
@@ -390,6 +413,12 @@
             <span>يومية / أسبوعية / شهرية / سنوية + توقعات الأسعار، بربط مباشر بالعملاء المحتملين</span>
           </div>
           <div class="opp-head-actions">
+            <div class="gov-view-switch" id="oppViewSwitch" role="group" aria-label="طريقة عرض الفرص">
+              <button type="button" class="gov-view-btn active" data-opp-view="grid">شبكة</button>
+              <button type="button" class="gov-view-btn" data-opp-view="table">جدول مضغوط</button>
+            </div>
+            <button id="oppExportCsvBtn" class="board-mini-btn" type="button" title="تصدير الفرص الحالية إلى CSV بترميز UTF-8 يعمل مع Excel" hidden>⬇ تصدير CSV</button>
+            <button id="oppCopyBtn" class="board-mini-btn" type="button" title="نسخ الفرص الحالية إلى الحافظة بصيغة TSV — الصق مباشرة في Excel" hidden>📋 نسخ</button>
             <span class="opp-schedule-note">الصفحة الرئيسية = أفضل الفرص اليومية · تتحدث يوميًا في 6:00 صباحًا</span>
             <span id="oppUpdated" class="opp-updated"></span>
             <button id="oppRefreshBtn" class="primary">تحديث الفرص</button>
@@ -589,6 +618,31 @@
         </div>
         <p class="scope-note">آخر تحقق من الأسعار: أغسطس 2026. حيث لا تنشر المنصة سعرًا ثابتًا (مثل باقات 4Sale) نكتب ذلك كما تنص صفحتها الرسمية — الشفافية تشمل أرقامنا نحن أيضًا.</p>
       </section>
+
+      <section class="metrics-panel" data-main-panel="metrics">
+        <div class="section-title">
+          <div>
+            <h2>سجل تعريفات المقاييس</h2>
+            <span>كل رقم يظهر في المنصة — صيغته ومصدره ومن اعتمده. مرجع داخلي موحد لفريق البيانات.</span>
+          </div>
+          <span class="filter-summary" id="metricsMeta"></span>
+        </div>
+
+        <div class="metrics-toolbar">
+          <label class="metrics-search">
+            <span>ابحث في السجل</span>
+            <input id="metricsFilter" type="text" placeholder="اكتب اسم مقياس أو كلمة من الصيغة… مثل: عائد، ثقة، سعر المتر" autocomplete="off">
+          </label>
+          <div class="metrics-legend">
+            <i class="legend-swatch legend-approved"></i>معتمد — فريق بيانات الفريج
+            <i class="legend-swatch legend-auto"></i>محسوب تلقائيًا من الحصاد
+          </div>
+        </div>
+
+        <div id="metricsRoot" class="metrics-root">
+          <div class="empty">جاري تحميل سجل المقاييس...</div>
+        </div>
+      </section>
   </main>
 
   <template id="resultTemplate">
@@ -774,6 +828,8 @@
     </aside>
   </div>
 
-  <script src="app.js?v=20260816-accounts-portfolio-platform-dates"></script>
+  <script src="components/hover-card.js"></script>
+  <script src="components/a11y-enhancements.js"></script>
+  <script src="app.js?v=20260818-hover-a11y"></script>
 </body>
 </html>

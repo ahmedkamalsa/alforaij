@@ -29,9 +29,13 @@ from backend.services.supabase_store import (
     supabase_data_summary,
 )
 from backend.services.valuation import enrich_rankings
+from backend.services.security import SecurityMiddleware
 
 
 from backend.services.ai_evaluator import generate_professional_analysis
+
+# إعداد طبقة الأمان المركزية
+_security = SecurityMiddleware()
 
 # ذاكرة مؤقتة للفرص (تُحدَّث أول بأول): تُبنى عند أول طلب وتُعاد لفترة قصيرة
 import threading as _threading
@@ -182,74 +186,17 @@ def _dashboard_record(listing) -> dict:
     }
 
 
-def _area_governorate_map(listings) -> dict[str, str]:
-    """خريطة منطقة ← محافظة بقيم مطبّعة (اسم محافظة موحّد)، حتى لا تصل قيمة
-    غير مطبّعة مثل «محافظة الاحمدي» إلى سجلات السوق التي تكمل محافظتها من هنا."""
-    mapping = {}
-    for row in listings:
-        if row.area and row.governorate and row.area not in mapping:
-            mapping[row.area] = _normalize_governorate_name(row.governorate)
-    return mapping
-
-
-_GOVERNORATE_ALIASES = {
-    "الأحمدي": "محافظة الأحمدي",
-    "احمدي": "محافظة الأحمدي",
-    "الاحمدي": "محافظة الأحمدي",
-    "محافظة الاحمدي": "محافظة الأحمدي",
-    "حولي": "محافظة حولي",
-    "الجهراء": "محافظة الجهراء",
-    "العاصمة": "محافظة العاصمة",
-    "الفروانية": "محافظة الفروانية",
-    "مبارك الكبير": "محافظة مبارك الكبير",
-}
-
-
-def _normalize_governorate_name(value: str) -> str:
-    clean = str(value or "").strip()
-    if not clean:
-        return ""
-    canonical = _GOVERNORATE_CANONICAL.get(_governorate_key(clean))
-    if canonical:
-        return canonical
-    if clean in _GOVERNORATE_ALIASES:
-        return _GOVERNORATE_ALIASES[clean]
-    if clean.startswith("محافظة "):
-        return clean
-    return clean
-
-
-# يوحّد همزات/تاء مربوطة في أسماء المحافظات حتى لا يتكرر «محافظة الأحمدي» و«الاحمدي» كصفين
-_ARABIC_GOV_NORM = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ى": "ي", "ة": "ه"})
-
-
-def _governorate_key(value: str) -> str:
-    clean = str(value or "").strip()
-    if clean.startswith("محافظة "):
-        clean = clean[len("محافظة "):]
-    return clean.translate(_ARABIC_GOV_NORM).strip()
-
-
-_GOVERNORATE_CANONICAL = {
-    "الاحمدي": "محافظة الأحمدي",
-    "حولي": "محافظة حولي",
-    "الجهراء": "محافظة الجهراء",
-    "العاصمة": "محافظة العاصمة",
-    "الفروانية": "محافظة الفروانية",
-    "مبارك الكبير": "محافظة مبارك الكبير",
-}
-
-
-def _normalize_dashboard_place(record: dict, area_map: dict[str, str]) -> None:
-    area = str(record.get("area") or "").strip()
-    governorate = str(record.get("governorate") or "").strip()
-    if governorate:
-        record["governorate"] = _normalize_governorate_name(governorate)
-    if not record.get("governorate") and area in area_map:
-        record["governorate"] = area_map[area]
-    elif not record.get("governorate") and area in _GOVERNORATE_ALIASES:
-        record["governorate"] = _normalize_governorate_name(area)
-        record["area"] = ""
+# تطبيع المكان (منطقة ← محافظة بنفس الصيغ الكنسية) مشترك في
+# backend/services/request_parser.py — اللوحة وتحليلات السوق تبنيان دلاءهما منه
+# نفس الخريطة المعتمدة. هنا أسماء مستعارة بنفس الأسماء الداخلية السابقة حتى لا
+# تتغير بقية الاستدعاءات ولا اختبارات الخريطة.
+from backend.services.request_parser import (  # noqa: E402
+    GOVERNORATE_ALIASES as _GOVERNORATE_ALIASES,
+    area_governorate_map as _area_governorate_map,
+    dashboard_area_key as _dashboard_area_key,
+    normalize_dashboard_place as _normalize_dashboard_place,
+    normalize_governorate_name as _normalize_governorate_name,
+)
 
 
 def _platform_match(source: str, selected: set[str]) -> bool:
@@ -653,8 +600,11 @@ def json_response(handler: BaseHTTPRequestHandler, payload: dict, status: int = 
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
     handler.send_header("Access-Control-Allow-Origin", "*")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    # رؤوس الأمان (CSP + XSS protection)
+    for header, value in _security.get_headers().items():
+        handler.send_header(header, value)
     handler.end_headers()
     handler.wfile.write(body)
 
@@ -869,6 +819,17 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 logger.exception("Market demand failed")
                 json_response(self, {"error": "Market demand failed", "detail": str(exc)}, status=500)
+            return
+        if path == "/api/metric-registry":
+            # سجل تعريفات المقاييس الموثق — كل رقم يظهر في المنصة بصيغته ومصدره
+            # ومعتمده. الصيغ الرقمية مبنية من ثوابت المحرك الفعلية (لا نصوص منسوخة)،
+            # فيتزامن السجل تلقائيًا مع أي تغيير في منطق الحساب.
+            from backend.services.metric_registry import build_metric_registry
+            try:
+                json_response(self, build_metric_registry())
+            except Exception as exc:
+                logger.exception("Metric registry failed")
+                json_response(self, {"error": "Metric registry failed", "detail": str(exc)}, status=500)
             return
         if path == "/api/dashboard/summary":
             params = parse_qs(urlparse(self.path).query)
@@ -1119,7 +1080,7 @@ class Handler(BaseHTTPRequestHandler):
             json_response(self, {"error": "Invalid JSON"}, status=400)
             return
         path = urlparse(self.path).path
-        text = str(payload.get("text") or "")
+        text = _security.sanitize(str(payload.get("text") or ""))
         if path == "/api/parse":
             json_response(self, {"request": parse_request(text).__dict__})
             return

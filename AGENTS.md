@@ -19,7 +19,12 @@
 - `scripts/run_mobile_checks.py` and `scripts/run_performance_checks.py` manage server lifecycle themselves (start → health wait → stop). Performance bounds: cold ≤8s, warm ≤2s (typical first load ~870ms).
 - pypdf extracts Arabic as **presentation forms** — normalize with `unicodedata.normalize("NFKC", ...)` before string comparisons in tests.
 
+## CI / GitHub Actions quirks
+- `GITHUB_STEP_SUMMARY` Markdown links resolve relative to the **repository root** on GitHub.com, not the script's filesystem path. Use `docs/foo.md`, not `../docs/foo.md`.
+- Daily scripts (`check_harvest_governorates.py`, `send_opportunity_alerts.py`) share an `_emit()` pattern: writes to `GITHUB_STEP_SUMMARY` if set, else stdout. Both are called from `.github/workflows/daily-data-update.yml`.
+
 ## Architecture & constraints
+- **area_governorate_map import chain**: `main.py` re-exports `_area_governorate_map`, `_normalize_dashboard_place`, `_normalize_governorate_name` from `request_parser.py` (with `_` prefix aliases, `# noqa: E402`). Tests and scripts import from `main.py`, not directly from `request_parser.py`. If you move these functions, update 12+ import sites across `tests/` and `scripts/`.
 - Deliberately dependency-free: stdlib Python + static HTML/JS/CSS. **No package.json, no Tailwind, no Node build** — don't add dependencies.
 - Deployed sites are static snapshots (`STATIC_SNAPSHOT_MODE`): no live API on hosted URLs — all numbers visitors see are snapshot data. The live backend (`http.server` stdlib, port 8000) is not hosted anywhere.
 - A PDF report subsystem exists and is tested: `backend/services/pdf_report.py` (reportlab + arabic_reshaper/bidi, Tahoma→DejaVu→Helvetica fallback) with `tests/test_pdf_report.py` (9 tests) — including a dedicated demand-indicator page when the report carries `demandIndicators` and generators in `scripts/generate_*_pdf.py`; `reports/*.pdf` are git-tracked deliverables. It loads logos from `frontend/assets/` via `__file__` (not CWD) — deleting/moving those PNGs silently degrades headers to a drawn «ف» fallback.
