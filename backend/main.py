@@ -1183,6 +1183,20 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/analyze":
             job_id = str(payload.get("jobId") or "")
             _progress_push(job_id, "parse", "تحليل الطلب وفهم النية والمنطقة والنوع")
+            # فحص صلاحية البحث على الخادم (Server-side tier check)
+            from backend.services.server_tier import authorize_request, record_usage, extract_user_from_token
+            token = self.headers.get("Authorization", "").replace("Bearer ", "")
+            user = extract_user_from_token(token)
+            user_id = user["user_id"] if user else ""
+            auth_result = authorize_request(user_id, "search")
+            if not auth_result["authorized"]:
+                json_response(self, {
+                    "error": "tier_limit",
+                    "message": auth_result["message"],
+                    "tier": auth_result["tier"],
+                    "upgrade": auth_result.get("upgrade"),
+                }, status=403)
+                return
             try:
                 request = parse_request(text)
                 if payload.get("mode") in {"search", "valuation", "search_and_value"}:
@@ -1342,6 +1356,11 @@ class Handler(BaseHTTPRequestHandler):
                     report["demandIndicators"] = {"count": 0, "buyRequests": 0, "rentRequests": 0, "scope": "", "items": []}
 
                 _progress_push(job_id, "done", f"اكتمل التقرير — {len(deduped)} نتيجة", results=len(deduped))
+                # تسجيل الاستخدام بعد البحث الناجح
+                try:
+                    record_usage(user_id, "search")
+                except Exception:
+                    pass
                 json_response(self, report)
             except Exception as exc:
                 logger.exception("Analysis failed")
@@ -1434,6 +1453,44 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 logger.exception("Official transactions import failed")
                 json_response(self, {"status": "failed", "error": str(exc)}, status=500)
+            return
+        if path == "/api/tier/status":
+            # حالة خطتك الحالية: الخطة والاستخدام اليومي والحدود المتبقية
+            from backend.services.server_tier import get_tier_limits, extract_user_from_token
+            token = self.headers.get("Authorization", "").replace("Bearer ", "")
+            user = extract_user_from_token(token)
+            user_id = user["user_id"] if user else ""
+            json_response(self, get_tier_limits(user_id))
+            return
+        if path == "/api/tier/upgrade":
+            # ترقية الخطة: يتطلب JWT صالح
+            from backend.services.server_tier import upgrade_user, extract_user_from_token
+            token = self.headers.get("Authorization", "").replace("Bearer ", "")
+            user = extract_user_from_token(token)
+            if not user:
+                json_response(self, {"error": "غير مصرح — سجّل الدخول أولاً"}, status=401)
+                return
+            new_tier = str(payload.get("tier") or "")
+            if not new_tier:
+                json_response(self, {"error": "حدد الخطة الجديدة"}, status=400)
+                return
+            result = upgrade_user(user["user_id"], new_tier)
+            json_response(self, result, status=200 if "error" not in result else 400)
+            return
+        if path == "/api/tier/authorize":
+            # فحص صلاحية ميزة: يتطلب JWT أو يُعيد حالة "مجاني" للمستخدمين غير المسجلين
+            from backend.services.server_tier import authorize_request, extract_user_from_token
+            token = self.headers.get("Authorization", "").replace("Bearer ", "")
+            user = extract_user_from_token(token)
+            user_id = user["user_id"] if user else ""
+            feature = str(payload.get("feature") or "search")
+            result = authorize_request(user_id, feature)
+            json_response(self, result)
+            return
+        if path == "/api/tier/pricing":
+            # عرض الخطط والأسعار (للصفحة العامة)
+            from backend.services.tier import list_tiers
+            json_response(self, {"tiers": list_tiers()})
             return
         json_response(self, {"error": "Unknown endpoint"}, status=404)
 
