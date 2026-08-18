@@ -105,7 +105,8 @@ class MarketInsightsTests(unittest.TestCase):
         hawally = areas["حولي"]
         self.assertAlmostEqual(hawally["rentalYield"], 5.0, places=1)
         self.assertEqual(hawally["medianSalePerM2"], 2000.0)
-        self.assertEqual(hawally["governorate"], "حولي")  # مستنتجة من خريطة المحلل
+        # نفس خريطة اللوحة المعتمدة: «حولي» كمنطقة تُحسم لمحافظتها الكنسية
+        self.assertEqual(hawally["governorate"], "محافظة حولي")
         self.assertIsNone(areas["الفروانية"]["rentalYield"])
         self.assertIsNone(areas["المنقف"]["rentalYield"])  # إيجار واحد → حارس الموثوقية
         self.assertEqual(result["sampleTotals"], {"sale": 7, "rent": 3, "buyRequests": 0, "rentRequests": 0})

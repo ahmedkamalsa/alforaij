@@ -11,6 +11,14 @@
 جداول قاعدة البيانات، الواجهة والتبويبات، الوكيل اليومي، مبادئ التقييم، الاختبارات،
 والنشر. أي وكيل أو مطوّر جديد يبدأ منه بدل إعادة اكتشاف المشروع.
 
+كل رقم يظهر في المنصة موثق بصيغته ومصدره في **[docs/source.md](docs/source.md)** — مرجع المطورين
+خارج الواجهة، مولَّد تلقائيًا من نفس مصدر `/api/metric-registry` (لا تنسخ الأرقام يدويًا).
+بعد أي تغيير في ثوابت الحساب أعد توليده:
+
+```bash
+python scripts/export_metric_registry_md.py
+```
+
 ## التشغيل
 
 ```powershell
@@ -69,6 +77,35 @@ taskkill //F //PID <PID>
 ```powershell
 cd D:\foraj_social\287\alforaij-research-assistant
 python -m unittest discover -s tests
+```
+
+### سلسلة ضمانات المناطق والمحافظات
+
+لوحة السوق وتحليلاتها تعتمدان على خريطة «منطقة ← محافظة» موحدة. **[docs/MAP_GUARANTEES.md](docs/MAP_GUARANTEES.md)** يوثّق أربع طبقات اختبارات مترابطة تمنع انقسام الدلاء وكدس المناطق تحت «غير محددة» — مع قصة أخطاء حقيقية كسرتها.
+
+| الطبقة | الملفات | ماذا تضمن |
+|---|---|---|
+| 1. الخريطة المعتمدة | `AREA_TO_GOVERNORATE` · `tests/test_area_governorate_map.py` | كل منطقة في محافظة واحدة فقط |
+| 2. الإحداثيات | `data/kuwait_areas.json` · `tests/test_kuwait_areas_coords.py` | نقاط الخريطة التفاعلية متوافقة مع الخريطة |
+| 3. الحصاد الحي | `market_listings` · `tests/test_market_listings_governorates.py` · `scripts/check_harvest_governorates.py` | أي منطقة جديدة تصل يوميًا تُحل فورًا |
+| 4. قائمة المعرفة | `KNOWN_AREAS` · `AREA_ALIASES` · داخل اختبارات الطبقات 1–3 | كل اسم في الكشف النصي له إسناد |
+
+#### تشغيل الاختبارات
+
+```bash
+# الطبقات الأربع (الحي يتخطى افتراضيًا):
+PYTHONIOENCODING=utf-8 python -m unittest \
+  tests.test_area_governorate_map \
+  tests.test_kuwait_areas_coords \
+  tests.test_market_listings_governorates \
+  tests.test_check_harvest_governorates
+
+# مع الفحص الحي (يتطلب Supabase مهيأة):
+ALFORAIJ_TEST_ALLOW_SUPABASE=1 PYTHONIOENCODING=utf-8 python -m unittest \
+  tests.test_market_listings_governorates
+
+# الفحص اليومي (رمز الخروج 1 عند منطقة بلا إسناد):
+PYTHONIOENCODING=utf-8 python scripts/check_harvest_governorates.py
 ```
 
 ## تحديث بيانات الفريج المحلية

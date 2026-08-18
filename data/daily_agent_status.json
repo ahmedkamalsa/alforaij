@@ -1,8 +1,8 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-18T03:35:25",
-  "finishedAt": "2026-08-18T03:37:40",
+  "startedAt": "2026-08-17T06:00:02",
+  "finishedAt": "2026-08-17T06:03:12",
   "steps": [
     {
       "name": "sync_source_registry",
@@ -34,7 +34,7 @@
       "result": {
         "count": 5,
         "reachable": 0,
-        "blocked": 5
+        "blocked": 4
       }
     },
     {
@@ -57,7 +57,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 418,
+        "totalScored": 414,
         "includeExternal": true
       }
     },
@@ -66,7 +66,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 474,
+        "count": 538,
         "error": ""
       }
     },
@@ -75,7 +75,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 494,
+        "count": 521,
         "error": ""
       }
     },
@@ -85,7 +85,7 @@
       "result": {
         "status": "swept",
         "days": 14,
-        "cutoff": "2026-08-04T03:36:45.237991+00:00",
+        "cutoff": "2026-08-03T03:01:52.817212+00:00",
         "error": "",
         "count": null
       }
@@ -95,8 +95,8 @@
       "status": "ok",
       "result": {
         "status": "deduped",
-        "groups": 1,
-        "marked": 1,
+        "groups": 2,
+        "marked": 2,
         "error": ""
       }
     },
@@ -105,7 +105,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 254,
+        "count": 262,
         "error": ""
       }
     },
@@ -114,10 +114,10 @@
       "status": "ok",
       "result": {
         "status": "success",
-        "count": 9,
+        "count": 7,
         "local": "saved",
         "database": "saved",
-        "note": "جمع 9 تطورًا، 5/11 مصادر عقارية"
+        "note": "جمع 7 تطورًا، 3/11 مصادر عقارية"
       }
     },
     {
@@ -125,7 +125,7 @@
       "status": "ok",
       "result": {
         "added": 16,
-        "removed": 17,
+        "removed": 14,
         "priceDrops": 0
       }
     },
@@ -144,11 +144,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "marketListingsHarvested": 474,
-    "opportunitiesScored": 418,
+    "marketListingsHarvested": 538,
+    "opportunitiesScored": 414,
     "notificationCounts": {
       "added": 16,
-      "removed": 17,
+      "removed": 14,
       "priceDrops": 0
     },
     "whatsappAlerts": {
@@ -221,8 +221,8 @@
     "candidatePlatforms": {
       "count": 5,
       "reachable": 0,
-      "blocked": 5,
-      "discontinued": 0,
+      "blocked": 4,
+      "discontinued": 1,
       "sources": [
         {
           "id": "aqarmap_kw",
@@ -230,8 +230,8 @@
           "url": "https://aqarmap.com/kw/",
           "kind": "marketplace",
           "role": "بحث وتقييم عند إعادة تفعيل النسخة الكويتية (متوقفة حاليًا — يعيد بوابة مصر).",
-          "status": "unreachable",
-          "detail": "HTTP Error 403: Forbidden"
+          "status": "discontinued",
+          "detail": "الموقع يعيد بوابة مصر حاليًا (النسخة الكويتية متوقفة)"
         },
         {
           "id": "bayut_kw",
@@ -249,7 +249,7 @@
           "kind": "official",
           "role": "تأكيد الموقع/المنطقة/القطعة؛ غير قابل للوصول من شبكات الخوادم حاليًا.",
           "status": "unreachable",
-          "detail": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1032)>"
+          "detail": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1028)>"
         },
         {
           "id": "propertyfinder_kw",
@@ -258,7 +258,7 @@
           "kind": "marketplace",
           "role": "بحث وتقييم عند توفر الوصول (محجوب جغرافيًا من شبكات الخوادم حاليًا).",
           "status": "unreachable",
-          "detail": "<urlopen error [Errno 111] Connection refused>"
+          "detail": "<urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
         },
         {
           "id": "e_gov_kw_portal",
@@ -285,13 +285,13 @@
         "market_listings": {
           "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
           "available": true,
-          "count": 1721,
+          "count": 1600,
           "status": "ok"
         },
         "price_trends": {
           "label": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
           "available": true,
-          "count": 363,
+          "count": 360,
           "status": "ok"
         },
         "market_ads": {
@@ -315,19 +315,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 728,
+          "count": 726,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 5513,
+          "count": 5475,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 68423,
+          "count": 68032,
           "status": "ok"
         },
         "client_leads": {
@@ -345,13 +345,13 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 390,
+          "count": 385,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 461,
+          "count": 459,
           "status": "ok"
         }
       },

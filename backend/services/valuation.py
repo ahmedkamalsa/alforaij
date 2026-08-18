@@ -10,6 +10,31 @@ from backend.models import Listing, PropertyRequest, RankedListing
 from backend.services.official_valuation import calculate_valuation, assess_deal_quality, derive_market_benchmark
 from backend.services.request_parser import extract_rental_income
 
+# ── ثوابت الحساب الموثقة — يقرأها سجل تعريفات المقاييس (/api/metric-registry) ──
+# مصدر حي واحد للحقيقة: أي تغيير هنا ينعكس تلقائيًا في السجل الموثق أمام المستخدم.
+REC_MATCH_WEIGHT = 0.62          # وزن مطابقة الطلب في درجة التوصية
+REC_DEAL_WEIGHT = 0.28           # وزن جاذبية السعر
+REC_CONFIDENCE_WEIGHT = 0.10     # وزن الثقة
+REC_WARNING_PENALTY = 3          # نقاط تُخصم لكل تحذير نقص بيانات
+REC_MAX_PENALTY = 12             # سقف خصم تحذيرات نقص البيانات
+
+CONFIDENCE_BASE = 0.5            # أساس الثقة بلا مقارنات
+CONFIDENCE_PER_COMPARABLE = 0.06  # زيادة الثقة لكل مقارنة سعرية
+CONFIDENCE_MAX = 0.9             # سقف الثقة من المقارنات السوقية
+CONFIDENCE_OFFICIAL = 0.85       # رفع الثقة مع مؤشر رسمي
+CONFIDENCE_OFFICIAL_TRANSACTIONS = 0.9  # رفع الثقة مع صفقات رسمية مسجلة
+
+# حدود عدالة السعر (بيع وإيجار): (أقصى نسبة إلى الوسيط، درجة الجاذبية)
+# النسبة الأكبر من آخر حد تأخذ DEAL_SCORE_OVER.
+DEAL_SCORE_BANDS = (
+    (0.82, 100),   # ≤0.82 → ممتاز
+    (0.92, 88),    # ≤0.92 → أقل من السوق
+    (1.08, 74),    # ≤1.08 → عادل
+    (1.18, 58),    # ≤1.18 → أعلى قليلًا
+    (1.35, 38),    # ≤1.35 → غالي
+)
+DEAL_SCORE_OVER = 20             # >1.35 → مبالغ فيه
+
 
 @dataclass
 class ValuationResult:
@@ -236,31 +261,31 @@ def _rental_price_label(target: Listing, comps: list[Listing]) -> ValuationResul
             rental_yield_percent=yield_pct,
         )
 
-    # عدالة الإيجار: نسبة الإيجار المطلوب إلى وسيط إيجارات المنطقة
-    if ratio <= 0.82:
+    # عدالة الإيجار: نسبة الإيجار المطلوب إلى وسيط إيجارات المنطقة — نفس حدود DEAL_SCORE_BANDS
+    if ratio <= DEAL_SCORE_BANDS[0][0]:
         label = "إيجار ممتاز"
         reason = f"الإيجار أقل من وسيط إيجارات المنطقة بوضوح: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
-        deal_score = 100
-    elif ratio <= 0.92:
+        deal_score = DEAL_SCORE_BANDS[0][1]
+    elif ratio <= DEAL_SCORE_BANDS[1][0]:
         label = "أقل من السوق"
         reason = f"الإيجار أقل من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
-        deal_score = 88
-    elif ratio <= 1.08:
+        deal_score = DEAL_SCORE_BANDS[1][1]
+    elif ratio <= DEAL_SCORE_BANDS[2][0]:
         label = "إيجار عادل"
         reason = f"الإيجار قريب من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
-        deal_score = 74
-    elif ratio <= 1.18:
+        deal_score = DEAL_SCORE_BANDS[2][1]
+    elif ratio <= DEAL_SCORE_BANDS[3][0]:
         label = "أعلى قليلاً"
         reason = f"الإيجار أعلى قليلًا من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
-        deal_score = 58
-    elif ratio <= 1.35:
+        deal_score = DEAL_SCORE_BANDS[3][1]
+    elif ratio <= DEAL_SCORE_BANDS[4][0]:
         label = "غالي"
         reason = f"الإيجار أعلى بوضوح من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
-        deal_score = 38
+        deal_score = DEAL_SCORE_BANDS[4][1]
     else:
         label = "مبالغ فيه"
         reason = f"الإيجار أعلى كثيرًا من وسيط إيجارات المنطقة: {monthly:,.0f} د.ك/شهر مقابل وسيط {median_rent:,.0f} د.ك/شهر."
-        deal_score = 20
+        deal_score = DEAL_SCORE_OVER
 
     basis = f"المقارنة تمت داخل {scope} على الإيجار الشهري للعروض المشابهة"
     if target.space and median_rent_sqm:
@@ -268,11 +293,11 @@ def _rental_price_label(target: Listing, comps: list[Listing]) -> ValuationResul
     if yield_pct is not None and capital_note:
         basis += f"، والعائد الإيجاري السنوي المتوقع {yield_pct:.1f}% (الإيجار السنوي {annual:,.0f} د.ك ÷ قيمة العقار التقديرية {capital_value:,.0f} د.ك — {capital_note})"
     reason = f"{reason} {basis}."
-    confidence = min(0.9, 0.5 + len(clean) * 0.06)
+    confidence = min(CONFIDENCE_MAX, CONFIDENCE_BASE + len(clean) * CONFIDENCE_PER_COMPARABLE)
     if capital_kind == "official_transactions":
-        confidence = max(confidence, 0.9)
+        confidence = max(confidence, CONFIDENCE_OFFICIAL_TRANSACTIONS)
     elif capital_kind == "official":
-        confidence = max(confidence, 0.85)
+        confidence = max(confidence, CONFIDENCE_OFFICIAL)
     return ValuationResult(
         label=label,
         reason=reason,
@@ -493,32 +518,32 @@ def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
     else:
         basis += "، لأن مساحة هذا الإعلان غير مذكورة لم يُحسب سعر المتر"
 
-    if ratio <= 0.82:
+    if ratio <= DEAL_SCORE_BANDS[0][0]:
         label = "لقطة ممتازة"
         reason = f"السعر أقل من وسيط المقارنات بنسبة كبيرة: {price:,.0f} د.ك مقابل وسيط {market:,.0f} د.ك. {basis}."
-        deal_score = 100
-    elif ratio <= 0.92:
+        deal_score = DEAL_SCORE_BANDS[0][1]
+    elif ratio <= DEAL_SCORE_BANDS[1][0]:
         label = "أقل من السوق"
         reason = f"السعر أقل من وسيط المقارنات: {price:,.0f} د.ك مقابل وسيط {market:,.0f} د.ك. {basis}."
-        deal_score = 88
-    elif ratio <= 1.08:
+        deal_score = DEAL_SCORE_BANDS[1][1]
+    elif ratio <= DEAL_SCORE_BANDS[2][0]:
         label = "سعر عادل"
         reason = f"السعر قريب من وسيط المقارنات: {price:,.0f} د.ك مقابل وسيط {market:,.0f} د.ك. {basis}."
-        deal_score = 74
-    elif ratio <= 1.18:
+        deal_score = DEAL_SCORE_BANDS[2][1]
+    elif ratio <= DEAL_SCORE_BANDS[3][0]:
         label = "أعلى قليلاً"
         reason = f"السعر أعلى قليلًا من وسيط المقارنات: {price:,.0f} د.ك مقابل وسيط {market:,.0f} د.ك. {basis}."
-        deal_score = 58
-    elif ratio <= 1.35:
+        deal_score = DEAL_SCORE_BANDS[3][1]
+    elif ratio <= DEAL_SCORE_BANDS[4][0]:
         label = "غالي"
         reason = f"السعر أعلى بوضوح من وسيط المقارنات: {price:,.0f} د.ك مقابل وسيط {market:,.0f} د.ك. {basis}."
-        deal_score = 38
+        deal_score = DEAL_SCORE_BANDS[4][1]
     else:
         label = "مبالغ فيه"
         reason = f"السعر أعلى كثيرًا من وسيط المقارنات: {price:,.0f} د.ك مقابل وسيط {market:,.0f} د.ك. {basis}."
-        deal_score = 20
+        deal_score = DEAL_SCORE_OVER
 
-    confidence = min(0.9, 0.5 + len(clean) * 0.06)
+    confidence = min(CONFIDENCE_MAX, CONFIDENCE_BASE + len(clean) * CONFIDENCE_PER_COMPARABLE)
     return ValuationResult(
         label=label,
         reason=reason,
@@ -554,16 +579,16 @@ def _try_seed_override(target: Listing, market: float, price: float, evidence: l
 
 
 def recommendation_breakdown(match_score: float, valuation: ValuationResult, warnings: list[str]) -> tuple[float, list[dict[str, Any]]]:
-    match_points = round(match_score * 0.62, 1)
-    deal_points = round(valuation.deal_score * 0.28, 1)
-    confidence_points = round(valuation.confidence * 10, 1)
-    missing_penalty = min(12, len(warnings) * 3)
+    match_points = round(match_score * REC_MATCH_WEIGHT, 1)
+    deal_points = round(valuation.deal_score * REC_DEAL_WEIGHT, 1)
+    confidence_points = round(valuation.confidence * (REC_CONFIDENCE_WEIGHT * 100), 1)
+    missing_penalty = min(REC_MAX_PENALTY, len(warnings) * REC_WARNING_PENALTY)
     total = round(max(0, min(100, match_points + deal_points + confidence_points - missing_penalty)), 1)
     return total, [
-        {"name": "مطابقة الطلب", "value": match_score, "weight": "62%", "points": match_points},
-        {"name": "جاذبية السعر", "value": valuation.deal_score, "weight": "28%", "points": deal_points},
-        {"name": "الثقة", "value": round(valuation.confidence * 100), "weight": "10%", "points": confidence_points},
-        {"name": "خصم نقص البيانات", "value": len(warnings), "weight": "3 نقاط لكل تحذير حتى 12", "points": -missing_penalty},
+        {"name": "مطابقة الطلب", "value": match_score, "weight": f"{int(REC_MATCH_WEIGHT * 100)}%", "points": match_points},
+        {"name": "جاذبية السعر", "value": valuation.deal_score, "weight": f"{int(REC_DEAL_WEIGHT * 100)}%", "points": deal_points},
+        {"name": "الثقة", "value": round(valuation.confidence * 100), "weight": f"{int(REC_CONFIDENCE_WEIGHT * 100)}%", "points": confidence_points},
+        {"name": "خصم نقص البيانات", "value": len(warnings), "weight": f"{REC_WARNING_PENALTY} نقاط لكل تحذير حتى {REC_MAX_PENALTY}", "points": -missing_penalty},
         {"name": "درجة التوصية النهائية", "value": total, "weight": "الناتج", "points": total},
     ]
 

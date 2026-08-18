@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-import re
 from collections import Counter
 from typing import Any
 
 from backend.models import Listing
-from backend.services.request_parser import GOVERNORATE_AREAS
+from backend.services.request_parser import area_governorate_map, normalize_governorate_name
+
+# ── ثوابت تنظيف وتحليل السوق الموثقة — يقرأها سجل تعريفات المقاييس (/api/metric-registry) ──
+OUTLIER_IQR_MULTIPLIER = 3        # معيار الشواذ: 3×IQR
+OUTLIER_MIN_SAMPLES = 4           # الحد الأدنى للعينات لتطبيق استبعاد الشواذ
+YIELD_MIN_SAMPLES_PER_SIDE = 2    # حد أدنى لعينتي البيع والإيجار لحساب العائد
+YIELD_CAP_PCT = 15                # سقف واقعي للعائد (أعلى غالبًا خطأ بيانات)
+YIELD_HIGH_SAMPLES_PER_SIDE = 5   # عينات كافية لكل جانب لاعتبار الثقة «عالية»
+MONTHS_PER_YEAR = 12              # أشهر السنة لتحويل الإيجار الشهري إلى سنوي
 
 
 def is_demand_transaction(transaction: str) -> bool:
@@ -92,10 +99,17 @@ def build_demand_indicators(rows: list[dict[str, Any]]) -> dict[str, Any]:
         # معروفة — نعبئ المحافظة من خريطة المنطقة الرسمية حتى لا تتكدس كل الطلبات
         # تحت «غير محددة» في بُعد المحافظات.
         if gov == "غير محددة" and area != "غير محددة" and area in area_gov:
-            gov = f"محافظة {area_gov[area]}"
-        # توحيد شكل المحافظة (محافظة الأحمدي == محافظة الاحمدي) عبر المصادر حتى لا
-        # تنقسم دلاء نفس المحافظة في الـ payload وفي العرض.
-        gov = re.sub(r"[إأآا]", "ا", gov)
+            gov = area_gov[area]  # قيمة كنسية («محافظة الأحمدي») من خريطة اللوحة
+        if gov == "غير محددة" and area != "غير محددة":
+            # منطقة تحمل اسم محافظة («حولي» كمنطقة) — تُحسم لمحافظتها الكنسية
+            # مثل اللوحة تمامًا (مع الإبقاء على اسم المنطقة لإحصائيات كل منطقة).
+            canonical = normalize_governorate_name(area)
+            if canonical.startswith("محافظة "):
+                gov = canonical
+        # توحيد شكل المحافظة إلى الصيغة الكنسية نفسها في اللوحة (محافظة الأحمدي ==
+        # محافظة الاحمدي) عبر المصادر حتى لا تنقسم دلاء نفس المحافظة في الـ payload
+        # وفي العرض — نفس normalize_governorate_name الذي تستخدمه اللوحة.
+        gov = normalize_governorate_name(gov) or gov
         source = str(row.get("source") or "").strip() or "غير محدد"
         month = str(row.get("fetched_at") or "")[:7]
 
@@ -157,7 +171,7 @@ def clean_outliers(values: list[float]) -> list[float]:
     آلاف لمنطقة سكنية) تُشوّه الوسيط والعائد؛ هذا التنظيف يجعل المتوسطات
     ممثلة للعرض الفعلي دون حذف بيانات حقيقية عند العينات الصغيرة.
     """
-    if len(values) < 4:
+    if len(values) < OUTLIER_MIN_SAMPLES:
         return values
     ordered = sorted(values)
     q1 = ordered[len(ordered) // 4]
@@ -165,17 +179,17 @@ def clean_outliers(values: list[float]) -> list[float]:
     iqr = q3 - q1
     if iqr <= 0:
         return values
-    lo, hi = q1 - 3 * iqr, q3 + 3 * iqr
+    lo, hi = q1 - OUTLIER_IQR_MULTIPLIER * iqr, q3 + OUTLIER_IQR_MULTIPLIER * iqr
     return [v for v in values if lo <= v <= hi]
 
 
 def _area_to_governorate_map() -> dict[str, str]:
-    """خريطة رسمية منطقة ← محافظة (من المحلل) لتغطية الصفوف بلا محافظة مخزنة."""
-    area_gov: dict[str, str] = {}
-    for gov, areas in GOVERNORATE_AREAS.items():
-        for area in areas:
-            area_gov.setdefault(area, gov)
-    return area_gov
+    """خريطة رسمية منطقة ← محافظة لتغطية الصفوف بلا محافظة مخزنة.
+
+    نفس خريطة اللوحة المعتمدة تمامًا (area_governorate_map في request_parser:
+    AREA_TO_GOVERNORATE بقيم كنسية + سدّ الفجوات من السجلات) — حتى لا تنحرف
+    دلاء تحليلات السوق عن اللوحة."""
+    return area_governorate_map([])
 
 
 def build_market_analytics(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -214,6 +228,7 @@ def build_market_analytics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         property_type = str(row.get("property_type") or "").strip()
         area = str(row.get("area") or "").strip()
         governorate = str(row.get("governorate") or "").strip()
+        governorate = normalize_governorate_name(governorate) or governorate
         if transaction:
             bucket["transactions"][transaction] = bucket["transactions"].get(transaction, 0) + 1
             trans_counts[transaction] = trans_counts.get(transaction, 0) + 1
@@ -305,6 +320,13 @@ def build_market_insights(rows: list[dict[str, Any]]) -> dict[str, Any]:
             space = None
         per_m2 = price / space if space and space > 0 else None
         governorate = str(row.get("governorate") or "").strip() or area_gov.get(area, "")
+        if not governorate:
+            # منطقة تحمل اسم محافظة («حولي» كمنطقة) — تُحسم لمحافظتها الكنسية
+            # مثل اللوحة تمامًا (مع الإبقاء على اسم المنطقة لإحصائيات كل منطقة).
+            canonical = normalize_governorate_name(area)
+            if canonical.startswith("محافظة "):
+                governorate = canonical
+        governorate = normalize_governorate_name(governorate) or governorate
         bucket = by_area.setdefault(area, {
             "area": area,
             "governorate": governorate,
@@ -374,16 +396,16 @@ def build_market_insights(rows: list[dict[str, Any]]) -> dict[str, Any]:
         # عائد الإيجار فقط عند توفر بيع وإيجار معًا (بعد التنظيف) بحد أدنى لعينتين
         # لكل منهما، وسعر بيع أكبر من الإيجار السنوي — وإلا يبقى غير محسوب بدل
         # عرض نسب مضللة من عينات مفردة أو أرقام مهرطبة.
-        sale_ok = len(clean_sale) >= 2
-        rent_ok = len(clean_rent) >= 2
+        sale_ok = len(clean_sale) >= YIELD_MIN_SAMPLES_PER_SIDE
+        rent_ok = len(clean_rent) >= YIELD_MIN_SAMPLES_PER_SIDE
         yield_pct = None
         yield_note = ""
-        if sale_ok and rent_ok and sale_median and rent_median and sale_median > rent_median * 12:
-            computed = round((rent_median * 12) / sale_median * 100, 2)
-            # سقف واقعي: عائد > 15% يكاد دائمًا يكون خطأ بيانات لا فرصة حقيقية
-            if 0 < computed <= 15:
+        if sale_ok and rent_ok and sale_median and rent_median and sale_median > rent_median * MONTHS_PER_YEAR:
+            computed = round((rent_median * MONTHS_PER_YEAR) / sale_median * 100, 2)
+            # سقف واقعي: عائد أعلى من YIELD_CAP_PCT يكاد دائمًا يكون خطأ بيانات لا فرصة حقيقية
+            if 0 < computed <= YIELD_CAP_PCT:
                 yield_pct = computed
-                yield_note = "high" if (len(clean_sale) >= 5 and len(clean_rent) >= 5) else "low"
+                yield_note = "high" if (len(clean_sale) >= YIELD_HIGH_SAMPLES_PER_SIDE and len(clean_rent) >= YIELD_HIGH_SAMPLES_PER_SIDE) else "low"
         areas.append({
             "area": bucket["area"],
             "governorate": bucket["governorate"],

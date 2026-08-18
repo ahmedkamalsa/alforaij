@@ -23,7 +23,7 @@ from backend.connectors.official_data import search as search_official_transacti
 from backend.connectors.official_indicators import search as search_official_indicators
 from backend.models import Listing, PropertyRequest
 from backend.services.request_parser import KNOWN_AREAS as REQUEST_KNOWN_AREAS
-from backend.services.request_parser import PROPERTY_TYPES, normalize_text, detect_seller_type, extract_area_range, excluded_numbers, text_has_area, extract_rental_income
+from backend.services.request_parser import PROPERTY_TYPES, normalize_text, detect_seller_type, extract_area_range, excluded_numbers, text_has_area, extract_rental_income, detect_area_in_text
 
 
 USER_AGENT = (
@@ -283,10 +283,11 @@ def clean_text(value: str) -> str:
 
 
 def detect_area(text: str) -> str:
-    for area in KNOWN_AREAS:
-        if text_has_area(area, text):
-            return area
-    return ""
+    """منطقة كويتية من نص الإعلان (عنوان + وصف). تفويض للكاشف المشترك في
+    request_parser: أطول تطابق أولًا + أسماء مرادفة (عربي/إنجليزي) + صيغ بلا
+    مسافات — فالمناطق الناقصة من القائمة المحلية (المنصورية، السرة، النسيم...)
+    تُكتشف من القائمة الكاملة المعتمدة."""
+    return detect_area_in_text(text)
 
 
 def detect_property_type(text: str, fallback: str = "") -> str:

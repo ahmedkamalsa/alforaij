@@ -1,21 +1,12 @@
 {
-  "generatedAt": "2026-08-18T03:36:47",
-  "count": 9,
+  "generatedAt": "2026-08-17T06:02:01",
+  "count": 7,
   "status": "success",
-  "note": "جمع 9 تطورًا، 5/11 مصادر عقارية",
+  "note": "جمع 7 تطورًا، 3/11 مصادر عقارية",
   "developments": [
     {
-      "url": "https://www.arabtimesonline.com/news/kuwaiti-expert-urges-gulf-to-redraw-oil-export-routes/",
-      "title": "KUWAIT CITY, Aug 17: Former Board Member of Kuwait Petroleum Corporation (KPC), former Minister of Housing and oil expe...",
-      "source": "arabtimes",
-      "source_name": "Arab Times",
-      "category": "أخبار السوق",
-      "published": "",
-      "summary": ""
-    },
-    {
-      "url": "https://www.alanba.com.kw/1372378",
-      "title": "بالفيديو.. الحجز شهراً لمخالفة الخطوط الأرضية",
+      "url": "https://alanba.com.kw/BBCNews/19151/",
+      "title": "هيثم حسن إلى سيلتك... كيف استقبل الجمهور الصفقة؟",
       "source": "alanba",
       "source_name": "الأنباء",
       "category": "أخبار السوق",
@@ -23,19 +14,10 @@
       "summary": ""
     },
     {
-      "url": "https://www.alraimedia.com/article/1776387/اقتصاد/تشدد-رقابي-ببلاغات-غسل-الأموال-والرد-خلال-يوم",
-      "title": "في تحرّك تنظيمي يستهدف تعزيز فعالية منظومة مُكافحة غسل الأموال وتمويل الإرهاب، وضمان سلامة ودقّة واكتمال البيانات والمعلومات المطلوبة رقابياً، تم التشديد رقابيا",
-      "source": "alrai",
-      "source_name": "الراي",
-      "category": "أخبار السوق",
-      "published": "",
-      "summary": ""
-    },
-    {
-      "url": "https://www.alraimedia.com/article/1776397/خارجيات/العرب-والعالم/روسيا-تحذر-لندن-من-عواقب-بعد-تقارير-عن-استخدام-مسيرات-بريطانية-في-الهجمات-على-أراضيها",
-      "title": "روسيا تحذر لندن من عواقب بعد تقارير عن استخدام مسيرات بريطانية في الهجمات على أراضيها",
-      "source": "alrai",
-      "source_name": "الراي",
+      "url": "https://alanba.com.kw/BBCNews/19148/",
+      "title": "البطاطس \"تغلي\" تحت الأرض مع اجتياح موجة حر قياسية لمساحات شاسعة من آسيا - الغارديان",
+      "source": "alanba",
+      "source_name": "الأنباء",
       "category": "أخبار السوق",
       "published": "",
       "summary": ""
@@ -113,9 +95,9 @@
     },
     {
       "name": "Arab Times",
-      "status": "success",
-      "records": 1,
-      "note": "2 عنوانًا إجمالًا، 1 عقاريًا",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
       "fetchMethod": "HTML",
       "endpoint": "https://www.arabtimesonline.com/news/feed/"
     },
@@ -130,8 +112,8 @@
     {
       "name": "الأنباء",
       "status": "success",
-      "records": 1,
-      "note": "2 عنوانًا إجمالًا، 1 عقاريًا",
+      "records": 2,
+      "note": "2 عنوانًا إجمالًا، 2 عقاريًا",
       "fetchMethod": "HTML",
       "endpoint": "https://www.alanba.com.kw/rss/"
     },
@@ -145,9 +127,9 @@
     },
     {
       "name": "الراي",
-      "status": "success",
-      "records": 2,
-      "note": "2 عنوانًا إجمالًا، 2 عقاريًا",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
       "fetchMethod": "HTML",
       "endpoint": "https://www.alraimedia.com/"
     },

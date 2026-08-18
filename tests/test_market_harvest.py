@@ -142,7 +142,8 @@ class TestMarketHarvest(unittest.TestCase):
         hawally = areas["حولي"]
         self.assertAlmostEqual(hawally["rentalYield"], 5.0, places=1)
         self.assertEqual(hawally["medianSalePerM2"], 2000.0)
-        self.assertEqual(hawally["governorate"], "حولي")
+        # نفس خريطة اللوحة المعتمدة: «حولي» كمنطقة تُحسم لمحافظتها الكنسية
+        self.assertEqual(hawally["governorate"], "محافظة حولي")
         self.assertIsNone(areas["الفروانية"]["rentalYield"])
         # المنقف: عينتا بيع لكن إيجار واحد → العائد غير محسوب (حارس الموثوقية)
         self.assertIsNone(areas["المنقف"]["rentalYield"])

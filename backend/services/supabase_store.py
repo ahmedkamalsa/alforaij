@@ -828,12 +828,26 @@ def _analysis_rows(limit: int, table: str) -> list[dict[str, Any]]:
     السوق. متسامح: فشل أي من المصدرين لا يمنع الآخر.
     """
     rows: list[dict[str, Any]] = []
+    # نفس تطبيع اللوحة المعتمد (backend/services/request_parser.normalize_dashboard_place):
+    # سدّ المنطقة الناقصة أو المُلتقطة خطأً كاسم محافظة من نص الإعلان، ثم المحافظة
+    # من الخريطة الدقيقة (AREA_TO_GOVERNORATE) بالصيغ الكنسية — حتى تبنى تحليلات
+    # السوق دلاءها من نفس خريطة اللوحة تمامًا (لا «محافظة الاحمدي» بلا همزة بجانب
+    # «محافظة الأحمدي»، ولا دلو المحافظة نفسها منقسمة بين صيغة قصيرة وأخرى كاملة).
+    from backend.services.request_parser import area_governorate_map, normalize_dashboard_place
+    area_map = area_governorate_map([])
     if market_listings_table_available():
         # active فقط: الإعلانات المباعة/المنتهية (stale) لا تدخل المؤشرات ولا الوسيطات
         endpoint = f"{SUPABASE_URL}/rest/v1/{table}?select=*&status=eq.active&order=fetched_at.desc&limit={int(limit)}"
         rows = _fetch_rows(endpoint) or []
+        for row in rows:
+            # keep_governorate_area: تحليلات السوق تحتاج اسم المنطقة للبقاء حتى لو
+            # كان اسم محافظة («حولي» كمنطقة) — إحصائيات لكل منطقة بخلاف اللوحة.
+            normalize_dashboard_place(row, area_map, keep_governorate_area=True)
     try:
-        rows.extend(market_analysis.local_listings_to_rows(load_listings()))
+        local_rows = market_analysis.local_listings_to_rows(load_listings())
+        for row in local_rows:
+            normalize_dashboard_place(row, area_map, keep_governorate_area=True)
+        rows.extend(local_rows)
     except Exception as exc:
         logger.warning("Market analysis local rows failed: %s", exc)
     return rows

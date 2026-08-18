@@ -152,16 +152,27 @@ def _source_trust(source: str) -> float:
     return SOURCE_TRUST.get(base, 0.5)
 
 
+# ── ثوابت حساب الفرص الموثقة — يقرأها سجل تعريفات المقاييس (/api/metric-registry) ──
+OPP_SCORE_DEAL_WEIGHT = 0.65       # وزن جاذبية السعر في درجة الفرصة
+OPP_SCORE_CONFIDENCE_WEIGHT = 0.35  # وزن الثقة في درجة الفرصة
+OPP_CONF_TRUST_WEIGHT = 0.5         # وزن مصداقية المصدر في ثقة الفرصة
+OPP_CONF_VALUATION_WEIGHT = 0.3     # وزن ثقة التقييم
+OPP_CONF_EVIDENCE_WEIGHT = 0.2      # وزن قوة الأدلة
+OPP_EVIDENCE_BASE = 0.35            # أساس قوة الأدلة بلا مقارنات
+OPP_EVIDENCE_PER_COMPARABLE = 0.13  # زيادة قوة الأدلة لكل مقارنة
+OPP_EVIDENCE_MAX = 1.0              # سقف قوة الأدلة
+
+
 def _confidence(source: str, valuation) -> float:
     """ثقة حتمية: 50% مصداقية المصدر + 30% ثقة التقييم + 20% قوة الأدلة."""
     trust = _source_trust(source)
-    evidence_factor = min(1.0, 0.35 + valuation.comparables_count * 0.13)
-    return round(min(1.0, trust * 0.5 + valuation.confidence * 0.3 + evidence_factor * 0.2), 2)
+    evidence_factor = min(OPP_EVIDENCE_MAX, OPP_EVIDENCE_BASE + valuation.comparables_count * OPP_EVIDENCE_PER_COMPARABLE)
+    return round(min(1.0, trust * OPP_CONF_TRUST_WEIGHT + valuation.confidence * OPP_CONF_VALUATION_WEIGHT + evidence_factor * OPP_CONF_EVIDENCE_WEIGHT), 2)
 
 
 def _opportunity_score(deal_score: float, confidence: float) -> float:
     """درجة الفرصة: 65% جاذبية السعر + 35% الثقة (بدون أي عنصر عشوائي)."""
-    return round(min(100.0, deal_score * 0.65 + confidence * 100 * 0.35), 1)
+    return round(min(100.0, deal_score * OPP_SCORE_DEAL_WEIGHT + confidence * 100 * OPP_SCORE_CONFIDENCE_WEIGHT), 1)
 
 
 def _load_csv_clients() -> list[dict[str, Any]]:

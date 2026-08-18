@@ -92,6 +92,13 @@ def score_listing(
             reason = f"منطقة الإعلان {listing.area} خارج المناطق المطلوبة — نتيجة استرشادية لتعويض ندرة الإعلانات."
             warnings.append(ANY_EXPAND_WARNING)
             add_component(breakdown, "المنطقة", 5, reason)
+        elif expansion == "broad":
+            # توسعة عريضة — لا يوجد أي نتيجة في كل المناطق: يعرض إعلانات نفس النوع
+            # من أي منطقة حتى لا يبقى المستخدم بلا نتيجة.
+            score += 3
+            reason = f"منطقة الإعلان {listing.area} خارج المناطق المطلوبة — نتيجة عريضة لتعويض غياب النتائج."
+            warnings.append("نتيجة عريضة — خارج المنطقة المطلوبة")
+            add_component(breakdown, "المنطقة", 3, reason)
         else:
             reason = f"لا يوجد دليل أن الإعلان داخل {', '.join(request.areas)}."
             warnings.append(reason)
@@ -232,11 +239,14 @@ def top_matches(
     limit: int = 50,
     min_results: int = 3,
 ) -> list[tuple[Listing, float, list[str], list[str], list[dict[str, Any]]]]:
-    """مطابقة على ثلاث مراحل حتى لا يبقى البحث فارغًا في المناطق النادرة:
+    """مطابقة على أربع مراحل حتى لا يبقى البحث فارغًا:
 
-    1) صارمة: مناطق الطلب فقط (كما كانت دائمًا).
-    2) إذا نقصت النتائج (< min_results): توسعة لنفس المحافظة بنقاط جزئية ووسم واضح.
-    3) إذا ما زالت ناقصة: توسعة استرشادية لكل المناطق بوسم أقوى وترتيب أدنى.
+    1) صارمة: مناطق الطلب فقط.
+    2) توسعة لنفس المحافظة عند ندرة النتائج.
+    3) توسعة لكل المناطق (استرشادية).
+    4) [جديد] توسعة أخيرة للم橦وب/للإيجار: عند غياب النتائج بالكامل، يبحث
+       في كل الإعلانات من نفس نوع العقار حتى لا يبقى المستخدم بلا نتيجة —
+       مع وسم "توسعة عريضة" واضح.
     """
     ranked = _score_all(request, listings, expansion="none")
     if request.areas and len(ranked) < min_results:
@@ -252,4 +262,10 @@ def top_matches(
             any_ranked = _score_all(request, listings, expansion="any")
             if len(any_ranked) > len(ranked):
                 ranked = any_ranked
+    # المرحلة 4: توسعة عريضة — عند غياب النتائج بالكامل، يبحث في كل الإعلانات
+    # من نفس نوع العقار (بيع/إيجار) حتى لا يبقى المستخدم بلا نتيجة.
+    if len(ranked) == 0 and request.transaction:
+        broad_ranked = _score_all(request, listings, expansion="broad")
+        if len(broad_ranked) > len(ranked):
+            ranked = broad_ranked
     return ranked[:limit]

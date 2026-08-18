@@ -1,0 +1,556 @@
+/* ===== نظام التصميم الحديث — تحسينات احترافية =====
+   يُضاف كطبقة تجاوية فوق الأنماط الحالية.
+   لا يحذف أي نمط موجود — يُحسّن فقط. */
+
+/* ── تحسينات عامة ── */
+.result-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl, 16px);
+  background: var(--surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.25s cubic-bezier(0.22, 0.8, 0.3, 1),
+              box-shadow 0.25s ease,
+              border-color 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.result-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-gold-400), var(--blue-deep, #3b66f0));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.result-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  border-color: var(--brand-gold-400, #d9b850);
+}
+
+.result-card:hover::before {
+  opacity: 1;
+}
+
+/* ── تحسين بطاقات KPI (تعزيز فقط — لا يحذف الأنماط الأصلية) ── */
+.kpi-card:hover {
+  border-color: var(--brand-gold-400, #d9b850) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ── تحسين الأزرار ── */
+button, .hero-link {
+  transition: all 0.2s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+button.primary, button.hero-link {
+  background: linear-gradient(135deg, var(--brand-gold-500, #b7a13a), var(--brand-gold-600, #a8860f));
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 24px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(183, 161, 58, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+button.primary::before, button.hero-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+button.primary:hover, button.hero-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(183, 161, 58, 0.4);
+}
+
+button.primary:hover::before, button.hero-link:hover::before {
+  left: 100%;
+}
+
+button.primary:active, button.hero-link:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(183, 161, 58, 0.3);
+}
+
+/* ── تحسين التبويبات ── */
+.main-tabs {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.main-tab {
+  position: relative;
+  border-radius: var(--radius-md, 8px);
+  transition: all 0.25s ease;
+}
+
+.main-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--brand-gold-400, #d9b850);
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
+.main-tab:hover::after {
+  width: 60%;
+}
+
+.main-tab.active::after {
+  width: 80%;
+  background: #fff;
+}
+
+/* ── تحسين حقول الإدخال ── */
+input[type="text"], input[type="number"], input[type="tel"], select, textarea {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 14px;
+  font-size: 14px;
+  transition: all 0.25s ease;
+  background: var(--surface);
+}
+
+input[type="text"]:focus, input[type="number"]:focus, input[type="tel"]:focus, select:focus, textarea:focus {
+  border-color: var(--brand-gold-400, #d9b850);
+  box-shadow: 0 0 0 3px rgba(217, 184, 80, 0.15);
+  outline: none;
+}
+
+/* ── تحسين الجداول ── */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+thead th {
+  background: var(--surface);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--line);
+  color: var(--muted);
+}
+
+tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+tbody tr {
+  transition: background 0.15s ease;
+}
+
+tbody tr:hover {
+  background: var(--surface);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── تحسين الإشعارات والتنبيهات ── */
+.bell-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--red, #fca5a5);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 2px 6px rgba(248, 113, 113, 0.4);
+}
+
+/* ── تحسين بطاقات المحافظات ── */
+.governorate-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.governorate-card, .gov-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl, 16px);
+  padding: 20px;
+  transition: all 0.3s cubic-bezier(0.22, 0.8, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.governorate-card::before, .gov-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--brand-gold-400, #d9b850), var(--brand-navy-200, #3d6de0));
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.governorate-card:hover, .gov-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  border-color: var(--brand-gold-400, #d9b850);
+}
+
+.governorate-card:hover::before, .gov-card:hover::before {
+  opacity: 1;
+}
+
+/* ── تحسين شريط التقدم ── */
+.progress-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--brand-gold-500, #b7a13a), var(--brand-gold-300, #e2c968));
+  transition: width 0.5s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+/* ── تحسين الشارات (Pills) ── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: all 0.2s ease;
+}
+
+.pill:hover {
+  transform: scale(1.05);
+}
+
+.pill.green, .pill.success {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.pill.amber, .pill.warning {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.pill.red, .pill.danger {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.pill.blue, .pill.info {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.pill.violet, .pill.purple {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+/* ── تحسين رسوم SVG ── */
+svg text {
+  font-family: var(--font-body);
+}
+
+/* ── تحسين التمرير السلس ── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── تحسين الأنيميشن ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.4s ease-out forwards;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ── تحسين البطاقات القابلة للنقر ── */
+.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.clickable:active {
+  transform: scale(0.98);
+}
+
+/* ── تحسين Tooltips ── */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--navy, #0f172a);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.2s ease;
+  z-index: 1000;
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-8px);
+}
+
+/* ── تحسين الفوتر ── */
+footer, .card-footer {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+/* ── تحسين الأيقونات الداخلية ── */
+.tab-ic, .hero-ic {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* ── تحسين charged results ── */
+.score-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.score-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.score-item:hover {
+  border-color: var(--brand-gold-400, #d9b850);
+  background: var(--brand-gold-soft, rgba(217, 184, 80, 0.08));
+}
+
+/* ── تحسين لوحة التنقل للجهاز المحمول ── */
+@media (max-width: 768px) {
+  .main-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .main-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .main-tab {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+
+  .governorate-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .result-card {
+    margin: 8px 0;
+  }
+
+  .kpi-card strong {
+    font-size: 22px;
+  }
+}
+
+/* ── تحسين للوضع الداكن ── */
+@media (prefers-color-scheme: dark) {
+  .result-card {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .result-card:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* ── تحسين للطباعة ── */
+@media print {
+  .result-card, .kpi-card, .governorate-card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+
+  button, .hero-link, .chat-fab {
+    display: none !important;
+  }
+}
+
+/* ── Lucide Icon sizing helpers ── */
+.lucide-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lucide-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.lucide-sm svg { width: 14px; height: 14px; }
+.lucide-md svg { width: 18px; height: 18px; }
+.lucide-lg svg { width: 24px; height: 24px; }
+.lucide-xl svg { width: 32px; height: 32px; }
+
+/* ── تحسين hover-card ── */
+.source-trust-tip {
+  position: fixed;
+  z-index: 9999;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--navy, #0f172a);
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-width: 320px;
+  pointer-events: none;
+}
+
+/* ── تحسين Pricing Page ── */
+.pricing-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl, 16px);
+  padding: 32px;
+  transition: all 0.3s cubic-bezier(0.22, 0.8, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.pricing-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.pricing-card.featured {
+  border-color: var(--brand-gold-400, #d9b850);
+  box-shadow: 0 8px 30px rgba(217, 184, 80, 0.2);
+}
+
+.pricing-card.featured::before {
+  content: 'الأكثر شيوعًا';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 16px;
+  background: linear-gradient(135deg, var(--brand-gold-500), var(--brand-gold-600));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 0 0 8px 8px;
+}
