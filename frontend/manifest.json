@@ -1,62 +1,87 @@
 {
-  "name": "منصة الفريج العقارية",
+  "name": "منصة الفريج العقارية — بحث وتقييم وفرص",
   "short_name": "الفريج",
-  "description": "بحث وتقييم وفرص عقارية مبنية على الأدلة — الكويت",
+  "description": "بحث موحد في بيانات الفريج والمصادر الخارجية، تقييم موثق بمصدر كل رقم، وفرص مكسب تربط العرض بالطلب. الكويت.",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "lang": "ar",
   "dir": "rtl",
   "scope": "/",
-  "categories": ["business", "finance", "utilities"],
+  "id": "/",
+  "categories": ["business", "finance", "utilities", "productivity"],
+  "prefer_related_applications": false,
+  "handle_links": "preferred",
+  "share_target": {
+    "action": "/?share=",
+    "method": "GET",
+    "params": {
+      "text": "share",
+      "title": "name"
+    }
+  },
   "icons": [
     {
       "src": "/assets/alforaij-official-symbol.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any maskable",
+      "label": "أيقونة الفريج"
     },
     {
       "src": "/assets/alforaij_logo.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any",
+      "label": "شعار الفريج"
     },
     {
       "src": "/assets/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any",
+      "label": "أيقونة Apple"
     }
   ],
   "shortcuts": [
     {
-      "name": "بحث وتقييم",
+      "name": "بحث وتقييم عقاري",
       "short_name": "بحث",
       "url": "/?tab=search",
-      "description": "ابدأ بحثاً جديداً عن عقار"
+      "description": "ابدأ بحثاً جديداً عن عقار مع تقييم شامل",
+      "icons": [{ "src": "/assets/alforaij-official-symbol.png", "sizes": "96x96" }]
     },
     {
-      "name": "أفضل الفرص",
+      "name": "أفضل الفرص اليومية",
       "short_name": "فرص",
       "url": "/?tab=opportunities",
-      "description": "عرض أفضل الفرص الاستثمارية"
+      "description": "عرض أفضل الفرص الاستثمارية المقيّمة",
+      "icons": [{ "src": "/assets/alforaij-official-symbol.png", "sizes": "96x96" }]
     },
     {
       "name": "لوحة السوق",
       "short_name": "السوق",
       "url": "/?tab=board",
-      "description": "عرض إحصائيات السوق الحية"
+      "description": "إحصائيات السوق الحية والمحافظات",
+      "icons": [{ "src": "/assets/alforaij-official-symbol.png", "sizes": "96x96" }]
     },
     {
       "name": "تحليلات السوق",
       "short_name": "تحليلات",
       "url": "/?tab=insights",
-      "description": "تحليلات وتقارير السوق"
+      "description": "عائد الإيجار واتجاهات الأسعار",
+      "icons": [{ "src": "/assets/alforaij-official-symbol.png", "sizes": "96x96" }]
     }
   ],
-  "screenshots": [],
-  "prefer_related_applications": false
+  "screenshots": [
+    {
+      "src": "/assets/alforaij-official-symbol.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "واجهة البحث والتقييم"
+    }
+  ]
 }

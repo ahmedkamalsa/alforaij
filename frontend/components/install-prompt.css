@@ -1,0 +1,361 @@
+/* ===== Install Prompt — شريط + مودال + زر عائم ===== */
+
+/* ── Install Banner ── */
+.install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9998;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.3);
+  transform: translateY(100%);
+  opacity: 0;
+  transition: transform 0.4s cubic-bezier(0.22, 0.8, 0.3, 1),
+              opacity 0.3s ease;
+  direction: rtl;
+}
+
+.install-banner.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.install-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.install-banner-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.install-banner-icon img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.install-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.install-banner-text strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e8eef7;
+  margin-bottom: 2px;
+}
+
+.install-banner-text span {
+  display: block;
+  font-size: 12px;
+  color: #b3c2d5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.install-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.install-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #b7a13a, #a8860f);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(183, 161, 58, 0.3);
+  white-space: nowrap;
+}
+
+.install-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(183, 161, 58, 0.4);
+}
+
+.install-btn-primary:active {
+  transform: translateY(0);
+}
+
+.install-btn-primary svg {
+  width: 16px;
+  height: 16px;
+}
+
+.install-btn-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #b3c2d5;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.install-btn-close:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #e8eef7;
+}
+
+/* ── Install FAB (Floating Action Button) ── */
+.install-fab {
+  position: fixed;
+  bottom: 80px;
+  left: 20px;
+  z-index: 9997;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #b7a13a, #a8860f);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(183, 161, 58, 0.4);
+  transition: all 0.3s cubic-bezier(0.22, 0.8, 0.3, 1);
+  animation: fabPulse 2s ease-in-out infinite;
+}
+
+.install-fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 30px rgba(183, 161, 58, 0.5);
+}
+
+.install-fab:active {
+  transform: scale(0.95);
+}
+
+@keyframes fabPulse {
+  0%, 100% { box-shadow: 0 6px 20px rgba(183, 161, 58, 0.4); }
+  50% { box-shadow: 0 6px 30px rgba(183, 161, 58, 0.6); }
+}
+
+/* ── Install Modal ── */
+.install-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease;
+}
+
+.install-modal {
+  width: 100%;
+  max-width: 380px;
+  background: linear-gradient(160deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  animation: modalSlideUp 0.3s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.install-modal-head {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.install-modal-head img {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 12px;
+  border-radius: 14px;
+}
+
+.install-modal-head h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: #e8eef7;
+  margin-bottom: 6px;
+}
+
+.install-modal-head p {
+  font-size: 13px;
+  color: #b3c2d5;
+}
+
+.install-modal-steps {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.install-modal-steps ol {
+  margin: 0;
+  padding-right: 20px;
+  list-style: decimal;
+}
+
+.install-modal-steps li {
+  font-size: 14px;
+  color: #e8eef7;
+  line-height: 1.8;
+  margin-bottom: 4px;
+}
+
+.install-modal-steps li strong {
+  color: #d9b850;
+}
+
+.install-modal-steps li svg {
+  vertical-align: middle;
+  margin: 0 2px;
+}
+
+.install-modal-close {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #b7a13a, #a8860f);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(183, 161, 58, 0.3);
+}
+
+.install-modal-close:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(183, 161, 58, 0.4);
+}
+
+/* ── Light theme ── */
+[data-theme="light"] .install-banner {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(240, 245, 255, 0.95));
+  border-top-color: rgba(30, 58, 138, 0.15);
+  box-shadow: 0 -8px 30px rgba(30, 41, 59, 0.15);
+}
+
+[data-theme="light"] .install-banner-text strong {
+  color: #152238;
+}
+
+[data-theme="light"] .install-banner-text span {
+  color: #4b5d79;
+}
+
+[data-theme="light"] .install-modal {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(240, 245, 255, 0.98));
+  border-color: rgba(30, 58, 138, 0.15);
+}
+
+[data-theme="light"] .install-modal-head h3 {
+  color: #152238;
+}
+
+[data-theme="light"] .install-modal-head p {
+  color: #4b5d79;
+}
+
+[data-theme="light"] .install-modal-steps {
+  background: rgba(30, 58, 138, 0.05);
+  border-color: rgba(30, 58, 138, 0.1);
+}
+
+[data-theme="light"] .install-modal-steps li {
+  color: #152238;
+}
+
+/* ── Mobile responsive ── */
+@media (max-width: 480px) {
+  .install-banner-inner {
+    flex-wrap: wrap;
+  }
+
+  .install-banner-text span {
+    display: none;
+  }
+
+  .install-btn-primary {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .install-banner {
+    transition: opacity 0.1s ease;
+    transform: none;
+  }
+
+  .install-fab {
+    animation: none;
+  }
+
+  .install-modal {
+    animation: none;
+  }
+}
+
+/* ── Desktop: hide install prompts ── */
+@media (min-width: 1024px) {
+  .install-banner,
+  .install-fab {
+    display: none !important;
+  }
+}
+
+/* ── Already installed: hide ── */
+@media (display-mode: standalone) {
+  .install-banner,
+  .install-fab {
+    display: none !important;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
