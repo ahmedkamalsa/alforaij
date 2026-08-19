@@ -1,0 +1,1047 @@
+/* ===== تحسينات اللوحة والجدول — احترافي وريسبونسيف ===== */
+
+/* ── تحسين تخطيط اللوحة الرئيسي ── */
+.board-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+@media (max-width: 1024px) {
+  .board-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── تحسين كروت الإحصائيات ── */
+.board-stats {
+  display: grid;
+  gap: 10px;
+}
+
+.board-stat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--glass-border);
+  border-inline-start: 4px solid var(--blue);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%);
+  cursor: pointer;
+  text-align: right;
+  min-height: 52px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.board-stat:hover {
+  transform: translateY(-2px);
+  border-color: var(--blue);
+  background: linear-gradient(135deg, rgba(91, 140, 255, 0.12) 0%, rgba(91, 140, 255, 0.06) 100%);
+  box-shadow: 0 8px 20px rgba(2, 6, 16, 0.25);
+}
+
+.board-stat span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.board-stat strong {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.board-stat small {
+  display: block;
+  flex-basis: 100%;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+.board-stat.empty {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.board-stat.empty small {
+  opacity: 0.4;
+}
+
+/* ── ألوان تمييز الإحصائيات ── */
+.board-stat[data-board-stat="opportunities"] {
+  border-inline-start-color: #22c55e;
+}
+
+.board-stat[data-board-stat="scored"] {
+  border-inline-start-color: #a78bfa;
+}
+
+.board-stat[data-board-stat="evidence"] {
+  border-inline-start-color: #fbbf24;
+}
+
+.board-stat[data-board-stat="priced"] {
+  border-inline-start-color: #22c55e;
+}
+
+.board-stat[data-board-stat="withSpace"] {
+  border-inline-start-color: #14b8a6;
+}
+
+.board-stat[data-board-stat="direct"] {
+  border-inline-start-color: #f59e0b;
+}
+
+.board-stat[data-board-stat="office"] {
+  border-inline-start-color: #a78bfa;
+}
+
+/* ── تحسين جدول المحافظات ── */
+.governorate-board {
+  padding: 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.gov-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.gov-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.gov-table thead th {
+  padding: 12px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 2px solid var(--glass-border);
+  white-space: nowrap;
+}
+
+.gov-table thead th.axis {
+  color: var(--brand-gold-300, #e2c968);
+  border-bottom-color: var(--brand-gold-300, #e2c968);
+}
+
+.gov-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.gov-table tbody tr:hover {
+  background: rgba(91, 140, 255, 0.08);
+}
+
+.gov-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+/* خلية اسم المحافظة */
+.gov-table-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: right;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.gov-table-govname {
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.gov-table-toggle {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 12px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.gov-table-toggle:hover {
+  background: rgba(91, 140, 255, 0.15);
+  color: var(--blue);
+  border-color: rgba(91, 140, 255, 0.3);
+}
+
+.gov-table-areas-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* خلية التغير اليومي */
+.gov-table-delta {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.gov-table-delta.up {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.gov-table-delta.down {
+  color: #fb7185;
+  background: rgba(244, 63, 94, 0.14);
+}
+
+.gov-table-delta.flat {
+  color: var(--muted);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+/* خلية الرقم */
+.gov-table-cell {
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.gov-table-cell.axis {
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.gov-table-cell.selected {
+  background: rgba(91, 140, 255, 0.15);
+  box-shadow: inset 0 0 0 2px rgba(91, 140, 255, 0.3);
+}
+
+.gov-table-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gov-table-num:not(:disabled):hover {
+  background: rgba(91, 140, 255, 0.15);
+  border-color: rgba(91, 140, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.gov-table-num:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.gov-table-num.total {
+  font-weight: 900;
+  color: var(--blue);
+  font-size: 16px;
+}
+
+/* صفوف المناطق المفتوحة */
+.gov-table-gov.expanded .gov-table-row {
+  background: rgba(91, 140, 255, 0.06);
+}
+
+.gov-table-areas-row > td {
+  padding: 0;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* جدول المناطق الداخلي */
+.gov-area-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.gov-area-table .gov-table-num {
+  min-width: 28px;
+  font-size: 13px;
+}
+
+.gov-area-table td {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* صف الإجمالي */
+.gov-table-total tr {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.gov-table-total .gov-table-govname {
+  font-weight: 900;
+  font-size: 15px;
+}
+
+/* ── تحسين كروت المحافظات (وضع الشبكة) ── */
+.governorate-cards {
+  display: grid;
+  gap: 14px;
+}
+
+.gov-card {
+  padding: 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(160deg, rgba(91, 140, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-top: 3px solid rgba(91, 140, 255, 0.4);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.gov-card:hover {
+  border-color: rgba(91, 140, 255, 0.45);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(2, 6, 16, 0.25);
+}
+
+.gov-card.expanded {
+  background: linear-gradient(160deg, rgba(56, 120, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%);
+  border-color: rgba(91, 140, 255, 0.55);
+  box-shadow: 0 12px 32px rgba(2, 6, 16, 0.3);
+}
+
+.gov-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gov-card-name {
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+/* شارة المناطق */
+.gov-areas-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid rgba(91, 140, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(91, 140, 255, 0.08);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gov-areas-badge:hover {
+  background: rgba(91, 140, 255, 0.15);
+  border-color: rgba(91, 140, 255, 0.4);
+}
+
+.gov-areas-badge b {
+  font-weight: 900;
+}
+
+.gov-areas-badge small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* أرقام المحور */
+.count-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.count-button:hover {
+  background: rgba(91, 140, 255, 0.12);
+  border-color: rgba(91, 140, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.count-button.axis {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: var(--brand-gold-300, #e2c968);
+}
+
+/* مقياس الكروت */
+.gov-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+  .gov-card-metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .gov-card-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* حبوب المقياس */
+.metric-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.metric-pill:hover {
+  background: rgba(91, 140, 255, 0.1);
+  border-color: rgba(91, 140, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.metric-pill.axis {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.25);
+  color: var(--brand-gold-300, #e2c968);
+}
+
+.metric-pill.selected {
+  background: rgba(91, 140, 255, 0.15);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.2);
+}
+
+.metric-pill b {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.metric-pill span {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ── تحسين عرض المناطق داخل الكروت ── */
+.gov-card-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--glass-border);
+}
+
+@media (max-width: 600px) {
+  .gov-card-areas {
+    grid-template-columns: 1fr;
+  }
+}
+
+.area-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.15s ease;
+}
+
+.area-card:hover {
+  background: rgba(91, 140, 255, 0.06);
+  border-color: rgba(91, 140, 255, 0.2);
+}
+
+.area-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.area-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ── تحسين كرت الإجمالي ── */
+.gov-total-card {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-top: 3px solid rgba(251, 191, 36, 0.5);
+}
+
+.gov-total-card .gov-card-name {
+  color: var(--brand-gold-300, #e2c968);
+}
+
+.gov-total-card .count-button.axis {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+/* ── تحسين بطاقات KPI ── */
+.board-metric-card {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-height: 100px;
+  padding: 14px 16px;
+  padding-inline-start: 66px;
+  text-align: right;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.board-metric-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--m-color, var(--blue));
+  box-shadow: 0 12px 28px rgba(2, 6, 16, 0.35), 0 0 0 1px var(--m-chip, rgba(91, 140, 255, 0.16));
+}
+
+.board-metric-card.active {
+  border-color: var(--m-color, var(--blue));
+  box-shadow: 0 0 0 2px var(--m-chip, rgba(91, 140, 255, 0.16)), inset 0 0 24px var(--m-chip, rgba(91, 140, 255, 0.16));
+}
+
+.board-metric-card strong {
+  font-size: 32px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.board-metric-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.board-metric-card small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── تحسين بطاقات النتائج ── */
+.result-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(2, 6, 16, 0.25);
+  border-color: rgba(91, 140, 255, 0.3);
+}
+
+/* رقم الترتيب */
+.rank-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--blue-deep) 0%, #1d4ed8 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
+}
+
+/* المحتوى */
+.result-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.result-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.result-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.result-head .meta {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ── تحسين شارات النتيجة ── */
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.badge-pill.sale {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.badge-pill.rent {
+  background: rgba(20, 184, 166, 0.12);
+  color: #14b8a6;
+  border: 1px solid rgba(20, 184, 166, 0.25);
+}
+
+.badge-pill.demand {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+/* ── تحسين شريط المنصات ── */
+.platform-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.platform-chips label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.platform-chips label:hover {
+  background: rgba(91, 140, 255, 0.1);
+  border-color: rgba(91, 140, 255, 0.3);
+}
+
+.platform-chips label:has(input:checked) {
+  background: rgba(91, 140, 255, 0.15);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.platform-chips input {
+  width: auto;
+  min-height: auto;
+  accent-color: var(--blue);
+}
+
+/* ── تحسين الأزرار ── */
+button.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--blue-deep) 0%, #1d4ed8 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
+}
+
+button.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(29, 78, 216, 0.4);
+}
+
+button.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── تحسين حقول الإدخال ── */
+input, select, textarea {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(91, 140, 255, 0.15);
+}
+
+/* ── تحسين التبويبات ── */
+.opp-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.opp-tab:hover {
+  background: rgba(91, 140, 255, 0.1);
+  border-color: rgba(91, 140, 255, 0.3);
+}
+
+.opp-tab.active {
+  background: linear-gradient(135deg, rgba(91, 140, 255, 0.2) 0%, rgba(139, 92, 246, 0.15) 100%);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+/* ── تحسين بطاقات العملاء ── */
+.client-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.03);
+  transition: all 0.15s ease;
+}
+
+.client-row:hover {
+  background: rgba(91, 140, 255, 0.06);
+  border-color: rgba(91, 140, 255, 0.2);
+}
+
+@media (max-width: 768px) {
+  .client-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.client-row strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.client-row code {
+  font-size: 13px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.wa-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #4ade80;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.wa-open:hover {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+/* ── تحسين نموذج العملاء ── */
+.client-form {
+  padding: 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.client-form h3 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.client-form .fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.client-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.client-form .wide {
+  grid-column: 1 / -1;
+}
+
+/* ── تحسين الرسوم البيانية ── */
+.chart-container {
+  padding: 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ── تحسين التأثيرات الحركية ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.reveal-card {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reveal-card.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── تحسين العرض على الأجهزة المحمولة ── */
+@media (max-width: 768px) {
+  .board-layout {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .board-metrics {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .board-metric-card {
+    min-height: 80px;
+    padding: 10px 12px;
+    padding-inline-start: 50px;
+  }
+
+  .board-metric-card strong {
+    font-size: 24px;
+  }
+
+  .gov-card-metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .gov-card-areas {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .board-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gov-card-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .result-card {
+    grid-template-columns: 1fr;
+  }
+
+  .rank-cell {
+    display: none;
+  }
+}
+
+/* ── تحسين الوضع الفاتح ── */
+[data-theme="light"] .gov-table-wrap {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(30, 58, 138, 0.15);
+}
+
+[data-theme="light"] .gov-table thead th {
+  background: rgba(37, 99, 235, 0.08);
+  color: #1e40af;
+}
+
+[data-theme="light"] .gov-table tbody tr:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+[data-theme="light"] .gov-card {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(30, 58, 138, 0.15);
+}
+
+[data-theme="light"] .gov-card.expanded {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="light"] .board-stat {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(30, 58, 138, 0.12);
+}
+
+[data-theme="light"] .board-stat:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+[data-theme="light"] .result-card {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 16px rgba(30, 41, 59, 0.1);
+}
+
+[data-theme="light"] .client-row {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="light"] .client-row:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+[data-theme="light"] .platform-chips label {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(30, 58, 138, 0.15);
+}
+
+[data-theme="light"] .platform-chips label:has(input:checked) {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
