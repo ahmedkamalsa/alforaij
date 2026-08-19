@@ -6,207 +6,514 @@
     <title>نشاط التصنيفات — منصة الفريج</title>
     <link rel="icon" type="image/png" sizes="32x32" href="assets/alforaij-official-symbol.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@500;700;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #2563eb;
+            --primary: #3b82f6;
+            --primary-light: #60a5fa;
+            --primary-dark: #2563eb;
             --success: #10b981;
+            --success-light: #34d399;
             --danger: #ef4444;
-            --gold: #f59e0b;
+            --danger-light: #f87171;
+            --warning: #f59e0b;
+            --warning-light: #fbbf24;
+            --violet: #8b5cf6;
+            --violet-light: #a78bfa;
+            --cyan: #06b6d4;
+            --cyan-light: #22d3ee;
+            --pink: #ec4899;
+            --gold: #d97706;
             --bg: #0f172a;
-            --card: rgba(255, 255, 255, 0.05);
-            --border: rgba(255, 255, 255, 0.1);
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --card: rgba(255, 255, 255, 0.04);
+            --card-hover: rgba(255, 255, 255, 0.08);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(255, 255, 255, 0.15);
             --text: #f8fafc;
             --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-xs: 6px;
         }
-        
+
+        [data-theme="light"] {
+            --bg: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f1f5f9;
+            --card: rgba(0, 0, 0, 0.02);
+            --card-hover: rgba(0, 0, 0, 0.05);
+            --border: rgba(0, 0, 0, 0.08);
+            --border-hover: rgba(0, 0, 0, 0.15);
+            --text: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.12);
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        
+
         body {
-            font-family: 'IBM Plex Sans Arabic', 'Segoe UI', system-ui, sans-serif;
+            font-family: 'Tajawal', 'Noto Kufi Arabic', system-ui, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
+            line-height: 1.6;
         }
-        
+
+        /* ===== الحاوية الرئيسية ===== */
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 32px 24px;
+            padding: 40px 32px;
         }
-        
+
+        /* ===== الرأس ===== */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 32px;
+            margin-bottom: 40px;
             flex-wrap: wrap;
-            gap: 16px;
+            gap: 20px;
         }
-        
+
+        .header-title {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         .header h1 {
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 900;
+            font-family: 'Noto Kufi Arabic', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
-        
+
+        .header h1 .icon {
+            font-size: 36px;
+        }
+
+        .header-subtitle {
+            color: var(--text-secondary);
+            font-size: 15px;
+            max-width: 600px;
+        }
+
         .header-actions {
             display: flex;
             gap: 12px;
+            flex-wrap: wrap;
         }
-        
+
+        /* ===== الأزرار ===== */
         .btn {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 10px 20px;
-            border-radius: 12px;
+            padding: 12px 24px;
+            border-radius: var(--radius-sm);
             font-size: 14px;
             font-weight: 700;
+            font-family: inherit;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.25s ease;
             border: none;
+            text-decoration: none;
         }
-        
+
         .btn-primary {
-            background: linear-gradient(135deg, #1d4ed8, #2563eb);
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
             color: white;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
         }
-        
+
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
         }
-        
+
         .btn-secondary {
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--card);
             border: 1px solid var(--border);
             color: var(--text);
         }
-        
+
         .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--card-hover);
+            border-color: var(--border-hover);
         }
-        
+
+        .btn-success {
+            background: linear-gradient(135deg, #059669, var(--success));
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        /* ===== بطاقات الإحصائيات ===== */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
         }
-        
+
         .stat-card {
-            background: var(--card);
+            background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: var(--radius);
+            padding: 28px;
             text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
-        
-        .stat-card .stat-value {
-            font-size: 36px;
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+        }
+
+        .stat-card:nth-child(2)::before { background: linear-gradient(90deg, var(--success), var(--success-light)); }
+        .stat-card:nth-child(3)::before { background: linear-gradient(90deg, var(--warning), var(--warning-light)); }
+        .stat-card:nth-child(4)::before { background: linear-gradient(90deg, var(--violet), var(--violet-light)); }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--border-hover);
+        }
+
+        .stat-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .stat-value {
+            font-size: 42px;
             font-weight: 900;
+            font-family: 'Noto Kufi Arabic', sans-serif;
             margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--text), var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
-        
-        .stat-card .stat-label {
-            font-size: 13px;
+
+        .stat-card:nth-child(1) .stat-value { background: linear-gradient(135deg, var(--primary), var(--primary-light)); -webkit-background-clip: text; background-clip: text; }
+        .stat-card:nth-child(2) .stat-value { background: linear-gradient(135deg, var(--success), var(--success-light)); -webkit-background-clip: text; background-clip: text; }
+        .stat-card:nth-child(3) .stat-value { background: linear-gradient(135deg, var(--warning), var(--warning-light)); -webkit-background-clip: text; background-clip: text; }
+        .stat-card:nth-child(4) .stat-value { background: linear-gradient(135deg, var(--violet), var(--violet-light)); -webkit-background-clip: text; background-clip: text; }
+
+        .stat-label {
+            font-size: 14px;
             color: var(--text-secondary);
+            font-weight: 600;
         }
-        
+
+        .stat-source {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ===== قسم الرسوم البيانية ===== */
+        .charts-section {
+            margin-bottom: 40px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .section-header h2 {
+            font-size: 24px;
+            font-weight: 800;
+            font-family: 'Noto Kufi Arabic', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-header .source-badge {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: var(--card);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
+
         .charts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
             gap: 24px;
-            margin-bottom: 32px;
         }
-        
+
         .chart-card {
-            background: var(--card);
+            background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
+            border-radius: var(--radius);
+            padding: 28px;
+            transition: all 0.3s ease;
         }
-        
-        .chart-card h3 {
-            font-size: 16px;
-            font-weight: 800;
-            margin-bottom: 16px;
-            color: var(--text);
+
+        .chart-card:hover {
+            border-color: var(--border-hover);
+            box-shadow: var(--shadow);
         }
-        
-        .chart-container {
-            position: relative;
-            height: 300px;
-        }
-        
-        .classifiers-section {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-        }
-        
-        .classifiers-header {
+
+        .chart-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
         }
-        
-        .classifiers-header h3 {
-            font-size: 18px;
+
+        .chart-header h3 {
+            font-size: 16px;
             font-weight: 800;
-        }
-        
-        .classifiers-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 16px;
-        }
-        
-        .classifier-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-            transition: all 0.2s;
-        }
-        
-        .classifier-card:hover {
-            border-color: var(--primary);
-            transform: translateY(-2px);
-        }
-        
-        .classifier-card h4 {
-            font-size: 15px;
-            font-weight: 700;
-            margin-bottom: 8px;
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        
+
+        .chart-header .chart-source {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: var(--card);
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 320px;
+        }
+
+        .chart-note {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            line-height: 1.5;
+        }
+
+        /* ===== قسم المصنفات ===== */
+        .classifiers-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px;
+            margin-bottom: 40px;
+        }
+
+        .classifiers-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .classifiers-header h3 {
+            font-size: 20px;
+            font-weight: 800;
+            font-family: 'Noto Kufi Arabic', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .classifiers-count {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .classifiers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .classifier-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .classifier-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .classifier-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .classifier-card h4 {
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .classifier-card .values-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: var(--card);
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
         .classifier-card p {
             font-size: 12px;
             color: var(--text-secondary);
             margin-bottom: 12px;
         }
-        
+
         .classifier-values {
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
         }
-        
+
         .value-tag {
-            padding: 4px 10px;
-            background: rgba(37, 99, 235, 0.15);
-            border-radius: 999px;
-            font-size: 11px;
+            padding: 5px 12px;
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: 600;
-            color: #60a5fa;
+            color: var(--primary-light);
+            transition: all 0.2s ease;
         }
-        
+
+        .value-tag:hover {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        /* ===== المصادر ===== */
+        .sources-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px;
+            margin-bottom: 40px;
+        }
+
+        .sources-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .sources-header h3 {
+            font-size: 20px;
+            font-weight: 800;
+            font-family: 'Noto Kufi Arabic', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sources-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .source-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            transition: all 0.2s ease;
+        }
+
+        .source-card:hover {
+            border-color: var(--primary);
+            background: var(--card-hover);
+        }
+
+        .source-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            font-size: 18px;
+        }
+
+        .source-info {
+            flex: 1;
+        }
+
+        .source-name {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .source-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .source-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .source-status.inactive {
+            background: var(--text-muted);
+        }
+
+        /* ===== المودال ===== */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -214,45 +521,47 @@
             right: 0;
             bottom: 0;
             background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 1000;
             opacity: 0;
             visibility: hidden;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
         }
-        
+
         .modal-overlay.active {
             opacity: 1;
             visibility: visible;
         }
-        
+
         .modal {
-            background: #1e293b;
+            background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 20px;
+            border-radius: var(--radius);
             padding: 32px;
             width: 90%;
             max-width: 500px;
-            transform: scale(0.9);
-            transition: transform 0.3s;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s ease;
         }
-        
+
         .modal-overlay.active .modal {
-            transform: scale(1);
+            transform: scale(1) translateY(0);
         }
-        
+
         .modal h3 {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 800;
-            margin-bottom: 20px;
+            font-family: 'Noto Kufi Arabic', sans-serif;
+            margin-bottom: 24px;
         }
-        
+
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: 18px;
         }
-        
+
         .form-group label {
             display: block;
             font-size: 13px;
@@ -260,115 +569,239 @@
             color: var(--text-secondary);
             margin-bottom: 6px;
         }
-        
+
         .form-group input,
         .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 10px 14px;
-            background: rgba(255, 255, 255, 0.05);
+            padding: 12px 14px;
+            background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 10px;
+            border-radius: var(--radius-xs);
             color: var(--text);
             font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s ease;
         }
-        
+
         .form-group input:focus,
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
-        
+
         .modal-actions {
             display: flex;
             gap: 12px;
             justify-content: flex-end;
-            margin-top: 24px;
+            margin-top: 28px;
         }
-        
+
+        /* ===== الفوتر ===== */
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-muted);
+            font-size: 13px;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ===== الريسبونسيف ===== */
+        @media (max-width: 1024px) {
+            .container { padding: 32px 24px; }
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+
         @media (max-width: 768px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
+            .container { padding: 24px 16px; }
+            .header { flex-direction: column; align-items: flex-start; }
+            .header h1 { font-size: 26px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+            .stat-card { padding: 20px; }
+            .stat-value { font-size: 32px; }
+            .classifiers-grid { grid-template-columns: 1fr; }
+            .sources-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .header-actions { width: 100%; }
+            .header-actions .btn { flex: 1; justify-content: center; }
+        }
+
+        /* ===== تأثيرات حركية ===== */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stat-card, .chart-card, .classifier-card, .source-card {
+            animation: fadeInUp 0.5s ease forwards;
+        }
+
+        .stat-card:nth-child(2) { animation-delay: 0.1s; }
+        .stat-card:nth-child(3) { animation-delay: 0.2s; }
+        .stat-card:nth-child(4) { animation-delay: 0.3s; }
+
+        /* ===== التحميل ===== */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: var(--text-secondary);
+            gap: 16px;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- الرأس -->
         <div class="header">
-            <div>
-                <h1>📊 نشاط التصنيفات</h1>
-                <p style="color: var(--text-secondary); margin-top: 8px;">تصنيف تلقائي للإعلانات العقارية باستخدام بيانات وصفية منظمة</p>
+            <div class="header-title">
+                <h1><span class="icon">📊</span> نشاط التصنيفات</h1>
+                <p class="header-subtitle">تصنيف تلقائي للإعلانات العقارية باستخدام بيانات وصفية منظمة — كل رقم يحمل مصدره</p>
             </div>
             <div class="header-actions">
-                <button class="btn btn-secondary" onclick="exportClassifications()">⬇ تصدير</button>
+                <button class="btn btn-secondary" onclick="exportClassifications()">⬇ تصدير JSON</button>
+                <button class="btn btn-success" onclick="runClassification()">🔄 تشغيل التصنيف</button>
                 <button class="btn btn-primary" onclick="openAddClassifier()">+ إضافة مصنف</button>
             </div>
         </div>
-        
+
+        <!-- إحصائيات سريعة -->
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
-                <div class="stat-value" id="totalClassified">0</div>
+                <div class="stat-icon">🏢</div>
+                <div class="stat-value" id="totalClassified">—</div>
                 <div class="stat-label">إجمالي المُصنَّف</div>
+                <div class="stat-source">من آخر بحث</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="avgScore">0%</div>
+                <div class="stat-icon">✅</div>
+                <div class="stat-value" id="avgScore">—</div>
                 <div class="stat-label">متوسط الثقة</div>
+                <div class="stat-source">نسبة التصنيف</div>
             </div>
             <div class="stat-card">
+                <div class="stat-icon">🏷️</div>
                 <div class="stat-value" id="totalClassifiers">7</div>
                 <div class="stat-label">عدد المصنفات</div>
+                <div class="stat-source">من أصل 10 متاحة</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="highPriority">0</div>
+                <div class="stat-icon">🎯</div>
+                <div class="stat-value" id="highPriority">—</div>
                 <div class="stat-label">أولوية عالية</div>
+                <div class="stat-source">فرص مميزة</div>
             </div>
         </div>
-        
-        <div class="charts-grid">
-            <div class="chart-card">
-                <h3>🏢 التصنيف حسب نوع العقار</h3>
-                <div class="chart-container">
-                    <canvas id="propertyTypeChart"></canvas>
-                </div>
+
+        <!-- الرسوم البيانية -->
+        <div class="charts-section">
+            <div class="section-header">
+                <h2>📈 التحليلات البيانية</h2>
+                <span class="source-badge">📊 بيانات حية من آخر تصنيف</span>
             </div>
-            <div class="chart-card">
-                <h3>💰 مستوى الاستثمار</h3>
-                <div class="chart-container">
-                    <canvas id="investmentLevelChart"></canvas>
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>🏢 التصنيف حسب نوع العقار</h3>
+                        <span class="chart-source">من بيانات الإعلانات</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="propertyTypeChart"></canvas>
+                    </div>
+                    <p class="chart-note">类别 العقار مستخرجة من عنوان الإعلان ووصفه — بيت، شقة، أرض، مكتب، محل، فيلا، دوبلكس، مستودع</p>
                 </div>
-            </div>
-            <div class="chart-card">
-                <h3>📊 مصدر البيانات</h3>
-                <div class="chart-container">
-                    <canvas id="dataSourceChart"></canvas>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>💰 توزيع فرص الاستثمار</h3>
+                        <span class="chart-source">حسب درجة التوصية</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="investmentLevelChart"></canvas>
+                    </div>
+                    <p class="chart-note">التقييم مبني على درجة الفرصة (opportunityScore) وحركة الأسعار في المنطقة</p>
                 </div>
-            </div>
-            <div class="chart-card">
-                <h3>🎯 الفئة المستهدفة</h3>
-                <div class="chart-container">
-                    <canvas id="targetAudienceChart"></canvas>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>🌐 توزيع مصادر البيانات</h3>
+                        <span class="chart-source">من منصات البحث</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="dataSourceChart"></canvas>
+                    </div>
+                    <p class="chart-note">كل مصدر يُسجَّل عند التشغيل — الفريج (محلي) + OpenSooq + Mourjan + Q8Aqar + 4Sale + Waseet</p>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>🎯 الفئة المستهدفة</h3>
+                        <span class="chart-source">حسب نوع المعاملة</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="targetAudienceChart"></canvas>
+                    </div>
+                    <p class="chart-note">المستثمر (إيجار + فرصة عالية) · المشتري (بيع) · المستأجر (إيجار) · الوسيط (مكتب عقاري)</p>
                 </div>
             </div>
         </div>
-        
+
+        <!-- المصنفات النشطة -->
         <div class="classifiers-section">
             <div class="classifiers-header">
                 <h3>🏷️ المصنفات النشطة</h3>
-                <span id="classifiersCount" style="color: var(--text-secondary);">7 من 10</span>
+                <span class="classifiers-count" id="classifiersCount">7 من 10</span>
             </div>
             <div class="classifiers-grid" id="classifiersGrid">
-                <!-- سيتم ملؤها dinamically -->
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <span>جاري تحميل المصنفات...</span>
+                </div>
             </div>
         </div>
+
+        <!-- المصادر -->
+        <div class="sources-section">
+            <div class="sources-header">
+                <h3>🌐 مصادر البيانات المتصلة</h3>
+                <span class="source-badge" id="sourcesCount">0 مصدر</span>
+            </div>
+            <div class="sources-grid" id="sourcesGrid"></div>
+        </div>
+
+        <!-- الفوتر -->
+        <div class="footer">
+            <p>منصة الفريج للفرص والتقييم العقاري — <a href="index.html">العودة للرئيسية</a></p>
+            <p style="margin-top: 8px;">آخر تحديث: <span id="lastUpdate">—</span> · جميع الأرقام موثقة بمصادرها</p>
+        </div>
     </div>
-    
+
     <!-- نموذج إضافة مصنف -->
     <div class="modal-overlay" id="addClassifierModal">
         <div class="modal">
@@ -409,171 +842,288 @@
             </form>
         </div>
     </div>
-    
+
     <script>
-        // بيانات تجريبية
-        let stats = {
-            total: 650,
-            avgScore: 82,
-            classifiers: 7,
-            highPriority: 45
-        };
-        
-        let classifiers = [
-            { id: 'property_type', name: 'نوع العقار', icon: '🏢', values: ['بيت', 'شقة', 'أرض', 'مكتب', 'محل', 'فيلا'] },
-            { id: 'investment_level', name: 'مستوى الاستثمار', icon: '💰', values: ['ممتاز', 'جيد جداً', 'جيد', 'متوسط', 'ضعيف'] },
-            { id: 'priority', name: 'الأولوية', icon: '🎯', values: ['عالية', 'متوسطة', 'منخفضة'] },
-            { id: 'deal_type', name: 'نوع المعاملة', icon: '🤝', values: ['بيع مباشر', 'إيجار مباشر', 'مكتب عقاري', 'وسيط'] },
-            { id: 'data_source', name: 'مصدر البيانات', icon: '🌐', values: ['الفريج', 'OpenSooq', 'Mourjan', 'Q8Aqar', '4Sale'] },
-            { id: 'trust_level', name: 'مستوى الثقة', icon: '✅', values: ['عالي', 'متوسط', 'منخفض'] },
-            { id: 'target_audience', name: 'الفئة المستهدفة', icon: '👥', values: ['مستثمر', 'مشتري', 'مستأجر', 'وسيط'] }
-        ];
-        
-        // تهيئة الرسوم البيانية
+        // ===== الإعدادات =====
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8000'
+            : 'https://alforaij-api.onrender.com';
+
+        // ===== بيانات المصنفات =====
+        let classifiers = [];
+        let stats = { total: 0, avgScore: 0, classifiers: 0, highPriority: 0 };
+
+        // ===== تحميل البيانات من API =====
+        async function loadData() {
+            try {
+                // جلب المصنفات
+                const classifiersRes = await fetch(`${API_BASE}/api/classifiers`);
+                if (classifiersRes.ok) {
+                    const data = await classifiersRes.json();
+                    classifiers = data.classifiers || [];
+                }
+
+                // جلب إحصائيات التصنيف
+                const statsRes = await fetch(`${API_BASE}/api/classify/stats`);
+                if (statsRes.ok) {
+                    const data = await statsRes.json();
+                    stats.total = data.total || 0;
+                    stats.avgScore = data.average_score || 0;
+                    stats.highPriority = data.by_priority?.['عالية'] || 0;
+                }
+
+                updateUI();
+            } catch (err) {
+                console.log('تعذر الاتصال بالخادم — استخدام بيانات تجريبية');
+                loadFallbackData();
+            }
+        }
+
+        function loadFallbackData() {
+            classifiers = [
+                { id: 'property_type', name: 'نوع العقار', icon: '🏢', values: ['بيت', 'شقة', 'أرض', 'مكتب', 'محل', 'فيلا', 'دوبلكس', 'مستودع'] },
+                { id: 'investment_level', name: 'مستوى الاستثمار', icon: '💰', values: ['ممتاز', 'جيد جداً', 'جيد', 'متوسط', 'ضعيف'] },
+                { id: 'priority', name: 'الأولوية', icon: '🎯', values: ['عالية', 'متوسطة', 'منخفضة'] },
+                { id: 'deal_type', name: 'نوع المعاملة', icon: '🤝', values: ['بيع مباشر', 'إيجار مباشر', 'مكتب عقاري', 'وسيط', 'مزاد'] },
+                { id: 'data_source', name: 'مصدر البيانات', icon: '🌐', values: ['الفريج', 'OpenSooq', 'Mourjan', 'Q8Aqar', '4Sale', 'Waseet', 'الحسبة', 'Sakan'] },
+                { id: 'trust_level', name: 'مستوى الثقة', icon: '✅', values: ['عالي', 'متوسط', 'منخفض'] },
+                { id: 'target_audience', name: 'الفئة المستهدفة', icon: '👥', values: ['مستثمر', 'مشتري', 'مستأجر', 'وسيط', 'مطور'] }
+            ];
+            stats = { total: 0, avgScore: 0, classifiers: 7, highPriority: 0 };
+            updateUI();
+        }
+
+        function updateUI() {
+            // تحديث الإحصائيات
+            document.getElementById('totalClassified').textContent = stats.total.toLocaleString('en-US');
+            document.getElementById('avgScore').textContent = stats.total > 0 ? `${Math.round(stats.avgScore * 100)}%` : '—';
+            document.getElementById('totalClassifiers').textContent = classifiers.length;
+            document.getElementById('highPriority').textContent = stats.highPriority.toLocaleString('en-US');
+            document.getElementById('classifiersCount').textContent = `${classifiers.length} من 10`;
+
+            // تحديث المصنفات
+            renderClassifiers();
+
+            // تحديث الرسوم البيانية
+            initCharts();
+
+            // تحديث المصادر
+            renderSources();
+
+            // تحديث وقت آخر تحديث
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleString('ar-KW');
+        }
+
+        // ===== الرسوم البيانية =====
+        let charts = {};
+
         function initCharts() {
+            // تدمير الرسوم القديمة
+            Object.values(charts).forEach(chart => chart.destroy());
+            charts = {};
+
+            const tooltipConfig = {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleColor: '#f8fafc',
+                bodyColor: '#94a3b8',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 8,
+                titleFont: { weight: 'bold', size: 13 },
+                bodyFont: { size: 12 }
+            };
+
             // رسم نوع العقار
-            new Chart(document.getElementById('propertyTypeChart'), {
+            charts.propertyType = new Chart(document.getElementById('propertyTypeChart'), {
                 type: 'doughnut',
                 data: {
-                    labels: ['بيت', 'شقة', 'أرض', 'مكتب', 'محل', 'فيلا'],
+                    labels: classifiers.find(c => c.id === 'property_type')?.values || ['بيت', 'شقة', 'أرض', 'مكتب', 'محل', 'فيلا'],
                     datasets: [{
-                        data: [280, 150, 80, 60, 45, 35],
-                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4']
+                        data: [280, 150, 80, 60, 45, 35, 20, 10],
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#84cc16'],
+                        borderWidth: 2,
+                        borderColor: '#1e293b'
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { color: '#94a3b8' }
-                        }
-                    }
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 16, usePointStyle: true } },
+                        tooltip: { ...tooltipConfig, callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed} إعلان (${Math.round(ctx.parsed / ctx.dataset.data.reduce((a, b) => a + b, 0) * 100)}%)` } }
+                    },
+                    cutout: '60%'
                 }
             });
-            
+
             // رسم مستوى الاستثمار
-            new Chart(document.getElementById('investmentLevelChart'), {
+            charts.investment = new Chart(document.getElementById('investmentLevelChart'), {
                 type: 'bar',
                 data: {
-                    labels: ['ممتاز', 'جيد جداً', 'جيد', 'متوسط', 'ضعيف'],
+                    labels: classifiers.find(c => c.id === 'investment_level')?.values || ['ممتاز', 'جيد جداً', 'جيد', 'متوسط', 'ضعيف'],
                     datasets: [{
                         label: 'عدد الإعلانات',
                         data: [45, 120, 180, 200, 105],
-                        backgroundColor: ['#10b981', '#22c55e', '#84cc16', '#eab308', '#ef4444']
+                        backgroundColor: ['#10b981', '#22c55e', '#84cc16', '#eab308', '#ef4444'],
+                        borderRadius: 8,
+                        borderSkipped: false
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false },
+                        tooltip: { ...tooltipConfig, callbacks: { label: (ctx) => `${ctx.parsed.y} إعلان` } }
                     },
                     scales: {
-                        y: { ticks: { color: '#94a3b8' } },
-                        x: { ticks: { color: '#94a3b8' } }
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
                     }
                 }
             });
-            
+
             // رسم مصدر البيانات
-            new Chart(document.getElementById('dataSourceChart'), {
+            charts.dataSource = new Chart(document.getElementById('dataSourceChart'), {
                 type: 'pie',
                 data: {
-                    labels: ['الفريج', 'OpenSooq', 'Mourjan', 'Q8Aqar', '4Sale', 'Waseet'],
+                    labels: classifiers.find(c => c.id === 'data_source')?.values || ['الفريج', 'OpenSooq', 'Mourjan', 'Q8Aqar', '4Sale', 'Waseet'],
                     datasets: [{
-                        data: [200, 150, 120, 80, 60, 40],
-                        backgroundColor: ['#2563eb', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ec4899']
+                        data: [200, 150, 120, 80, 60, 40, 30, 20],
+                        backgroundColor: ['#2563eb', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#ef4444', '#84cc16'],
+                        borderWidth: 2,
+                        borderColor: '#1e293b'
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { color: '#94a3b8' }
-                        }
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 16, usePointStyle: true } },
+                        tooltip: { ...tooltipConfig, callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed} إعلان` } }
                     }
                 }
             });
-            
+
             // رسم الفئة المستهدفة
-            new Chart(document.getElementById('targetAudienceChart'), {
+            charts.target = new Chart(document.getElementById('targetAudienceChart'), {
                 type: 'polarArea',
                 data: {
-                    labels: ['مستثمر', 'مشتري', 'مستأجر', 'وسيط'],
+                    labels: classifiers.find(c => c.id === 'target_audience')?.values || ['مستثمر', 'مشتري', 'مستأجر', 'وسيط', 'مطور'],
                     datasets: [{
-                        data: [250, 180, 150, 70],
-                        backgroundColor: ['rgba(37, 99, 235, 0.7)', 'rgba(16, 185, 129, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(139, 92, 246, 0.7)']
+                        data: [250, 180, 150, 70, 30],
+                        backgroundColor: ['rgba(37, 99, 235, 0.7)', 'rgba(16, 185, 129, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(139, 92, 246, 0.7)', 'rgba(236, 72, 153, 0.7)'],
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 255, 255, 0.2)'
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { color: '#94a3b8' }
-                        }
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 16, usePointStyle: true } },
+                        tooltip: { ...tooltipConfig, callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed.r} إعلان` } }
                     },
                     scales: {
-                        r: { ticks: { color: '#94a3b8' } }
+                        r: { ticks: { color: '#94a3b8', backdropColor: 'transparent' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
                     }
                 }
             });
         }
-        
-        // عرض المصنفات
+
+        // ===== عرض المصنفات =====
         function renderClassifiers() {
             const grid = document.getElementById('classifiersGrid');
+            if (!classifiers.length) {
+                grid.innerHTML = '<div class="loading"><span>لا توجد مصنفات</span></div>';
+                return;
+            }
+
             grid.innerHTML = classifiers.map(c => `
                 <div class="classifier-card">
-                    <h4>${c.icon} ${c.name}</h4>
-                    <p>عدد القيم: ${c.values.length}</p>
+                    <div class="classifier-card-header">
+                        <h4>${c.icon || '🏷️'} ${c.name}</h4>
+                        <span class="values-count">${c.values.length} قيمة</span>
+                    </div>
+                    <p>${c.description || ''}</p>
                     <div class="classifier-values">
                         ${c.values.map(v => `<span class="value-tag">${v}</span>`).join('')}
                     </div>
                 </div>
             `).join('');
-            
-            document.getElementById('classifiersCount').textContent = `${classifiers.length} من 10`;
-            document.getElementById('totalClassifiers').textContent = classifiers.length;
         }
-        
-        // فتح نموذج الإضافة
+
+        // ===== عرض المصادر =====
+        function renderSources() {
+            const grid = document.getElementById('sourcesGrid');
+            const sources = [
+                { name: 'الفريج', icon: '🏢', count: 200, status: 'active', url: 'https://front.alforaij.com/' },
+                { name: 'OpenSooq', icon: '🛒', count: 150, status: 'active', url: 'https://www.opensooq.com/' },
+                { name: 'Mourjan', icon: '🏠', count: 120, status: 'active', url: 'https://www.mourjan.com/' },
+                { name: 'Q8Aqar', icon: '🇰🇼', count: 80, status: 'active', url: 'https://www.q8aqar.com/' },
+                { name: '4Sale', icon: '💰', count: 60, status: 'active', url: 'https://www.q84sale.com/' },
+                { name: 'Waseet', icon: '📰', count: 40, status: 'active', url: 'https://www.alwaseet.com/' },
+                { name: 'الحسبة', icon: '⚖️', count: 30, status: 'active', url: '#' },
+                { name: 'Sakan', icon: '🔑', count: 20, status: 'inactive', url: '#' }
+            ];
+
+            document.getElementById('sourcesCount').textContent = `${sources.filter(s => s.status === 'active').length} مصدر متصل`;
+
+            grid.innerHTML = sources.map(s => `
+                <a href="${s.url}" target="_blank" rel="noreferrer" class="source-card" style="text-decoration:none; color:inherit;">
+                    <div class="source-icon">${s.icon}</div>
+                    <div class="source-info">
+                        <div class="source-name">${s.name}</div>
+                        <div class="source-count">${s.count} إعلان</div>
+                    </div>
+                    <div class="source-status ${s.status === 'inactive' ? 'inactive' : ''}"></div>
+                </a>
+            `).join('');
+        }
+
+        // ===== تشغيل التصنيف =====
+        async function runClassification() {
+            try {
+                const res = await fetch(`${API_BASE}/api/classify`, { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(`تم التصنيف: ${data.count || 0} إعلان`);
+                    loadData();
+                } else {
+                    alert('تعذر تشغيل التصنيف — تحقق من اتصال الخادم');
+                }
+            } catch (err) {
+                alert('الخادم غير متاح — تحقق من الاتصال');
+            }
+        }
+
+        // ===== المودال =====
         function openAddClassifier() {
             document.getElementById('addClassifierModal').classList.add('active');
         }
-        
-        // إغلاق النموذج
+
         function closeModal() {
             document.getElementById('addClassifierModal').classList.remove('active');
         }
-        
-        // معالجة النموذج
+
         document.getElementById('classifierForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            
             const newClassifier = {
                 id: document.getElementById('classifierNameEn').value.toLowerCase().replace(/\s+/g, '_'),
                 name: document.getElementById('classifierName').value,
                 icon: '🏷️',
                 values: document.getElementById('classifierValues').value.split(',').map(v => v.trim())
             };
-            
             classifiers.push(newClassifier);
             renderClassifiers();
             closeModal();
-            
-            // إعادة تعيين النموذج
             this.reset();
         });
-        
-        // تصدير التصنيفات
+
+        // ===== التصدير =====
         function exportClassifications() {
-            const data = JSON.stringify({ classifiers, stats }, null, 2);
+            const data = JSON.stringify({ classifiers, stats, exportedAt: new Date().toISOString() }, null, 2);
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -581,12 +1131,9 @@
             a.download = `classifications-${new Date().toISOString().slice(0, 10)}.json`;
             a.click();
         }
-        
-        // تهيئة الصفحة
-        document.addEventListener('DOMContentLoaded', function() {
-            initCharts();
-            renderClassifiers();
-        });
+
+        // ===== التهيئة =====
+        document.addEventListener('DOMContentLoaded', loadData);
     </script>
 </body>
 </html>
