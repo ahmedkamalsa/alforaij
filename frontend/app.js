@@ -3787,6 +3787,39 @@ function renderReport(report) {
         gapBadge.hidden = false;
       }
     }
+    // شارات التصنيف التلقائي
+    const classBadges = node.querySelector(".classification-badges");
+    if (classBadges && item.classification) {
+      const c = item.classification;
+      const badges = [];
+      if (c.priority) {
+        const pCls = c.priority === "عالية" ? "priority-high" : c.priority === "متوسطة" ? "priority-medium" : "priority-low";
+        badges.push(`<span class="class-badge ${pCls}">🎯 ${c.priority}</span>`);
+      }
+      if (c.investmentLevel) {
+        const iCls = c.investmentLevel === "ممتاز" ? "investment-excellent" : c.investmentLevel.includes("جيد") ? "investment-good" : c.investmentLevel === "متوسط" ? "investment-medium" : "investment-low";
+        badges.push(`<span class="class-badge ${iCls}">💰 ${c.investmentLevel}</span>`);
+      }
+      if (c.trustLevel) {
+        const tCls = c.trustLevel === "عالي" ? "trust-high" : "";
+        badges.push(`<span class="class-badge ${tCls}">✅ ثقة ${c.trustLevel}</span>`);
+      }
+      if (c.propertyType) {
+        badges.push(`<span class="class-badge">🏢 ${c.propertyType}</span>`);
+      }
+      if (c.dealType) {
+        badges.push(`<span class="class-badge">🤝 ${c.dealType}</span>`);
+      }
+      if (c.dataSource) {
+        const sCls = c.dataSource === "الفريج" ? "source-local" : "source-external";
+        badges.push(`<span class="class-badge ${sCls}">🌐 ${c.dataSource}</span>`);
+      }
+      if (c.tags && c.tags.length) {
+        c.tags.forEach(tag => badges.push(`<span class="class-badge">🏷️ ${tag}</span>`));
+      }
+      classBadges.innerHTML = badges.join("");
+      classBadges.hidden = !badges.length;
+    }
     node.querySelector(".verdict-label").textContent = item.valuationLabel || "بدون حكم";
     node.querySelector(".recommendation").textContent = `توصية ${Math.round(item.recommendationScore || 0)} / 100`;
     const isRental = !!item.rental;

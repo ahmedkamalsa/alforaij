@@ -1272,6 +1272,44 @@ class Handler(BaseHTTPRequestHandler):
                 deduped = deduplicate_ranked(enriched)[:50]
                 _progress_push(job_id, "score", f"تقييم المطابقة والترتيب: {len(deduped)} نتيجة نهائية")
 
+                # تصنيف تلقائي للنتائج: يصنف كل إعلان حسب 7 فئات (نوع العقار، مستوى الاستثمار، الأولوية، نوع المعاملة، مصدر البيانات، مستوى الثقة، الفئة المستهدفة)
+                _progress_push(job_id, "classify", "تصنيف النتائج تلقائيًا حسب الفئات")
+                try:
+                    from backend.services.listing_classifier import get_classifier
+                    classifier = get_classifier()
+                    for result in deduped:
+                        listing_dict = {
+                            "id": result.get("id", ""),
+                            "title": result.get("title", ""),
+                            "description": result.get("description", ""),
+                            "price": result.get("price", 0),
+                            "space": result.get("space", 0),
+                            "area": result.get("area", ""),
+                            "governorate": result.get("governorate", ""),
+                            "propertyType": result.get("propertyType", ""),
+                            "transaction": result.get("transaction", ""),
+                            "listingMode": result.get("listingMode", ""),
+                            "source": result.get("source", ""),
+                            "opportunityScore": result.get("opportunityScore", 0),
+                            "movement": result.get("movement", 0),
+                            "evidenceCount": result.get("evidenceCount", 0),
+                        }
+                        classification = classifier.classify_listing(listing_dict)
+                        result["classification"] = {
+                            "propertyType": classification.classifications.get("property_type", ""),
+                            "investmentLevel": classification.classifications.get("investment_level", ""),
+                            "priority": classification.classifications.get("priority", ""),
+                            "dealType": classification.classifications.get("deal_type", ""),
+                            "dataSource": classification.classifications.get("data_source", ""),
+                            "trustLevel": classification.classifications.get("trust_level", ""),
+                            "targetAudience": classification.classifications.get("target_audience", ""),
+                            "overallScore": classification.overall_score,
+                            "tags": classification.tags,
+                        }
+                    _progress_push(job_id, "classify", f"تم تصنيف {len(deduped)} إعلانًا")
+                except Exception as classify_error:
+                    logger.warning("Classification failed: %s", classify_error)
+
                 # Fetch AI professional analysis
                 _progress_push(job_id, "report", "بناء التقرير والتحليل الاحترافي (قد يستغرق ثوانٍ)")
                 ai_insights = generate_professional_analysis(request, deduped, external_statuses)
