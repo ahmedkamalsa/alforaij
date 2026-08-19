@@ -628,6 +628,165 @@ textarea {
   100% { opacity: 1; filter: drop-shadow(0 0 0 rgba(226, 201, 104, 0)); }
 }
 
+/* ══════════════════════════════════════════
+   رابط لوحة الفريج البصرية (alforaijboard.netlify.app)
+   نفس استايل رابط الفريج مع ألوان Teal/Cyan لتمييزه
+   ══════════════════════════════════════════ */
+.hero-board-link {
+  position: relative;
+  overflow: hidden;
+  gap: 10px;
+  padding: 6px 15px 6px 8px;
+  border: 1px solid rgba(6, 182, 212, .6);
+  border-radius: var(--radius-pill);
+  /* الأساس سماوي (حالة التمرير) — والطبقة الزرقاء الداكنة فوقه تُظهر نفسها افتراضيًا */
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 62%, #155e75 100%);
+  box-shadow: 0 10px 26px rgba(6, 182, 212, .42), inset 0 1px 0 rgba(255, 255, 255, .25);
+  color: #fff;
+  transition: box-shadow 1.4s ease, border-color 1.4s ease, transform .3s ease;
+}
+
+/* الطبقة الداكنة (الحالة الافتراضية) تتلاشى عند التمرير فتكشف السماوي */
+.hero-board-link::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #0c4a6e 0%, #155e75 58%, #164e63 100%);
+  opacity: 1;
+  transition: opacity 1.4s ease;
+}
+
+.hero-board-link > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-board-link:hover {
+  transform: translateY(-2px);
+  border-color: rgba(6, 182, 212, .8);
+  box-shadow: 0 14px 38px rgba(6, 182, 212, .55), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+.hero-board-link:hover::before {
+  opacity: 0; /* الداكن → السماوي الفاتح */
+}
+
+/* ميدالية الشعار: سماوية افتراضيًا */
+.board-badge {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 50%;
+  background: #f4f5f7;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45), 0 2px 6px rgba(20, 30, 60, .35);
+}
+
+.board-badge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 26%, #cffafe 0%, #06b6d4 42%, #155e75 78%, #0c4a6e 100%);
+  opacity: 1;
+  transition: opacity 1.4s ease;
+}
+
+.board-badge-ic {
+  position: relative;
+  z-index: 1;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.hero-board-link:hover .board-badge::before {
+  opacity: 0; /* الميدالية السماوية → فاتحة */
+}
+
+/* اسم اللوحة بلوني السماوي: طبقتان فوق بعضهما تتعابران */
+.bn-teal {
+  background-image: linear-gradient(180deg, #cffafe 0%, #22d3ee 45%, #06b6d4 78%, #155e75 100%);
+}
+
+.bn-cyan {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(180deg, #ecfeff 0%, #67e8f9 48%, #06b6d4 100%);
+  opacity: 0;
+}
+
+.hero-board-link:hover .bn-teal {
+  opacity: 0;
+}
+
+.hero-board-link:hover .bn-cyan {
+  opacity: 1; /* الكلمة السماوية الداكنة → فاتحة */
+}
+
+.hero-board-link:hover .brand-sub {
+  color: rgba(6, 182, 212, .85);
+}
+
+.hero-board-link:hover .brand-arrow {
+  color: #06b6d4;
+  transform: translate(2px, -2px);
+}
+
+/* الثيم الفاتح: يُبقي الزر محتفظًا بالهوية */
+[data-theme="light"] .hero-board-link {
+  border-color: rgba(6, 182, 212, .55);
+  box-shadow: 0 10px 26px rgba(6, 182, 212, .28), inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+
+/* حركة الظهور */
+.hero-board-link {
+  animation: var(--animate-brand-enter);
+  animation-delay: 0.15s;
+}
+
+/* ══════════════════════════════════════════
+   تنبيه VPN (يظهر فقط عند عدم عمل الرابط)
+   ══════════════════════════════════════════ */
+.vpn-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background: rgba(239, 68, 68, .95);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 8px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all .2s ease;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.vpn-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(239, 68, 68, .95);
+}
+
+.hero-board-link:hover .vpn-tooltip {
+  opacity: 1;
+  visibility: visible;
+  bottom: calc(100% + 8px);
+}
+
 /* لمعة ذهبية تنزلق عبر الشارة مرتين ثم تخفت وتستقر (فوق المحتوى، لا تحجب النقر) */
 .hero-brand-link::after {
   content: "";
