@@ -18,6 +18,7 @@
   <script src="config.js?v=20260819-trends"></script>
   <script src="components/lucide-icons.js?v=20260819-modern"></script>
   <link rel="stylesheet" href="components/final-design.css?v=20260819-final">
+  <link rel="stylesheet" href="components/governorate-pro.css?v=20260819-gov">
   <link rel="stylesheet" href="components/hover-card-v2.css?v=20260819-modern">
   <link rel="stylesheet" href="components/install-prompt.css?v=20260819-modern">
 </head>
@@ -157,25 +158,38 @@
           <div id="boardCompanionAds" class="companion-ads"></div>
           <div id="boardMatchingLink" class="board-matching-link"></div>
         </section>
-        <section class="governorate-board">
-          <div class="section-title compact-title gov-title-row">
-            <div>
-              <h3>الأرقام حسب المحافظات</h3>
-              <span>اضغط المحافظة لفتح مناطقها، أو اضغط أي رقم لعرض الإعلانات الفعلية خلفه بأدلتها ومصادرها، أو أي إعلان لفتح تفاصيله الكاملة.</span>
+        <section class="governorate-section" aria-label="الأرقام حسب المحافظات">
+          <div class="gov-section-header">
+            <div class="gov-section-title">
+              <h2><span class="gov-icon">📊</span> الأرقام حسب المحافظات</h2>
+              <span class="gov-subtitle">اضغط المحافظة لفتح مناطقها، أو اضغط أي رقم لعرض الإعلانات الفعلية</span>
             </div>
-            <div class="gov-title-actions">
-              <div class="gov-view-switch" role="group" aria-label="طريقة عرض الأرقام حسب المحافظات">
+            <div class="gov-section-actions">
+              <div class="gov-view-switch" role="group" aria-label="طريقة عرض الأرقام">
                 <button type="button" class="gov-view-btn active" data-gov-view="grid">شبكة</button>
-                <button type="button" class="gov-view-btn" data-gov-view="table">جدول مضغوط</button>
+                <button type="button" class="gov-view-btn" data-gov-view="table">جدول</button>
               </div>
-              <button id="govExportCsvBtn" class="board-mini-btn" type="button" title="تصدير أرقام المحافظات والمناطق الحالية إلى CSV بترميز UTF-8 يعمل مع Excel" hidden>⬇ تصدير CSV</button>
-              <button id="govCopyBtn" class="board-mini-btn" type="button" title="نسخ الأرقام الحالية إلى الحافظة بصيغة TSV — الصق مباشرة في Excel" hidden>📋 نسخ</button>
-              <span id="govAxisPill" class="axis-pill">المحور: حركة الدلال</span>
-              <button id="govClearSelectionsBtn" class="board-mini-btn" type="button">مسح اختيارات اللوحة</button>
+              <span id="govAxisPill" class="gov-axis-pill">المحور: حركة الدلال</span>
+              <button id="govExportCsvBtn" class="gov-action-btn" type="button" title="تصدير CSV" hidden>⬇ CSV</button>
+              <button id="govCopyBtn" class="gov-action-btn" type="button" title="نسخ" hidden>📋 نسخ</button>
+              <button id="govClearSelectionsBtn" class="gov-action-btn" type="button">مسح الاختيارات</button>
             </div>
           </div>
-          <div id="governorateCards" class="governorate-cards">
-            <div class="gov-empty">جاري تحميل بيانات اللوحة...</div>
+          <div id="govSummaryBar" class="gov-summary-bar"></div>
+          <div class="gov-section-content">
+            <div id="governorateCards" class="gov-grid-view">
+              <div class="gov-loading">
+                <div class="gov-loading-spinner"></div>
+                <span>جاري تحميل بيانات المحافظات...</span>
+              </div>
+            </div>
+            <div id="govLinkedAds" class="gov-linked-ads" hidden>
+              <div class="gov-linked-ads-header">
+                <h3>📌 الإعلانات المرتبطة بالاختيار</h3>
+                <span id="govLinkedAdsCount" class="gov-linked-ads-count">0 إعلان</span>
+              </div>
+              <div id="govLinkedAdsGrid" class="gov-linked-ads-grid"></div>
+            </div>
           </div>
         </section>
       </div>

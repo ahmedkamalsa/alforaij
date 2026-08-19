@@ -1,0 +1,1082 @@
+/* ===== قسم المحافظات الاحترافي المنفرد ===== */
+
+/* ── الحاوية الرئيسية ── */
+.governorate-section {
+  position: relative;
+  padding: 0;
+  margin: 0;
+}
+
+/* ── رأس القسم ── */
+.gov-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(139, 92, 246, 0.06) 100%);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border-bottom: none;
+}
+
+.gov-section-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gov-section-title h2 {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gov-section-title h2 .gov-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(37, 99, 235, 0.2);
+  border-radius: var(--radius-md);
+  font-size: 18px;
+}
+
+.gov-section-title .gov-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ── أزرار التحكم في الرأس ── */
+.gov-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.gov-view-switch {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 3px;
+}
+
+.gov-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gov-view-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.gov-view-btn.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.gov-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gov-action-btn:hover {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.3);
+  color: var(--primary-light);
+}
+
+.gov-axis-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-full);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ── شريط الملخص السريع ── */
+.gov-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 28px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-bottom: none;
+}
+
+.gov-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gov-summary-item:hover {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.3);
+  transform: translateY(-2px);
+}
+
+.gov-summary-item .summary-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(37, 99, 235, 0.15);
+  border-radius: var(--radius-md);
+  font-size: 18px;
+}
+
+.gov-summary-item .summary-value {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.gov-summary-item .summary-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ── محتوى المحافظات ── */
+.gov-section-content {
+  padding: 24px 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+/* ── عرض الشبكة (Grid View) ── */
+.gov-grid-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .gov-grid-view {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── كارت المحافظة ── */
+.gov-card-pro {
+  position: relative;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.gov-card-pro:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-lg);
+}
+
+.gov-card-pro.expanded {
+  grid-column: 1 / -1;
+  background: rgba(37, 99, 235, 0.05);
+  border-color: rgba(37, 99, 235, 0.3);
+  box-shadow: var(--shadow-xl);
+}
+
+/* شريط لوني علوي */
+.gov-card-pro::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary) 0%, #8b5cf6 100%);
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.gov-card-pro:hover::before,
+.gov-card-pro.expanded::before {
+  opacity: 1;
+}
+
+/* رأس الكارت */
+.gov-card-pro-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.gov-card-pro-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gov-card-pro-name .gov-badge {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.gov-card-pro-name .gov-name-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gov-card-pro-name .gov-name-ar {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.gov-card-pro-name .gov-name-en {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.gov-card-pro-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gov-areas-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  border-radius: var(--radius-full);
+  color: var(--primary-light);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gov-expand-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gov-expand-btn:hover {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.3);
+  color: var(--primary-light);
+}
+
+.gov-card-pro.expanded .gov-expand-btn {
+  transform: rotate(180deg);
+}
+
+/* جسم الكارت — الإحصائيات */
+.gov-card-pro-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 900px) {
+  .gov-card-pro-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .gov-card-pro-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.gov-stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px 12px;
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gov-stat-cell:hover {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.gov-stat-cell.axis {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.gov-stat-cell.selected {
+  background: rgba(37, 99, 235, 0.2);
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.5);
+}
+
+.gov-stat-cell .stat-value {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.gov-stat-cell.axis .stat-value {
+  color: var(--gold);
+}
+
+.gov-stat-cell .stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.gov-stat-cell .stat-delta {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+}
+
+.gov-stat-cell .stat-delta.up {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.gov-stat-cell .stat-delta.down {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.gov-stat-cell .stat-delta.flat {
+  color: var(--text-muted);
+  background: rgba(100, 116, 139, 0.1);
+}
+
+/* ── المناطق (عند التوسيع) ── */
+.gov-card-pro-areas {
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--border-color);
+}
+
+.gov-areas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.gov-areas-header h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.gov-areas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .gov-areas-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gov-area-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  transition: var(--transition);
+}
+
+.gov-area-item:hover {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.3);
+  transform: translateX(-4px);
+}
+
+.gov-area-item .area-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gov-area-item .area-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gov-area-item .area-count {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.gov-area-item .area-stats {
+  display: flex;
+  gap: 6px;
+}
+
+.gov-area-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gov-area-pill:hover {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.gov-area-pill.axis {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--gold);
+}
+
+/* ── الإجمالي ── */
+.gov-total-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.02) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-xl);
+}
+
+.gov-total-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.gov-total-header h3 {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--gold);
+}
+
+.gov-total-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .gov-total-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .gov-total-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.gov-total-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gov-total-pill:hover {
+  background: rgba(245, 158, 11, 0.2);
+  transform: translateY(-2px);
+}
+
+.gov-total-pill .total-value {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--gold);
+}
+
+.gov-total-pill .total-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ── عرض الجدول (Table View) ── */
+.gov-table-pro-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.gov-table-pro {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.gov-table-pro thead th {
+  padding: 16px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  background: rgba(37, 99, 235, 0.08);
+  border-bottom: 2px solid var(--border-color);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.gov-table-pro thead th:first-child,
+.gov-table-pro thead th:nth-child(2),
+.gov-table-pro thead th:nth-child(3) {
+  text-align: right;
+}
+
+.gov-table-pro thead th.axis {
+  color: var(--gold);
+  background: rgba(245, 158, 11, 0.1);
+  border-bottom-color: var(--gold);
+}
+
+.gov-table-pro tbody tr {
+  transition: var(--transition);
+}
+
+.gov-table-pro tbody tr:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.gov-table-pro td {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* خلايا الجدول */
+.gov-td-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: right;
+}
+
+.gov-td-name .td-badge {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  border-radius: var(--radius-sm);
+  color: white;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.gov-td-name .td-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gov-td-name .td-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.gov-td-name .td-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.gov-td-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 40px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gov-td-number:hover {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.gov-td-number.axis {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--gold);
+}
+
+.gov-td-number.selected {
+  background: rgba(37, 99, 235, 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+}
+
+.gov-td-number.total {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--primary-light);
+}
+
+.gov-td-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gov-td-delta.up {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.gov-td-delta.down {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.gov-td-delta.flat {
+  color: var(--text-muted);
+  background: rgba(100, 116, 139, 0.1);
+}
+
+/* صف الإجمالي */
+.gov-table-pro tfoot tr {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.gov-table-pro tfoot td {
+  padding: 16px 18px;
+  border-top: 2px solid rgba(245, 158, 11, 0.3);
+}
+
+/* صف المناطق المفتوحة */
+.gov-areas-expand-row td {
+  padding: 0 !important;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.gov-areas-expand-row .gov-inner-area-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.gov-areas-expand-row .gov-inner-area-table th {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.gov-areas-expand-row .gov-inner-area-table td {
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.gov-areas-expand-row .gov-inner-area-table tr:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* ── ربط الإعلانات مع الفلاتر ── */
+.gov-linked-ads {
+  margin-top: 24px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+}
+
+.gov-linked-ads-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.gov-linked-ads-header h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.gov-linked-ads-count {
+  padding: 4px 12px;
+  background: rgba(37, 99, 235, 0.15);
+  border-radius: var(--radius-full);
+  color: var(--primary-light);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gov-linked-ads-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 768px) {
+  .gov-linked-ads-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gov-linked-ad-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  transition: var(--transition);
+}
+
+.gov-linked-ad-card:hover {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.3);
+  transform: translateY(-2px);
+}
+
+.gov-linked-ad-card .ad-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.gov-linked-ad-card .ad-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gov-linked-ad-card .ad-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.gov-linked-ad-card .ad-pill.price {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+}
+
+.gov-linked-ad-card .ad-pill.area {
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--primary-light);
+}
+
+.gov-linked-ad-card .ad-pill.source {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
+
+.gov-linked-ad-card .ad-pill.score {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--gold);
+}
+
+.gov-linked-ad-card .ad-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary-light);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.gov-linked-ad-card .ad-link:hover {
+  color: var(--primary);
+}
+
+/* ── 상태 التحميل ── */
+.gov-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.gov-loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.gov-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+.gov-empty-icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+/* ── التأثيرات الحركية ── */
+@keyframes govFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gov-animate-in {
+  animation: govFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .gov-section-header {
+    padding: 20px 20px;
+  }
+  
+  .gov-section-content {
+    padding: 20px;
+  }
+  
+  .gov-summary-bar {
+    padding: 14px 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .gov-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .gov-section-actions {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  
+  .gov-summary-item {
+    min-width: 140px;
+  }
+  
+  .gov-card-pro-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .gov-card-pro-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .gov-card-pro-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .gov-stat-cell .stat-value {
+    font-size: 20px;
+  }
+  
+  .gov-total-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .gov-linked-ads-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .gov-card-pro-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .gov-stat-cell {
+    padding: 12px 8px;
+  }
+  
+  .gov-stat-cell .stat-value {
+    font-size: 18px;
+  }
+  
+  .gov-total-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .gov-table-pro {
+    font-size: 12px;
+  }
+  
+  .gov-table-pro td {
+    padding: 10px 12px;
+  }
+}
+
+/* ── الوضع الفاتح ── */
+[data-theme="light"] .gov-card-pro {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .gov-card-pro-header {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .gov-card-pro-stats {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .gov-stat-cell {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="light"] .gov-table-pro-wrap {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="light"] .gov-table-pro thead th {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+[data-theme="light"] .gov-linked-ads {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="light"] .gov-linked-ad-card {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="light"] .gov-area-item {
+  background: rgba(255, 255, 255, 0.7);
+}

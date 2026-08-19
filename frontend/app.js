@@ -1179,6 +1179,145 @@ function renderGovAreaCards(rows, governorate, govRows, sel, activeMetric, metri
     </div>`;
 }
 
+// ── دوال التصميم الاحترافي الجديد ────────────────────────────────────────
+// شريط الملخص السريع أعلى قسم المحافظات
+function renderGovSummaryBar(rows, governorates, activeMetric) {
+  const bar = $("govSummaryBar");
+  if (!bar) return;
+  const totalAds = rows.length;
+  const totalAreas = uniqueValues(rows.map((r) => r.area).filter(Boolean)).length;
+  const totalOpportunities = countMetric(rows, "opportunities");
+  const totalPriced = rows.filter((r) => Number(r.price) > 0).length;
+  bar.innerHTML = `
+    <div class="gov-summary-item">
+      <span class="summary-icon">🏢</span>
+      <div>
+        <div class="summary-value">${totalAds.toLocaleString("en-US")}</div>
+        <div class="summary-label">إجمالي الإعلانات</div>
+      </div>
+    </div>
+    <div class="gov-summary-item">
+      <span class="summary-icon">📍</span>
+      <div>
+        <div class="summary-value">${governorates.length}</div>
+        <div class="summary-label">محافظة</div>
+      </div>
+    </div>
+    <div class="gov-summary-item">
+      <span class="summary-icon">🏘️</span>
+      <div>
+        <div class="summary-value">${totalAreas}</div>
+        <div class="summary-label">منطقة</div>
+      </div>
+    </div>
+    <div class="gov-summary-item">
+      <span class="summary-icon">💰</span>
+      <div>
+        <div class="summary-value">${totalOpportunities}</div>
+        <div class="summary-label">فرصة محسوبة</div>
+      </div>
+    </div>
+    <div class="gov-summary-item">
+      <span class="summary-icon">🏷️</div>
+      <div>
+        <div class="summary-value">${totalPriced}</div>
+        <div class="summary-label">مع سعر</div>
+      </div>
+    </div>
+  `;
+}
+
+// عرض المناطق عند توسيع المحافظة (التصميم الجديد)
+function renderGovAreasExpanded(rows, governorate, govRows, sel, activeMetric) {
+  const areaGroups = {};
+  for (const row of govRows) {
+    if (!row.area) continue;
+    const key = normalizeArabic(row.area);
+    if (!(key in areaGroups)) areaGroups[key] = row.area;
+  }
+  const areas = Object.values(areaGroups).sort((a, b) => String(a).localeCompare(String(b), "ar"));
+  if (!areas.length) return "";
+  const metrics = ["movement", "opportunities", "saleOffers", "buyRequests", "rentOffers", "rentRequests"];
+  return `
+    <div class="gov-card-pro-areas">
+      <div class="gov-areas-header">
+        <h4>📍 المناطق (${areas.length})</h4>
+      </div>
+      <div class="gov-areas-grid">
+        ${areas.map((area) => {
+          const areaRows = govRows.filter((row) => row.area === area);
+          const areaCells = metricCells(rows, governorate, area);
+          const axisCell = areaCells.find((c) => c.metric === activeMetric) || areaCells[0];
+          const delta = metricDailyDelta(areaRows, activeMetric);
+          const deltaCls = delta.delta > 0 ? "up" : delta.delta < 0 ? "down" : "flat";
+          return `
+            <div class="gov-area-item" data-board-area="${escapeHtml(area)}">
+              <div class="area-info">
+                <span class="area-name">${escapeHtml(area)}</span>
+                <span class="area-count">${areaRows.length} إعلان</span>
+              </div>
+              <div class="area-stats">
+                ${areaCells.slice(0, 3).map((cell) => `
+                  <button class="gov-area-pill${activeMetric === cell.metric ? " axis" : ""}" type="button" data-board-gov="${escapeHtml(governorate)}" data-board-area-run="${escapeHtml(area)}" data-board-metric-run="${escapeHtml(cell.metric)}" ${cell.count ? "" : "disabled"} title="${escapeHtml(boardMetricLabels[cell.metric] || "")}">
+                    ${cell.count.toLocaleString("en-US")}
+                  </button>`).join("")}
+              </div>
+            </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+}
+
+// عرض الإعلانات المرتبطة بالاختيار
+function renderGovLinkedAds(governorate, area, metric) {
+  const container = $("govLinkedAds");
+  const grid = $("govLinkedAdsGrid");
+  const countEl = $("govLinkedAdsCount");
+  if (!container || !grid) return;
+  if (!governorate) {
+    container.hidden = true;
+    return;
+  }
+  // جلب الإعلانات المرتبطة
+  const rows = boardState.records.filter((row) => {
+    const loc = boardLocationBucket(row);
+    if (loc !== governorate) return false;
+    if (area && row.area !== area) return false;
+    return true;
+  });
+  // ترتيب حسب المقياس النشط
+  const sorted = rows.sort((a, b) => {
+    const aVal = metric === "movement" ? (a.movement || 0) : metric === "opportunities" ? (a.opportunityScore || 0) : metric === "saleOffers" ? (a.price || 0) : 0;
+    const bVal = metric === "movement" ? (b.movement || 0) : metric === "opportunities" ? (b.opportunityScore || 0) : metric === "saleOffers" ? (b.price || 0) : 0;
+    return bVal - aVal;
+  }).slice(0, 12); // أول 12 إعلان
+  if (!sorted.length) {
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+  countEl.textContent = `${sorted.length} من ${rows.length} إعلان`;
+  grid.innerHTML = sorted.map((row) => {
+    const title = row.title || row.description || "إعلان عقاري";
+    const price = row.price ? `${Number(row.price).toLocaleString("en-US")} د.ك` : "بدون سعر";
+    const areaName = row.area || "";
+    const source = row.source || "";
+    const score = row.opportunityScore ? `${Math.round(row.opportunityScore)}%` : "";
+    const link = row.url || row.originalUrl || "#";
+    return `
+      <div class="gov-linked-ad-card">
+        <span class="ad-title">${escapeHtml(title.substring(0, 80))}${title.length > 80 ? "..." : ""}</span>
+        <div class="ad-meta">
+          <span class="ad-pill price">💰 ${escapeHtml(price)}</span>
+          ${areaName ? `<span class="ad-pill area">📍 ${escapeHtml(areaName)}</span>` : ""}
+          ${source ? `<span class="ad-pill source">🌐 ${escapeHtml(source)}</span>` : ""}
+          ${score ? `<span class="ad-pill score">⭐ ${score}</span>` : ""}
+        </div>
+        <a class="ad-link" href="${escapeHtml(link)}" target="_blank" rel="noreferrer">فتح الإعلان ←</a>
+      </div>`;
+  }).join("");
+}
+
 // الجدول المضغوط لنفس أرقام كروت المحافظات — نفس معالجات النقر (فتح/درج تفاصيل)
 // مع صف مدمج قابل للتوسيع يكشف مناطق كل محافظة.
 function renderGovTable(rows, governorates, activeMetric, totals) {
@@ -6249,6 +6388,7 @@ function bind() {
       if (govFilter) govFilter.value = gov;
       if (areaFilter) areaFilter.value = area;
       renderBoard();
+      renderGovLinkedAds(gov, area, metric);
       const rows = filteredBoardRows().filter((row) => {
         const rowGov = boardLocationBucket(row);
         const targetGov = canonicalGovernorate(gov) || "غير محددة";
