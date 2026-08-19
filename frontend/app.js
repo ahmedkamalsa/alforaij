@@ -805,8 +805,39 @@ function staticAnalyzeReport(payload) {
   };
 }
 
+const CLIENTS_KEY = "alforaij_clients_v1";
+
+function staticSaveClient(payload) {
+  const phone = String(payload.phone || "").trim();
+  if (!phone) return { status: "error", detail: "رقم الهاتف مطلوب" };
+  let clients = [];
+  try {
+    clients = JSON.parse(localStorage.getItem(CLIENTS_KEY) || "[]");
+  } catch { clients = []; }
+  const existing = clients.findIndex((c) => c.phone === phone);
+  const code = existing >= 0 ? clients[existing].code : `LEAD-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+  const entry = {
+    code,
+    phone,
+    area: payload.area || "",
+    type: payload.type || "",
+    price: payload.price || "",
+    note: payload.note || "",
+    createdAt: new Date().toISOString(),
+  };
+  if (existing >= 0) {
+    clients[existing] = { ...clients[existing], ...entry };
+  } else {
+    clients.unshift(entry);
+  }
+  localStorage.setItem(CLIENTS_KEY, JSON.stringify(clients.slice(0, 200)));
+  return { status: existing >= 0 ? "updated" : "added", code };
+}
+
 async function postJson(path, payload) {
   if (STATIC_SNAPSHOT_MODE && path === "/api/analyze") return staticAnalyzeReport(payload);
+  // حفظ عميل محتمل في وضع الثابت (localStorage) عند عدم وجود خادم API
+  if (STATIC_SNAPSHOT_MODE && path === "/api/clients") return staticSaveClient(payload);
   try {
     const response = await fetch(apiUrl(path), {
       method: "POST",
@@ -818,6 +849,7 @@ async function postJson(path, payload) {
   } catch (err) {
     // أي مضيف بلا API (خادم ثابت محلي، رابط مضبوط غير متاح): التحليل يعمل داخل المتصفح على اللقطة
     if (path === "/api/analyze") return staticAnalyzeReport(payload);
+    if (path === "/api/clients") return staticSaveClient(payload);
     throw err;
   }
 }
@@ -5120,7 +5152,7 @@ function renderClientsTab(root) {
     <form id="clientForm" class="client-form">
       <h3>إضافة عميل محتمل جديد</h3>
       <div class="fields">
-        <label>رقم الهاتف (مطلوب)<input id="clientPhone" type="text" placeholder="01064955051" required></label>
+        <label>رقم الهاتف (مطلوب)<input id="clientPhone" type="tel" placeholder="5XXXXXXX" pattern="[0-9]{8}" maxlength="8" required dir="ltr"></label>
         <label>المنطقة<input id="clientArea" type="text" placeholder="النهضة"></label>
         <label>نوع العقار<input id="clientType" type="text" placeholder="بيت / شقة"></label>
         <label>الميزانية (د.ك)<input id="clientPrice" type="number" min="0" placeholder="400000"></label>
@@ -5901,8 +5933,15 @@ async function loadOpportunityTab(tier) {
   root.innerHTML = '<div class="empty">جاري التحميل...</div>';
   try {
     if (tier === "clients") {
-      const payload = await getJson("/api/clients");
-      oppState.clients = payload.clients || [];
+      let clients = [];
+      try {
+        const payload = await getJson("/api/clients");
+        clients = payload.clients || [];
+      } catch {
+        // وضع الثابت: قراءة من localStorage
+        try { clients = JSON.parse(localStorage.getItem(CLIENTS_KEY) || "[]"); } catch { clients = []; }
+      }
+      oppState.clients = clients;
       renderClientsTab(root);
     } else if (tier === "alerts") {
       const payload = await getJson("/api/whatsapp-alerts");

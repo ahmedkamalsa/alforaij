@@ -183,11 +183,20 @@ def search(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
             continue
 
         code = f"AD-{row.get('source_listing_id') or row.get('id')}"
+        # استخراج المنطقة المحددة من العنوان/الملخص بدل الاعتماد على اسم المحافظة فقط
+        # (مثل: "صباح الاحمد البحرية" بدل "الأحمدي")
+        title_summary = f"{row.get('title') or ''} {row.get('summary') or ''}"
+        specific_area = detect_area_in_text(title_summary)
+        # إذا كانت المنطقة المحددة أقصر من 3 أحرف فهي غالبًا خطأ — ن fallback للمحافظة
+        if specific_area and len(specific_area) >= 3:
+            area_to_use = specific_area
+        else:
+            area_to_use = region_ar
         listing = Listing(
             code=code,
             transaction=request.transaction or "للبيع",
             governorate="",
-            area=region_ar,
+            area=area_to_use,
             property_type=pt_ar,
             detail_class="مصدر حي",
             price=price_kwd,
