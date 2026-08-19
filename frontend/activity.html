@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>نشاط التصنيفات — منصة الفريج</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/alforaij-official-symbol.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --gold: #f59e0b;
+            --bg: #0f172a;
+            --card: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'IBM Plex Sans Arabic', 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 900;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #1d4ed8, #2563eb);
+            color: white;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .stat-card .stat-value {
+            font-size: 36px;
+            font-weight: 900;
+            margin-bottom: 8px;
+        }
+        
+        .stat-card .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        
+        .chart-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        
+        .chart-card h3 {
+            font-size: 16px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .classifiers-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        
+        .classifiers-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .classifiers-header h3 {
+            font-size: 18px;
+            font-weight: 800;
+        }
+        
+        .classifiers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        
+        .classifier-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+        
+        .classifier-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        
+        .classifier-card h4 {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .classifier-card p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        
+        .classifier-values {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .value-tag {
+            padding: 4px 10px;
+            background: rgba(37, 99, 235, 0.15);
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #60a5fa;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 32px;
+            width: 90%;
+            max-width: 500px;
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+        
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+        
+        .modal h3 {
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 14px;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+        
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>📊 نشاط التصنيفات</h1>
+                <p style="color: var(--text-secondary); margin-top: 8px;">تصنيف تلقائي للإعلانات العقارية باستخدام بيانات وصفية منظمة</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="exportClassifications()">⬇ تصدير</button>
+                <button class="btn btn-primary" onclick="openAddClassifier()">+ إضافة مصنف</button>
+            </div>
+        </div>
+        
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalClassified">0</div>
+                <div class="stat-label">إجمالي المُصنَّف</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgScore">0%</div>
+                <div class="stat-label">متوسط الثقة</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalClassifiers">7</div>
+                <div class="stat-label">عدد المصنفات</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="highPriority">0</div>
+                <div class="stat-label">أولوية عالية</div>
+            </div>
+        </div>
+        
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>🏢 التصنيف حسب نوع العقار</h3>
+                <div class="chart-container">
+                    <canvas id="propertyTypeChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>💰 مستوى الاستثمار</h3>
+                <div class="chart-container">
+                    <canvas id="investmentLevelChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>📊 مصدر البيانات</h3>
+                <div class="chart-container">
+                    <canvas id="dataSourceChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>🎯 الفئة المستهدفة</h3>
+                <div class="chart-container">
+                    <canvas id="targetAudienceChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="classifiers-section">
+            <div class="classifiers-header">
+                <h3>🏷️ المصنفات النشطة</h3>
+                <span id="classifiersCount" style="color: var(--text-secondary);">7 من 10</span>
+            </div>
+            <div class="classifiers-grid" id="classifiersGrid">
+                <!-- سيتم ملؤها dinamically -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- نموذج إضافة مصنف -->
+    <div class="modal-overlay" id="addClassifierModal">
+        <div class="modal">
+            <h3>إضافة مصنف جديد</h3>
+            <form id="classifierForm">
+                <div class="form-group">
+                    <label>اسم المصنف</label>
+                    <input type="text" id="classifierName" placeholder="مثال: حالة السوق" required>
+                </div>
+                <div class="form-group">
+                    <label>الاسم بالإنجليزية</label>
+                    <input type="text" id="classifierNameEn" placeholder="Example: Market Status" required>
+                </div>
+                <div class="form-group">
+                    <label>التصنيف</label>
+                    <select id="classifierCategory">
+                        <option value="property_type">نوع العقار</option>
+                        <option value="investment_level">مستوى الاستثمار</option>
+                        <option value="priority">الأولوية</option>
+                        <option value="deal_type">نوع المعاملة</option>
+                        <option value="data_source">مصدر البيانات</option>
+                        <option value="trust_level">مستوى الثقة</option>
+                        <option value="target_audience">الفئة المستهدفة</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>الوصف</label>
+                    <input type="text" id="classifierDescription" placeholder="وصف مختصر للمصنف">
+                </div>
+                <div class="form-group">
+                    <label>القيم (مفصولة بفاصلة)</label>
+                    <input type="text" id="classifierValues" placeholder="مثال: نشط, معلق, منتهي">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">إضافة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        // بيانات تجريبية
+        let stats = {
+            total: 650,
+            avgScore: 82,
+            classifiers: 7,
+            highPriority: 45
+        };
+        
+        let classifiers = [
+            { id: 'property_type', name: 'نوع العقار', icon: '🏢', values: ['بيت', 'شقة', 'أرض', 'مكتب', 'محل', 'فيلا'] },
+            { id: 'investment_level', name: 'مستوى الاستثمار', icon: '💰', values: ['ممتاز', 'جيد جداً', 'جيد', 'متوسط', 'ضعيف'] },
+            { id: 'priority', name: 'الأولوية', icon: '🎯', values: ['عالية', 'متوسطة', 'منخفضة'] },
+            { id: 'deal_type', name: 'نوع المعاملة', icon: '🤝', values: ['بيع مباشر', 'إيجار مباشر', 'مكتب عقاري', 'وسيط'] },
+            { id: 'data_source', name: 'مصدر البيانات', icon: '🌐', values: ['الفريج', 'OpenSooq', 'Mourjan', 'Q8Aqar', '4Sale'] },
+            { id: 'trust_level', name: 'مستوى الثقة', icon: '✅', values: ['عالي', 'متوسط', 'منخفض'] },
+            { id: 'target_audience', name: 'الفئة المستهدفة', icon: '👥', values: ['مستثمر', 'مشتري', 'مستأجر', 'وسيط'] }
+        ];
+        
+        // تهيئة الرسوم البيانية
+        function initCharts() {
+            // رسم نوع العقار
+            new Chart(document.getElementById('propertyTypeChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['بيت', 'شقة', 'أرض', 'مكتب', 'محل', 'فيلا'],
+                    datasets: [{
+                        data: [280, 150, 80, 60, 45, 35],
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+            
+            // رسم مستوى الاستثمار
+            new Chart(document.getElementById('investmentLevelChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['ممتاز', 'جيد جداً', 'جيد', 'متوسط', 'ضعيف'],
+                    datasets: [{
+                        label: 'عدد الإعلانات',
+                        data: [45, 120, 180, 200, 105],
+                        backgroundColor: ['#10b981', '#22c55e', '#84cc16', '#eab308', '#ef4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' } },
+                        x: { ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+            
+            // رسم مصدر البيانات
+            new Chart(document.getElementById('dataSourceChart'), {
+                type: 'pie',
+                data: {
+                    labels: ['الفريج', 'OpenSooq', 'Mourjan', 'Q8Aqar', '4Sale', 'Waseet'],
+                    datasets: [{
+                        data: [200, 150, 120, 80, 60, 40],
+                        backgroundColor: ['#2563eb', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ec4899']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+            
+            // رسم الفئة المستهدفة
+            new Chart(document.getElementById('targetAudienceChart'), {
+                type: 'polarArea',
+                data: {
+                    labels: ['مستثمر', 'مشتري', 'مستأجر', 'وسيط'],
+                    datasets: [{
+                        data: [250, 180, 150, 70],
+                        backgroundColor: ['rgba(37, 99, 235, 0.7)', 'rgba(16, 185, 129, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(139, 92, 246, 0.7)']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8' }
+                        }
+                    },
+                    scales: {
+                        r: { ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        }
+        
+        // عرض المصنفات
+        function renderClassifiers() {
+            const grid = document.getElementById('classifiersGrid');
+            grid.innerHTML = classifiers.map(c => `
+                <div class="classifier-card">
+                    <h4>${c.icon} ${c.name}</h4>
+                    <p>عدد القيم: ${c.values.length}</p>
+                    <div class="classifier-values">
+                        ${c.values.map(v => `<span class="value-tag">${v}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('classifiersCount').textContent = `${classifiers.length} من 10`;
+            document.getElementById('totalClassifiers').textContent = classifiers.length;
+        }
+        
+        // فتح نموذج الإضافة
+        function openAddClassifier() {
+            document.getElementById('addClassifierModal').classList.add('active');
+        }
+        
+        // إغلاق النموذج
+        function closeModal() {
+            document.getElementById('addClassifierModal').classList.remove('active');
+        }
+        
+        // معالجة النموذج
+        document.getElementById('classifierForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const newClassifier = {
+                id: document.getElementById('classifierNameEn').value.toLowerCase().replace(/\s+/g, '_'),
+                name: document.getElementById('classifierName').value,
+                icon: '🏷️',
+                values: document.getElementById('classifierValues').value.split(',').map(v => v.trim())
+            };
+            
+            classifiers.push(newClassifier);
+            renderClassifiers();
+            closeModal();
+            
+            // إعادة تعيين النموذج
+            this.reset();
+        });
+        
+        // تصدير التصنيفات
+        function exportClassifications() {
+            const data = JSON.stringify({ classifiers, stats }, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `classifications-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+        }
+        
+        // تهيئة الصفحة
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            renderClassifiers();
+        });
+    </script>
+</body>
+</html>

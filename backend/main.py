@@ -1553,6 +1553,71 @@ class Handler(BaseHTTPRequestHandler):
             result = forecast_return(price, rent, years, rent_growth, price_growth)
             json_response(self, result)
             return
+        
+        # ══════════════════════════════════════════════════════════════════
+        # نظام التصنيفات الذكية
+        # ══════════════════════════════════════════════════════════════════
+        if path == "/api/classifiers":
+            # جلب جميع المصنفات
+            from backend.services.listing_classifier import get_classifier
+            classifier = get_classifier()
+            json_response(self, {"classifiers": classifier.get_classifiers()})
+            return
+        if path == "/api/classifiers/add":
+            # إضافة مصنف جديد
+            from backend.services.listing_classifier import get_classifier, Classifier, ClassificationCategory
+            classifier = get_classifier()
+            new_class = Classifier(
+                id=payload.get("id", ""),
+                name=payload.get("name", ""),
+                name_en=payload.get("name_en", ""),
+                category=ClassificationCategory(payload.get("category", "property_type")),
+                description=payload.get("description", ""),
+                values=payload.get("values", [])
+            )
+            if classifier.add_classifier(new_class):
+                json_response(self, {"success": True, "message": "تمت الإضافة"})
+            else:
+                json_response(self, {"error": "الحد الأقصى 10 مصنفات"}, status=400)
+            return
+        if path == "/api/classifiers/remove":
+            # حذف مصنف
+            from backend.services.listing_classifier import get_classifier
+            classifier = get_classifier()
+            cid = payload.get("id", "")
+            if classifier.remove_classifier(cid):
+                json_response(self, {"success": True})
+            else:
+                json_response(self, {"error": "المصنف غير موجود"}, status=404)
+            return
+        if path == "/api/classify":
+            # تصنيف إعلان أو مجموعة إعلانات
+            from backend.services.listing_classifier import get_classifier
+            classifier = get_classifier()
+            listings = payload.get("listings", [])
+            if not listings:
+                json_response(self, {"error": "حدد إعلانات للتصنيف"}, status=400)
+                return
+            results = classifier.classify_batch(listings)
+            from dataclasses import asdict
+            json_response(self, {
+                "results": [asdict(r) for r in results],
+                "count": len(results)
+            })
+            return
+        if path == "/api/classify/stats":
+            # إحصائيات التصنيف
+            from backend.services.listing_classifier import get_classifier
+            classifier = get_classifier()
+            json_response(self, classifier.get_statistics())
+            return
+        if path == "/api/classify/export":
+            # تصدير التصنيفات
+            from backend.services.listing_classifier import get_classifier
+            classifier = get_classifier()
+            json_response(self, {"classifications": classifier.export_classifications()})
+            return
+        
         json_response(self, {"error": "Unknown endpoint"}, status=404)
 
     def log_message(self, format: str, *args) -> None:
