@@ -80,83 +80,54 @@
     </section>
 
     <section class="board-panel" data-main-panel="board">
-      <div class="section-title">
-        <div>
-          <h2>لوحة الأرقام والعروض</h2>
-          <span>فلاتر الصفحة الرئيسية مرتبطة مباشرة بالبحث والتقييم والفرص.</span>
+      <div class="board-header">
+        <div class="board-header-title">
+          <h2>📊 لوحة السوق</h2>
+          <span id="boardFilterSummary" class="board-summary-badge">كل السجلات</span>
         </div>
-        <span id="boardFilterSummary" class="filter-summary">كل السجلات</span>
       </div>
 
-      <div class="board-filter-grid">
-        <label>قائمة جاهزة حسب الرقم
-          <select id="boardMetricFilter">
-            <option value="movement">حركة الدلال</option>
-            <option value="opportunities">فرص محسوبة</option>
-            <option value="saleOffers">عروض للبيع</option>
-            <option value="buyRequests">طلبات شراء</option>
-            <option value="rentOffers">عروض الإيجار</option>
-            <option value="rentRequests">طلبات الإيجار</option>
-          </select>
-        </label>
-        <label>المحافظة - اكتب أو اختر
-          <input id="boardGovernorateFilter" placeholder="كل المحافظات" autocomplete="off">
-          <datalist id="boardGovernorates"></datalist>
-        </label>
-        <label>نوع المعاملة - اكتب أو اختر
-          <input id="boardTransactionFilter" placeholder="كل المعاملات" autocomplete="off">
-          <datalist id="boardTransactions"></datalist>
-        </label>
-        <label>نوع العقار - اكتب أو اختر
-          <input id="boardPropertyTypeFilter" placeholder="كل أنواع العقار" autocomplete="off">
-          <datalist id="boardPropertyTypes"></datalist>
-        </label>
-        <label>نمط الإدراج
-          <select id="boardListingModeFilter">
-            <option value="">كل الأنماط</option>
-          </select>
-        </label>
-        <label>المنطقة - اكتب أو اختر
-          <input id="boardAreaFilter" placeholder="كل المناطق" autocomplete="off">
-          <datalist id="boardAreas"></datalist>
-        </label>
-        <div class="board-platform-field">
-          <span class="field-caption">منصات التقييم - الافتراضي كل المنصات</span>
-          <div class="platform-chips" id="boardPlatformFilter">
-            <label><input name="boardPlatform" type="checkbox" value="__all" checked> كل المنصات</label>
-            <label><input name="boardPlatform" type="checkbox" value="الفريج"> الفريج</label>
-            <label><input name="boardPlatform" type="checkbox" value="بوشملان"> بوشملان</label>
-            <label><input name="boardPlatform" type="checkbox" value="OpenSooq"> OpenSooq</label>
-            <label><input name="boardPlatform" type="checkbox" value="Mourjan"> Mourjan</label>
-            <label><input name="boardPlatform" type="checkbox" value="Q8Aqar"> Q8Aqar</label>
-            <label><input name="boardPlatform" type="checkbox" value="الحسبة"> الحسبة</label>
-            <label><input name="boardPlatform" type="checkbox" value="Sakan"> Sakan</label>
-            <label><input name="boardPlatform" type="checkbox" value="Waseet"> Waseet</label>
-            <label><input name="boardPlatform" type="checkbox" value="4Sale"> 4Sale</label>
+      <div class="board-quick-filters">
+        <div class="board-filter-row">
+          <div class="board-filter-group">
+            <label class="board-filter-label">المحور</label>
+            <select id="boardMetricFilter" class="board-select">
+              <option value="movement">حركة الدلال</option>
+              <option value="opportunities">فرص محسوبة</option>
+              <option value="saleOffers">عروض للبيع</option>
+              <option value="buyRequests">طلبات شراء</option>
+              <option value="rentOffers">عروض الإيجار</option>
+              <option value="rentRequests">طلبات الإيجار</option>
+            </select>
           </div>
+          <div class="board-filter-group">
+            <label class="board-filter-label">المحافظة</label>
+            <input id="boardGovernorateFilter" class="board-input" placeholder="الكل" autocomplete="off">
+            <datalist id="boardGovernorates"></datalist>
+          </div>
+          <div class="board-filter-group">
+            <label class="board-filter-label">المنطقة</label>
+            <input id="boardAreaFilter" class="board-input" placeholder="الكل" autocomplete="off">
+            <datalist id="boardAreas"></datalist>
+          </div>
+          <div class="board-filter-group">
+            <label class="board-filter-label">نوع العقار</label>
+            <input id="boardPropertyTypeFilter" class="board-input" placeholder="الكل" autocomplete="off">
+            <datalist id="boardPropertyTypes"></datalist>
+          </div>
+          <button id="boardRunSearchBtn" class="board-apply-btn" type="button">🔍 تطبيق</button>
+          <button id="boardClearFiltersBtn" class="board-clear-btn" type="button">مسح</button>
         </div>
-      </div>
-
-      <div class="board-filter-actions">
-        <button id="boardRunSearchBtn" class="primary" type="button">بحث وتقييم حسب الاختيارات</button>
-        <button id="boardClearFiltersBtn" type="button">مسح اختيارات اللوحة</button>
       </div>
 
       <div id="boardMetricCards" class="board-metrics"></div>
 
       <div class="board-layout">
         <section class="board-overview">
-          <div class="section-title compact-title">
-            <h3>حركة الاختيارات</h3>
-            <span>اضغط أي رقم لعرض الإعلانات الفعلية خلفه — ثم «تشغيل نفس الفلاتر في التقييم» عند الحاجة.</span>
+          <div class="board-overview-header">
+            <h3>📈 ملخص السوق</h3>
           </div>
           <div id="boardStats" class="board-stats"></div>
-          <div class="section-title compact-title companion-title">
-            <h3>إعلانات مرافقة</h3>
-            <span>حسب نفس الفلاتر والمنصات.</span>
-          </div>
-          <div id="boardCompanionAds" class="companion-ads"></div>
-          <div id="boardMatchingLink" class="board-matching-link"></div>
         </section>
         <section class="governorate-section" aria-label="الأرقام حسب المحافظات">
           <div class="gov-section-header">
