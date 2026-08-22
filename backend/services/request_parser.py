@@ -41,7 +41,7 @@ KNOWN_AREAS = [
     "العدان", "المنقف", "البصري", "الجليعة", "ضاحية الفحيحيل",
     "بنيدر", "مزيرعة الوفرة", "نويصيب", "أم قدير",
     "الفنطاس", "الظهر", "ضاحية فهد الأحمد", "غرب عبدالله مبارك", "ام الهيمان",
-    "خيران السكنية", "الخيران السكنية",
+    "خيران السكنية",
     # محافظة الجهراء
     "الجهراء", "المطلاع", "جابر الأحمد", "جابر الاحمد",
     "سعد العبدالله", "الصليبية", "الوهاب", "تيماء",
@@ -154,7 +154,7 @@ AREA_ALIASES: dict[str, list[str]] = {
     "الزور": ["zour", "al-zour"],
     "هدية": ["hadiya", "hediya"],
     "الخيران": ["khairan", "kheiran"],
-    "خيران السكنية": ["الخيران السكنية", "kheiran residential", "al-khiran residential", "khairan residential"],
+    "خيران السكنية": ["الخيران السكنية", "kheiran residential", "al-khiran residential", "khairan residential", "kheiran al-sakinah", "al khiran sakinah"],
     "نويصيب": ["nuwaisib", "nuwaiseeb"],
     "أم قدير": ["ام قدير", "um qadeer"],
     "ميدان حولي": ["midan hawally"],
@@ -214,7 +214,7 @@ GOVERNORATE_AREAS: dict[str, list[str]] = {
         "العدان", "المنقف", "البصري", "الجليعة", "ضاحية الفحيحيل",
         "بنيدر", "مزيرعة الوفرة", "نويصيب", "أم قدير",
         "الفنطاس", "الظهر", "ضاحية فهد الأحمد", "غرب عبدالله مبارك", "ام الهيمان",
-        "خيران السكنية", "الخيران السكنية",
+        "خيران السكنية",
     ],
     "الجهراء": [
         "الجهراء", "المطلاع", "جابر الأحمد", "جابر الاحمد",
@@ -686,6 +686,8 @@ def parse_request(raw_text: str) -> PropertyRequest:
         transaction = "بدل"
     elif "للبيع" in normalized:
         transaction = "للبيع"
+    elif "للايجار" in normalized or "للإيجار" in normalized:
+        transaction = "للإيجار"
     elif any(word in normalized for word in ("عندي", "اعرض")) and any(word in normalized for word in ("ايجار", "استأجر", "استاجر")):
         transaction = "للإيجار"
     elif any(word in normalized for word in ("ايجار", "استأجر", "استاجر")):
