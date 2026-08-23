@@ -1084,6 +1084,60 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/parse":
             json_response(self, {"request": parse_request(text).__dict__})
             return
+        if path == "/api/whatsapp/parse":
+            # تحليل رسالة واتساب مُ Forwarded — يستخرج التفاصيل تلقائيًا
+            from backend.services.whatsapp_parser import analyze_whatsapp_message, analyze_bulk_messages
+            sender = _security.sanitize(str(payload.get("sender") or ""))
+            phone = str(payload.get("phone") or "")
+            raw = str(payload.get("text") or "")
+            bulk = bool(payload.get("bulk"))
+            if bulk:
+                messages = analyze_bulk_messages(raw)
+                json_response(self, {
+                    "count": len(messages),
+                    "messages": [
+                        {
+                            "rawText": msg.raw_text[:200],
+                            "sender": msg.sender,
+                            "phone": msg.phone,
+                            "propertyType": msg.property_type,
+                            "transaction": msg.transaction,
+                            "area": msg.area,
+                            "governorate": msg.governorate,
+                            "price": msg.price,
+                            "priceText": msg.price_text,
+                            "space": msg.space,
+                            "bedrooms": msg.bedrooms,
+                            "features": msg.features,
+                            "sellerType": msg.seller_type,
+                            "summary": msg.summary,
+                            "isPropertyListing": msg.is_property_listing,
+                            "confidence": msg.confidence,
+                        }
+                        for msg in messages
+                    ],
+                })
+            else:
+                msg = analyze_whatsapp_message(raw, sender=sender, phone=phone)
+                json_response(self, {
+                    "rawText": msg.raw_text[:200],
+                    "sender": msg.sender,
+                    "phone": msg.phone,
+                    "propertyType": msg.property_type,
+                    "transaction": msg.transaction,
+                    "area": msg.area,
+                    "governorate": msg.governorate,
+                    "price": msg.price,
+                    "priceText": msg.price_text,
+                    "space": msg.space,
+                    "bedrooms": msg.bedrooms,
+                    "features": msg.features,
+                    "sellerType": msg.seller_type,
+                    "summary": msg.summary,
+                    "isPropertyListing": msg.is_property_listing,
+                    "confidence": msg.confidence,
+                })
+            return
         if path == "/api/register":
             # تسجيل مستخدم مجاني: توحيد الهاتف الكويتي + إصدار OTP (6 أرقام/10 دقائق)
             # + نافذة 15 دقيقة بين إعادة الإرسال. التسليم واتساب (قالب) أو انحدار أنيق:
