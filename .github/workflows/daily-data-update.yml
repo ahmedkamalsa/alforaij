@@ -1,9 +1,14 @@
-name: Daily data update
+name: "[DISABLED] Daily data update"
+
+# ⚠️ معطّل — البيانات تُحدَّث يدويًا فقط.
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 3 * * *" # 06:00 Africa/Cairo
+    inputs:
+      confirm:
+        description: 'اكتب YES للتأكيد'
+        required: true
+        type: string
 
 permissions:
   # contents: write -> يسمح للوكيل بالتزام بيانات data/ ودفعها تلقائيًا بعد الحصاد.

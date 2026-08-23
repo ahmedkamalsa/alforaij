@@ -1,18 +1,14 @@
-name: Verify static frontend (read-only)
+name: "[DISABLED] Verify static frontend"
 
-# ⚠️ هذا الملف لا يُنشئ أي نشر —GH Pages حصرية لـ deploy-alforaijboard.yml.
-# الدور: توليد اللقطة الثابتة والتحقق من سلامتها فقط (لا صلاحيات كتابة).
+# ⚠️ معطّل — النشر محلي فقط. لا تشغّل هذا الملف.
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - "data/**"
-      - "frontend/**"
-      - "scripts/export_static_frontend_data.py"
-      - ".github/workflows/deploy-static.yml"
+    inputs:
+      confirm:
+        description: 'اكتب YES للتأكيد'
+        required: true
+        type: string
 
 permissions:
   contents: read

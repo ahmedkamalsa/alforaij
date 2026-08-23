@@ -1,15 +1,14 @@
-name: Deploy to Cloudflare Pages
+name: "[DISABLED] Deploy to Cloudflare Pages"
+
+# ⚠️ معطّل — النشر محلي فقط. لا تشغّل هذا الملف.
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - "data/**"
-      - "frontend/**"
-      - "scripts/export_static_frontend_data.py"
-      - ".github/workflows/deploy-cloudflare-pages.yml"
+    inputs:
+      confirm:
+        description: 'اكتب YES للتأكيد'
+        required: true
+        type: string
 
 concurrency:
   group: deploy-cloudflare-pages

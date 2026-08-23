@@ -1,15 +1,14 @@
-name: WhatsApp live readiness check
+name: "[DISABLED] WhatsApp live readiness check"
 
-# اختبار حي يدوي: يشغّل scripts/whatsapp_setup.py --check بالأسرار الحقيقية
-# (WHATSAPP_TOKEN + WHATSAPP_PHONE_ID من أسرار المستودع) ويعيد التقرير كأثر
-# (نص مقروء + JSON منظّم) — إثبات أن التسليم الفعلي على الهاتف جاهز فعلًا.
-#
-# الاستخدام: تبويب Actions ← «WhatsApp live readiness check» ← Run workflow.
-# يبقى التشغيل أحمر حتى تكتمل الجاهزية (الرقم + القالبان معتمدين) — والأثر
-# يُرفع دائمًا مهما كانت النتيجة.
+# ⚠️ معطّل — الفحص يدوي محلي فقط.
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'اكتب YES للتأكيد'
+        required: true
+        type: string
 
 permissions:
   contents: read

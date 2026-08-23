@@ -1,25 +1,15 @@
-name: Deploy alforaijboard Pages (gh-pages exclusive)
+name: "[DISABLED] Deploy alforaijboard Pages"
 
-# 🏠 المصدر الوحيد لـ gh-pages — ينشر الواجهة الثابتة (frontend + static-data)
-# إلى فرع gh-pages في مستودع ahmedkamalsa/alforaijboard.
-# الصفحة الحية: https://ahmedkamalsa.github.io/alforaijboard/
-# ⚠️ لا تُنشئ workflow أخرى تدفع إلى gh-pages — هذا الملف هو الحصرية.
-# يتطلب سريًا واحدًا: ALFORAIJBOARD_TOKEN (PAT بنطاق repo).
+# ⚠️ معطّل — النشر محلي فقط. لا تشغّل هذا الملف.
+# كان ينشر إلى ahmedkamalsa/alforaijboard gh-pages.
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - "data/**"
-      - "frontend/**"
-      - "scripts/export_static_frontend_data.py"
-      - ".github/workflows/deploy-alforaijboard.yml"
-  # إعادة بناء تلقائية يوميًا بعد الحصاد (03:00 UTC) لتبقى اللقطة الثابتة
-  # محدثة من قاعدة البيانات الحية دون أي خطوة يدوية — 04:00 UTC = 07:00 القاهرة.
-  schedule:
-    - cron: "0 4 * * *"
+    inputs:
+      confirm:
+        description: 'اكتب YES للتأكيد'
+        required: true
+        type: string
 
 permissions:
   contents: read
