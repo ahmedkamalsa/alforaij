@@ -1,4 +1,7 @@
-name: Deploy static frontend
+name: Verify static frontend (read-only)
+
+# ⚠️ هذا الملف لا يُنشئ أي نشر —GH Pages حصرية لـ deploy-alforaijboard.yml.
+# الدور: توليد اللقطة الثابتة والتحقق من سلامتها فقط (لا صلاحيات كتابة).
 
 on:
   workflow_dispatch:
@@ -9,24 +12,17 @@ on:
       - "data/**"
       - "frontend/**"
       - "scripts/export_static_frontend_data.py"
-      - "netlify.toml"
       - ".github/workflows/deploy-static.yml"
-  # إعادة بناء تلقائية يوميًا بعد الحصاد (03:00 UTC) لتبقى اللقطة الثابتة
-  # محدثة من قاعدة البيانات الحية دون أي خطوة يدوية — 04:00 UTC = 07:00 القاهرة.
-  schedule:
-    - cron: "0 4 * * *"
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: deploy-static
+  group: verify-static
   cancel-in-progress: true
 
 jobs:
-  prepare:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,67 +38,16 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           AGENT_ROUTER_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: frontend
-      - name: Upload Netlify artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: netlify-frontend
-          path: frontend
-
-  github-pages:
-    needs: prepare
-    runs-on: ubuntu-latest
-    if: ${{ github.event.repository.private == false }}
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
-
-  github-pages-private-note:
-    needs: prepare
-    runs-on: ubuntu-latest
-    if: ${{ github.event.repository.private == true }}
-    steps:
-      - name: Explain GitHub Pages skip
+      - name: Verify frontend files exist
         run: |
-          echo "GitHub Pages is skipped because this repository is private and the current GitHub plan does not support Pages for private repositories."
-          echo "Use Netlify for private-source deployment, or make the repository public/upgrade GitHub plan to enable Pages."
-
-  netlify:
-    needs: prepare
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: netlify-frontend
-          path: frontend
-      - name: Deploy to Netlify (with live verification)
-        run: |
-          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
-            echo "::warning::Netlify deploy is not configured. Follow docs/NETLIFY_SETUP.md: add NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID as GitHub Actions secrets to enable it."
-            echo "GitHub Pages remains the primary deploy path."
-            exit 0
-          fi
-          npx --yes netlify-cli deploy --prod --dir=frontend --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
-          # فحص آلي: الحصول على رابط الموقع الحي ثم التأكد أنه يعيد HTTP 200
-          SITE_URL=$(npx --yes netlify-cli sites:info --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN" --json 2>/dev/null | jq -r '.ssl_url // .url // empty')
-          if [ -n "$SITE_URL" ]; then
-            echo "Netlify live at: $SITE_URL"
-            sleep 8
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$SITE_URL" || true)
-            echo "Verification HTTP: $code"
-            if [ "$code" = "200" ]; then
-              echo "✅ Netlify deploy verified (HTTP 200)"
-            else
-              echo "::warning::Netlify returned HTTP $code for $SITE_URL"
-            fi
-          fi
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          echo "=== Static snapshot verification ==="
+          echo "Files in frontend/:"
+          ls -la frontend/ | head -20
+          echo ""
+          echo "index.html exists: $(test -f frontend/index.html && echo 'YES' || echo 'NO')"
+          echo "config.js exists: $(test -f frontend/config.js && echo 'YES' || echo 'NO')"
+          echo "styles.css exists: $(test -f frontend/styles.css && echo 'YES' || echo 'NO')"
+          echo "app.js exists: $(test -f frontend/app.js && echo 'YES' || echo 'NO')"
+          echo ""
+          echo "✅ Static snapshot generated successfully."
+          echo "📝 Deployment is handled by deploy-alforaijboard.yml (gh-pages) and deploy-static.yml (Netlify)."

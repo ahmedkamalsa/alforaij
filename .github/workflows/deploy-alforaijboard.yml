@@ -1,11 +1,10 @@
-name: Deploy alforaijboard Pages
+name: Deploy alforaijboard Pages (gh-pages exclusive)
 
-# ينشر الواجهة الثابتة (frontend + static-data) إلى فرع gh-pages في مستودع
-# ahmedkamalsa/alforaijboard — الصفحة الحية على:
-#   https://ahmedkamalsa.github.io/alforaijboard/
-# الواجهة الموحدة (بلا صفحة لوحة مستقلة — «لوحة الأرقام والفرص» أُزيلت):
-# النسخة المنشورة تُحدَّث تلقائيًا مع كل تغيير في الواجهة لئلا تبقى نسخة قديمة
-# تعرض أزرارًا/صفحات محذوفة. يتطلب سريًا واحدًا: ALFORAIJBOARD_TOKEN (PAT بنطاق repo).
+# 🏠 المصدر الوحيد لـ gh-pages — ينشر الواجهة الثابتة (frontend + static-data)
+# إلى فرع gh-pages في مستودع ahmedkamalsa/alforaijboard.
+# الصفحة الحية: https://ahmedkamalsa.github.io/alforaijboard/
+# ⚠️ لا تُنشئ workflow أخرى تدفع إلى gh-pages — هذا الملف هو الحصرية.
+# يتطلب سريًا واحدًا: ALFORAIJBOARD_TOKEN (PAT بنطاق repo).
 
 on:
   workflow_dispatch:
