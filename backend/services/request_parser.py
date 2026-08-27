@@ -565,7 +565,7 @@ def parse_money(text: str) -> float | None:
         candidates.append(value)
     if not candidates:
         return None
-    money_words = ("ميزانيه", "حدود", "سعر", "مطلوب", "بياع", "ايجار", "دينار", "د.ك", "دك", "مراجعه", "سوم", "سومها", "بسوم")
+    money_words = ("ميزانيه", "حدود", "سعر", "مطلوب", "بياع", "ايجار", "دينار", "د.ك", "دك", "مراجعه", "سوم", "سومها", "بسوم", "بـ", "بَ", "للبيع", "للإيجار", "للايجار")
     if any(word in text for word in money_words):
         return max(candidates)
     return None
@@ -632,6 +632,14 @@ def extract_area_range(text: str) -> tuple[float | None, float | None, dict[str,
             value = float(match.group(1))
             return value, value, excluded
 
+    bare_area_match = re.search(
+        r"(?:مساحه|المساحه|مساحتها|مساحته|المساحة|مساحة)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)\b",
+        text,
+    )
+    if bare_area_match and not _follows_exclusion(text, bare_area_match.start(), exclusion_spans):
+        value = float(bare_area_match.group(1))
+        return value, value, excluded
+
     return None, None, excluded
 
 
@@ -682,13 +690,24 @@ def parse_request(raw_text: str) -> PropertyRequest:
     # نوع العملية — الأولوية للعلامة القاطعة: «للبيع» إعلان بيع يسبق أي ذكر عابر للإيجار
     # في النص المختلط (مثل بقايا رسالة سابقة «ايجار شقة في السالمية» قبل إعلان البيع)
     transaction = ""
+    has_wanted_word = any(word in normalized for word in ("ابي", "ابغى", "يبي", "نبي", "نبحث", "ابحث"))
+    has_rent_word = any(word in normalized for word in ("للايجار", "للإيجار", "ايجار", "استأجر", "استاجر"))
+    has_wanted_rent_phrase = has_wanted_word and has_rent_word
+    has_wanted_rent_phrase = has_wanted_rent_phrase or bool(
+        re.search(r"مطلوب\s+.{0,40}(?:للايجار|للإيجار|ايجار|استاجر|استأجر)", normalized)
+    )
+    has_wanted_rent_phrase = has_wanted_rent_phrase or bool(
+        re.search(r"(?:طلب|عميل|زبون)\s+.{0,40}(?:للايجار|للإيجار|ايجار|استاجر|استأجر)", normalized)
+    )
     if "بدل" in normalized:
         transaction = "بدل"
     elif "للبيع" in normalized:
         transaction = "للبيع"
-    elif "للايجار" in normalized or "للإيجار" in normalized:
-        transaction = "للإيجار"
+    elif has_wanted_rent_phrase:
+        transaction = "مطلوب للإيجار"
     elif any(word in normalized for word in ("عندي", "اعرض")) and any(word in normalized for word in ("ايجار", "استأجر", "استاجر")):
+        transaction = "للإيجار"
+    elif "للايجار" in normalized or "للإيجار" in normalized:
         transaction = "للإيجار"
     elif any(word in normalized for word in ("ايجار", "استأجر", "استاجر")):
         transaction = "مطلوب للإيجار"
@@ -717,10 +736,23 @@ def parse_request(raw_text: str) -> PropertyRequest:
         a for a in areas
         if not any(b != a and a in b and text_has_area(b, raw_text) for b in areas)
     ]
+    # إزالة المكررات بالاسم المُطبَّع (مثل «جابر الأحمد» و«جابر الاحمد»)
+    _seen_areas: set[str] = set()
+    _deduped: list[str] = []
+    for a in areas:
+        key = normalize_text(a)
+        if key not in _seen_areas:
+            _seen_areas.add(key)
+            _deduped.append(a)
+    areas = _deduped
     # المحافظات (بـ «محافظة» صراحة)
-    governorates = [area for area in GOVERNORATE_AREA_NAMES if _is_governorate_mention(area, normalized)]
-    # ذكر محافظة بلا «محافظة» قبلها (مثل «بالعاصمة» أو «فروانية»): تُوسَّع لمناطقها حتى
-    # لا تُفقد المحافظات غير المدرجة كمنطقة (العاصمة أبرزها) ولا يبقى البحث ناقصًا.
+    governorates_explicit = [area for area in GOVERNORATE_AREA_NAMES if _is_governorate_mention(area, normalized)]
+    # تتبع: هل ذُكرت محافظة بـ «محافظة» صراحةً (مثل «محافظة الفروانية»)
+    _has_explicit_gov_prefix = bool(governorates_explicit)
+    governorates = list(governorates_explicit)
+    _pre_expansion_area_count = len(areas)
+    # ذكر محافظة بلا «محافظة» قبلها (مثل «بالعاصمة» أو «فروانية»): تُوسَّع لمناطقها
+    # حتى لا تُفقد المحافظات غير المدرجة كمنطقة (العاصمة أبرزها).
     for gov in GOVERNORATE_AREA_NAMES:
         gov_norm = normalize_text(gov)
         if gov_norm in normalized and gov not in governorates:
@@ -728,6 +760,13 @@ def parse_request(raw_text: str) -> PropertyRequest:
             for gov_area in GOVERNORATE_AREAS.get(gov, []):
                 if gov_area not in areas:
                     areas.append(gov_area)
+    # إذا ذُكرت محافظة واحدة فقط بلا مناطق محددة (مثل «في حولي»):
+    # لا تُوسَّع — احتفظ بالمحافظة كمنطقة فقط.
+    # لكن إذا ذُكرت محافظة مع «محافظة» صراحةً (مثل «صباح الناصر محافظة الفروانية»)
+    # أو محافظتان+ (مثل «بالعاصمة او حولي») تُوسَّع كالمعتاد.
+    if len(governorates) == 1 and _pre_expansion_area_count <= 1 and not _has_explicit_gov_prefix:
+        # مثل "في حولي" → [حولي] و "في الجهراء" → [الجهراء]
+        areas = [governorates[0]]
     # في النص المختلط (بقايا رسالة سابقة + إعلان) تُعطى الأولوية لمنطقة الإعلان:
     # المنطقة الواردة بعد علامة العملية القاطعة («للبيع»/«للإيجار») تُفضَّل وتُحصر النتائج فيها
     marker = "للبيع" if transaction == "للبيع" else ("للايجار" if transaction == "للإيجار" else "")

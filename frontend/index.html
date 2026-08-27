@@ -24,70 +24,53 @@
   <header class="topbar">
     <div class="hero-content">
       <div class="hero-title">
-        <p class="eyebrow">بحث وتقييم وفرص عقارية مبنية على الأدلة</p>
-        <h1>منصة الفريج للفرص والتقييم العقاري</h1>
-        <p class="hero-copy">بحث موحد في بيانات الفريج والمصادر الخارجية، تقييم موثق بمصدر كل رقم، وفرص مكسب تربط العرض بالطلب والعملاء المحتملين.</p>
+        <h1>🏠 الفريج العقاري</h1>
+        <p class="hero-copy">بحث وتقييم وفرص عقارية مبنية على الأدلة — من بيانات الفريج والمصادر الخارجية</p>
         <div class="hero-actions">
           <div class="bell-wrap">
-            <button class="hero-link bell-toggle" id="bellToggle" type="button" aria-label="تنبيهاتي" title="تنبيهاتي — الفرص المطابقة لبحثك المحفوظ">🔔 <span id="bellCount" class="bell-count" hidden>0</span></button>
+            <button class="hero-link bell-toggle" id="bellToggle" type="button" aria-label="تنبيهاتي" title="تنبيهاتي">🔔 <span id="bellCount" class="bell-count" hidden>0</span></button>
             <div id="bellDropdown" class="bell-dropdown" hidden></div>
           </div>
-          <button class="hero-link theme-toggle" id="themeToggle" type="button" aria-label="تبديل الوضع الفاتح/الداكن" title="الوضع الداكن/الفاتح"><svg class="hero-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg> الوضع الفاتح</button>
-          <a class="hero-link hero-brand-link" href="https://front.alforaij.com/" target="_blank" rel="noreferrer" aria-label="فتح لوحة الفريج الأساسية — منصة الفريج الأصلية">
-            <span class="brand-badge"><img class="brand-badge-ic" src="assets/alforaij-official-symbol.png" alt=""></span>
-            <span class="brand-text">
-              <span class="brand-name">
-                <span class="bn-gold">شركة عبد العزيز سعود الفريج العقارية</span>
-                <span class="bn-blue">شركة عبد العزيز سعود الفريج العقارية</span>
-              </span>
-              <span class="brand-sub">ABDUL AZIZ SAUD AL-FURAJI REAL ESTATE COMPANY</span>
-            </span>
-            <svg class="brand-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
-          </a>
-          <a class="hero-link hero-board-link" href="https://alforaijboard.netlify.app/" target="_blank" rel="noreferrer" aria-label="فتح لوحة الفريج البصرية — alforaijboard.netlify.app" title="لوحة الفريج البصرية">
-            <span class="vpn-tooltip">⚠️ إذا لم تعمل، فعّل VPN ثم أعد المحاولة</span>
-            <span class="board-badge"><span class="board-badge-ic">📊</span></span>
-            <span class="brand-text">
-              <span class="brand-name">
-                <span class="bn-teal">لوحة الفريج البصرية</span>
-                <span class="bn-cyan">لوحة الفريج البصرية</span>
-              </span>
-              <span class="brand-sub">ALFORAIJ BOARD — VISION DASHBOARD</span>
-            </span>
-            <svg class="brand-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
-          </a>
+          <button class="hero-link theme-toggle" id="themeToggle" type="button" aria-label="تبديل الوضع"><svg class="hero-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg> الوضع الفاتح</button>
+          <div class="status" id="healthStatus">جاري فحص البيانات...</div>
         </div>
       </div>
-      <div class="logo-showcase" aria-label="شركة عبدالعزيز سعود الفريج العقارية">
-        <img class="brand-logo" src="assets/alforaij_logo.png" alt="شركة عبدالعزيز سعود الفريج العقارية">
-        <div class="status" id="healthStatus">جاري فحص البيانات...</div>
+      <div class="logo-showcase" aria-label="الفريج العقاري">
+        <img class="brand-logo" src="assets/alforaij_logo.png" alt="الفريج العقاري">
       </div>
     </div>
   </header>
 
+  <div class="geo-divider" aria-hidden="true"></div>
+
   <main class="workspace">
     <nav class="main-tabs" id="mainTabs" aria-label="الأقسام الرئيسية">
-      <button class="main-tab active" data-main-tab="search" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> البحث والتقييم <b class="main-tab-count" id="tabCountSearch"></b></button>
-      <button class="main-tab" data-main-tab="opportunities" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg> أفضل الفرص <b class="main-tab-count" id="tabCountOpp"></b></button>
-      <button class="main-tab" data-main-tab="board" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> <span class="tab-full">لوحة السوق</span><span class="tab-short">السوق</span> <b class="main-tab-count" id="tabCountBoard"></b></button>
-      <button class="main-tab" data-main-tab="insights" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg> <span class="tab-full">تحليلات السوق</span><span class="tab-short">التحليلات</span> <b class="main-tab-count" id="tabCountInsights"></b></button>
-      <button class="main-tab" data-main-tab="developments" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg> <span class="tab-full">التطورات</span><span class="tab-short">التطورات</span> <b class="main-tab-count" id="tabCountDevelopments"></b></button>
-      <button class="main-tab" data-main-tab="why-free" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16l4-6 3 3 5-7"/><path d="M14 6h5v5"/></svg> <span class="tab-full">لماذا مجاني وأدق</span><span class="tab-short">مجاني وأدق</span></button>
-      <button class="main-tab" data-main-tab="metrics" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg> <span class="tab-full">سجل المقاييس</span><span class="tab-short">المقاييس</span> <b class="main-tab-count" id="tabCountMetrics"></b></button>
-      <a class="main-tab" href="whatsapp.html" target="_blank" rel="noreferrer" style="text-decoration:none;color:inherit;"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> <span class="tab-full">واتساب</span><span class="tab-short">واتساب</span></a>
-      <a class="main-tab" href="activity.html" style="text-decoration:none;"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> <span class="tab-full">التصنيفات</span><span class="tab-short">التصنيفات</span></a>
+      <button class="main-tab active" data-main-tab="search" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> بحث <b class="main-tab-count" id="tabCountSearch"></b></button>
+      <button class="main-tab" data-main-tab="opportunities" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg> فرص <b class="main-tab-count" id="tabCountOpp"></b></button>
+      <button class="main-tab" data-main-tab="market" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> السوق <b class="main-tab-count" id="tabCountBoard"></b></button>
+      <button class="main-tab" data-main-tab="developments" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg> تحديثات <b class="main-tab-count" id="tabCountDevelopments"></b></button>
+      <button class="main-tab" data-main-tab="analytics" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m16 8-4 4-4-4-4 4"/></svg> تحليلات</button>
+      <button class="main-tab" data-main-tab="account" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg> حساب</button>
+      <details class="main-more">
+        <summary aria-label="روابط إضافية">•••</summary>
+        <div class="main-more-menu">
+          <button data-more-tab="why-free" type="button">مجاني وأدق</button>
+          <button data-more-tab="metrics" type="button">المقاييس <b class="main-tab-count" id="tabCountMetrics"></b></button>
+          <a href="activity.html">التصنيفات</a>
+        </div>
+      </details>
     </nav>
 
     <section class="action-toolbar" data-main-panel="search">
       <div>
-        <strong>مركز البحث والتقييم</strong>
-        <span>اكتب الطلب، اختر نطاق المصدر، ثم راجع النتائج والمصادر والأدلة من نفس الصفحة.</span>
+        <strong>بحث</strong>
+        <span>اكتب الطلب. النتيجة والمصدر في نفس الصفحة.</span>
       </div>
       <div class="action-buttons">
-        <button id="toggleCustomSearchBtn" type="button">بحث مخصص</button>
-        <button id="clearChatBtn" type="button">مسح البحث</button>
-        <button id="downloadReportBtn" type="button">حفظ التقرير JSON</button>
-        <button id="downloadPdfBtn" class="primary" type="button">تنزيل تقرير PDF</button>
+        <button id="toggleCustomSearchBtn" type="button">خيارات</button>
+        <button id="clearChatBtn" type="button">مسح</button>
+        <button id="downloadReportBtn" type="button">JSON</button>
+        <button id="downloadPdfBtn" class="primary" type="button">PDF</button>
       </div>
     </section>
 
@@ -328,16 +311,18 @@
       </details>
     </section>
 
+    <div class="geo-divider" aria-hidden="true"></div>
+
     <section class="results-panel" data-main-panel="search">
         <div class="section-title">
-          <h2>النتائج المرتبة</h2>
-          <span>حسب درجة التوصية</span>
+          <h2>النتائج</h2>
+          <span>الأعلى توصية أولًا</span>
         </div>
         <div class="results-toolbar">
-          <button id="simpleModeToggle" class="save-search-btn" type="button" onclick="toggleSimpleMode()" title="تبديل بين البطاقات المبسطة والتحليل المفصل">👁 وضع مبسّط</button>
-          <button id="saveSearchBtn" class="save-search-btn" type="button" onclick="handleSaveSearch()">🔔 احفظ البحث ونبّهني</button>
-          <button id="savedSearchesToggle" class="saved-toggle-btn" type="button" onclick="toggleSavedSearches()">بحثي المحفوظ</button>
-          <button id="accountBtn" class="saved-toggle-btn" type="button" onclick="openAccountModal()">حسابي</button>
+          <button id="simpleModeToggle" class="save-search-btn" type="button" onclick="toggleSimpleMode()" title="تبديل بين البطاقات المبسطة والتحليل المفصل">مبسط</button>
+          <button id="saveSearchBtn" class="save-search-btn" type="button" onclick="handleSaveSearch()">نبّهني</button>
+          <button id="savedSearchesToggle" class="saved-toggle-btn" type="button" onclick="toggleSavedSearches()">محفوظ</button>
+          <button id="accountBtn" class="saved-toggle-btn" type="button" onclick="openAccountModal()">حساب</button>
           <span id="saveSearchMsg" class="save-search-msg" hidden></span>
         </div>
         <div id="resultsFilterChips" class="results-filter-chips" hidden aria-label="فلاتر سريعة بالنقر"></div>
@@ -508,6 +493,20 @@
           <summary>حالة مصادر الاكتشاف اليومي</summary>
           <div id="developmentsSources" class="source-grid muted-grid"></div>
         </details>
+      </section>
+
+      <!-- ── لوحة التحليلات ── -->
+      <section class="analytics-panel" data-main-panel="analytics">
+        <div class="section-title">
+          <div>
+            <h2>📊 لوحة التحليلات</h2>
+            <span>أنماط البحث والمناطق الشائعة واتجاهات الأسعار</span>
+          </div>
+          <button onclick="window._refreshAnalytics && window._refreshAnalytics()" class="btn-sm">🔄 تحديث</button>
+        </div>
+        <div id="analyticsDashboard" class="analytics-grid">
+          <p class="muted">جاري تحميل البيانات…</p>
+        </div>
       </section>
 
       <section class="whyfree-panel" data-main-panel="why-free">
@@ -779,12 +778,47 @@
     <aside class="account-panel" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
       <button class="account-close" id="accountCloseBtn" type="button" aria-label="إغلاق">✕</button>
       <h3 id="accountTitle">حسابي المجاني</h3>
-      <p class="account-sub">سجّل برقم هاتفك — بلا كلمة مرور — واحفظ بحثك ليصلَك تنبيه عند نزول فرصة مطابقة.</p>
+      <p class="account-sub">سجّل برقم هاتفك أو حساب Google — بلا كلمة مرور — واحفظ بحثك ليصلَك تنبيه عند نزول فرصة مطابقة.</p>
       <div id="accountStepPhone">
-        <label class="account-field">رقم الهاتف (كويتي)
-          <input id="accountPhone" type="tel" inputmode="tel" placeholder="55512345" autocomplete="tel">
-        </label>
+        <label class="account-field">رقم الهاتف</label>
+        <div class="phone-input-row">
+          <select id="phoneCountryCode" class="phone-country-select" aria-label="رمز الدولة">
+            <option value="+965" data-flag="🇰🇼">🇰🇼 +965</option>
+            <option value="+966" data-flag="🇸🇦">🇸🇦 +966</option>
+            <option value="+971" data-flag="🇦🇪">🇦🇪 +971</option>
+            <option value="+20" data-flag="🇪🇬">🇪🇬 +20</option>
+            <option value="+973" data-flag="🇧🇭">🇧🇭 +973</option>
+            <option value="+974" data-flag="🇶🇦">🇶🇦 +974</option>
+            <option value="+968" data-flag="🇴🇲">🇴🇲 +968</option>
+            <option value="+964" data-flag="🇮🇶">🇮🇶 +964</option>
+            <option value="+962" data-flag="🇯🇴">🇯🇴 +962</option>
+            <option value="+961" data-flag="🇱🇧">🇱🇧 +961</option>
+            <option value="+90" data-flag="🇹🇷">🇹🇷 +90</option>
+            <option value="+44" data-flag="🇬🇧">🇬🇧 +44</option>
+            <option value="+1" data-flag="🇺🇸">🇺🇸 +1</option>
+            <option value="+91" data-flag="🇮🇳">🇮🇳 +91</option>
+            <option value="+86" data-flag="🇨🇳">🇨🇳 +86</option>
+            <option value="+81" data-flag="🇯🇵">🇯🇵 +81</option>
+            <option value="+82" data-flag="🇰🇷">🇰🇷 +82</option>
+            <option value="+33" data-flag="🇫🇷">🇫🇷 +33</option>
+            <option value="+49" data-flag="🇩🇪">🇩🇪 +49</option>
+            <option value="+7" data-flag="🇷🇺">🇷🇺 +7</option>
+            <option value="+55" data-flag="🇧🇷">🇧🇷 +55</option>
+            <option value="+61" data-flag="🇦🇺">🇦🇺 +61</option>
+            <option value="+60" data-flag="🇲🇾">🇲🇾 +60</option>
+            <option value="+66" data-flag="🇹🇭">🇹🇭 +66</option>
+            <option value="+63" data-flag="🇵🇭">🇵🇭 +63</option>
+          </select>
+          <input id="accountPhone" type="tel" inputmode="tel" placeholder="رقم الهاتف" autocomplete="tel" class="phone-number-input">
+        </div>
         <button id="accountSendOtp" class="primary" type="button" onclick="accountRequestOtp()">أرسل الرمز</button>
+        <div class="auth-divider"><span>أو</span></div>
+        <div id="googleSignInWrap">
+          <button type="button" class="google-signin-btn" id="googleSignInBtn" onclick="googleLogin()">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            <span>الدخول بحساب Google</span>
+          </button>
+        </div>
       </div>
       <div id="accountStepOtp" hidden>
         <p id="accountOtpNote" class="account-otp-note"></p>
@@ -838,7 +872,8 @@
   <script src="components/hover-card.js"></script>
   <script src="components/a11y-enhancements.js"></script>
   <script src="components/install-prompt.js"></script>
-  <script src="app.js?v=20260818-hover-a11y"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer onerror="console.log('Google GIS not loaded')"></script>
+  <script src="app.js?v=20260828-google"></script>
   <script>
     /* تهيئة Lucide Icons بعد تحميل الصفحة */
     if (window.LucideIcons) {
@@ -875,7 +910,42 @@
           console.warn('[App] SW registration failed:', err);
         }
       });
-    }
-  </script>
+    }    </script>
+
+  <!-- ── صندوق المساعد العقاري العائم ── -->
+  <div id="assistantOverlay" class="assistant-overlay" hidden>
+    <div class="assistant-chatbox">
+      <header class="assistant-header">
+        <div class="assistant-header-info">
+          <span class="assistant-avatar">🏠</span>
+          <div>
+            <h4 class="assistant-title">المساعد العقاري</h4>
+            <span class="assistant-status">متصل — ابحث وتقيّم فورًا</span>
+          </div>
+        </div>
+        <button class="assistant-close" id="assistantCloseBtn" type="button" aria-label="إغلاق">✕</button>
+      </header>
+      <div class="assistant-messages" id="assistantMessages">
+        <div class="assistant-msg assistant-msg-bot">
+          <div class="assistant-msg-avatar">🏠</div>
+          <div class="assistant-msg-body">
+            مرحباً! أنا المساعد العقاري من منصة الفريج. اكتب بحثك مثلاً:<br>
+            <em>«بيت 400م في الفروانية»</em> أو <em>«شقة للإيجار في السالمية»</em>
+          </div>
+        </div>
+      </div>
+      <form class="assistant-input-area" id="assistantForm" autocomplete="off">
+        <input id="assistantInput" type="text" placeholder="اكتب طلبك العقاري هنا..." autocomplete="off">
+        <button type="submit" class="assistant-send" aria-label="إرسال">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </form>
+      <div class="assistant-export-bar">
+        <button type="button" class="assistant-export-btn" onclick="exportChatPDF()" title="تحميل النتائج كملف PDF">📄 PDF</button>
+        <button type="button" class="assistant-export-btn" onclick="exportChatExcel()" title="تحميل النتائج كجدول Excel">📊 Excel</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

@@ -2,8 +2,8 @@
 """اختبار تلقائي لخادم MCP — يفتح الخادم عبر stdio ويتحقق من:
 
 1. المصافحة: initialize يرد بإصدار البروتوكول واسم الملقم alforaij_mcp.
-2. tools/list: 8 أدوات وكلها تحمل inputSchema.
-3. tools/call: كل أداة تعمل (parse/search/rank/evaluate/compare/report/sources/opportunities).
+2. tools/list: 9 أدوات وكلها تحمل inputSchema.
+3. tools/call: كل أداة تعمل (parse/search/rank/evaluate/compare/report/sources/opportunities/chat).
 4. أخطاء: طريقة مجهولة (-32601)، أداة مجهولة (-32602)، معامل ناقص (isError).
 5. الإشعارات والـ ping تعمل بلا تعليق.
 
@@ -29,6 +29,7 @@ EXPECTED_TOOLS = [
     "alforaij_generate_report",
     "alforaij_list_sources",
     "alforaij_get_opportunities",
+    "alforaij_answer_chat_query",
 ]
 
 
@@ -96,7 +97,7 @@ def main() -> int:
 
         r = client.call({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
         names = [t["name"] for t in r["result"]["tools"]]
-        check("tools/list has 8 tools", len(names) == 8, str(names))
+        check("tools/list has 9 tools", len(names) == 9, str(names))
         check("all expected tools present", all(name in names for name in EXPECTED_TOOLS), str(names))
         check("every tool has inputSchema", all("inputSchema" in t for t in r["result"]["tools"]))
 
@@ -145,6 +146,10 @@ def main() -> int:
 
         r = client.tool("alforaij_get_opportunities", {"include_external": False, "limit_per_tier": 5, "format": "json"})
         check("opportunities returns tiers", bool((r.get("summary") or {}).get("tiers")), str(r.get("error", "")))
+
+        r = client.tool("alforaij_answer_chat_query", {"text": "مطلوب بيت في المطلاع مساحة 400", "include_external": False, "format": "json"})
+        check("chat answer includes concise answer", bool(r.get("answer")), str(r.get("error", "")))
+        check("chat answer includes region decision", bool(r.get("regionDecision", {}).get("areas")), str(r))
 
         print("== صيغ وأخطاء ==")
         r = client.tool("alforaij_search_properties", {"transaction": "للبيع", "limit": 2})

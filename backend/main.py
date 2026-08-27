@@ -765,6 +765,53 @@ class Handler(BaseHTTPRequestHandler):
             # تتغير بالحصاد اليومي فقط — تكراره في كل تحميل صفحة إهدار.
             json_response(self, _ttl_cached("health", 120, _build_health_payload))
             return
+        if path == "/api/google-client-id":
+            # إرجاع Google Client ID للواجهة — يُقرأ من متغير البيئة أو .env
+            client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+            json_response(self, {"client_id": client_id})
+            return
+        if path == "/api/analytics" and self.command == "GET":
+            # قراءة إحصائيات التتبع للداشبورد
+            log_path = os.path.join(os.path.dirname(__file__), "..", "analytics.jsonl")
+            events = []
+            if os.path.exists(log_path):
+                try:
+                    with open(log_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line:
+                                events.append(json.loads(line))
+                except Exception:
+                    pass
+            # تحليل بسيط
+            from collections import Counter
+            clicks = Counter()
+            searches = Counter()
+            pages = Counter()
+            for ev in events:
+                if ev.get("event") == "click":
+                    clicks[ev.get("data", {}).get("label", "unknown")] += 1
+                elif ev.get("event") == "search":
+                    searches[ev.get("data", {}).get("query", "unknown")] += 1
+                elif ev.get("event") == "pageview":
+                    pages[ev.get("data", {}).get("page", "/")] += 1
+            json_response(self, {
+                "total": len(events),
+                "topClicks": clicks.most_common(20),
+                "topSearches": searches.most_common(20),
+                "topPages": pages.most_common(20),
+            })
+            return
+        # ── لوحة تحليلات متقدمة: أنماط البحث والمناطق الشائعة واتجاهات الأسعار ──
+        if path == "/api/analytics-dashboard":
+            try:
+                from backend.services.analytics_dashboard import build_dashboard
+                dashboard = build_dashboard()
+                json_response(self, dashboard)
+            except Exception as dash_err:
+                logger.warning("Analytics dashboard failed: %s", dash_err)
+                json_response(self, {"error": str(dash_err)}, status=500)
+            return
         if path == "/api/sources":
             json_response(self, {"sources": source_registry()})
             return
@@ -1145,17 +1192,19 @@ class Handler(BaseHTTPRequestHandler):
             from backend.services.accounts import (
                 OTP_RESEND_WINDOW_SECONDS,
                 issue_otp,
-                normalize_phone_kw,
+                normalize_phone,
                 otp_resend_allowed,
+                COUNTRY_CODES,
             )
             from backend.services.supabase_store import fetch_user, upsert_user
             from scripts.send_whatsapp_message import send_template_message
 
-            phone = normalize_phone_kw(payload.get("phone") or "")
+            phone, country_code = normalize_phone(payload.get("phone") or "")
             if not phone:
+                supported = ", ".join([f"{c['name']} ({c['code']})" for c in COUNTRY_CODES.values()])
                 json_response(
                     self,
-                    {"error": "invalid_phone", "detail": "أدخل رقم هاتف كويتي صحيح (مثال: 55512345)"},
+                    {"error": "invalid_phone", "detail": f"أدخل رقم هاتف صحيح — الدول المدعومة: {supported}"},
                     status=400,
                 )
                 return
@@ -1198,10 +1247,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/verify-otp":
             # التحقق من الرمز: يصحح المحاولات/الانتهاء، ويُنشئ سرّ المستخدم (24 حرفًا)
             # إن لم يكن موجودًا ويرجعه — المفتاح الوحيد لبياناته في المهام التالية.
-            from backend.services.accounts import check_otp, new_secret, normalize_phone_kw
+            from backend.services.accounts import check_otp, new_secret, normalize_phone
             from backend.services.supabase_store import fetch_user, patch_user
 
-            phone = normalize_phone_kw(payload.get("phone") or "")
+            phone, _ = normalize_phone(payload.get("phone") or "")
             code = str(payload.get("code") or "").strip()
             if not phone or not code:
                 json_response(self, {"error": "missing_fields", "detail": "أدخل الهاتف والرمز"}, status=400)
@@ -1234,6 +1283,109 @@ class Handler(BaseHTTPRequestHandler):
             )
             json_response(self, {"status": "ok", "secret": secret, "phone": phone})
             return
+        if path == "/api/google-login":
+            # تسجيل دخول عبر Google: التحقق من JWT credential ثم إنشاء/جلب المستخدم
+            # يُلتف خطأ Supabase بأمان — لا يُجمّد الخادم
+            try:
+                from backend.services.accounts import new_secret
+                from backend.services.supabase_store import fetch_user, upsert_user, patch_user
+                credential = payload.get("credential") or ""
+                if not credential:
+                    json_response(self, {"error": "missing_credential", "detail": "لم يتم إرسال بيانات Google"}, status=400)
+                    return
+                # تحليل JWT credential من Google Identity Services
+                import base64, json as _json
+                try:
+                    parts = credential.split(".")
+                    if len(parts) != 3:
+                        raise ValueError("Invalid JWT format")
+                    # فك تشفير الـ payload (الجزء الثاني)
+                    payload_b64 = parts[1]
+                    # إضافة padding لو ناقص
+                    padding = 4 - len(payload_b64) % 4
+                    if padding != 4:
+                        payload_b64 += "=" * padding
+                    idinfo = _json.loads(base64.urlsafe_b64decode(payload_b64))
+                except Exception as e:
+                    logger.warning("Google credential decode failed: %s", e)
+                    json_response(self, {"error": "invalid_credential", "detail": "بيانات Google غير صالحة"}, status=400)
+                    return
+                # التحقق من issuer وaudience
+                allowed_issuers = {"accounts.google.com", "https://accounts.google.com"}
+                if idinfo.get("iss") not in allowed_issuers:
+                    json_response(self, {"error": "invalid_issuer"}, status=400)
+                    return
+                google_sub = idinfo.get("sub") or ""
+                google_email = idinfo.get("email") or ""
+                google_name = idinfo.get("name") or ""
+                google_picture = idinfo.get("picture") or ""
+                if not google_sub:
+                    json_response(self, {"error": "no_sub", "detail": "لا يوجد معرّف Google"}, status=400)
+                    return
+                # استخدام google_sub كبديل للهاتف (معرّف فريد)
+                phone_key = f"google:{google_sub}"
+                user = None
+                try:
+                    user = fetch_user(phone_key)
+                except Exception as fetch_err:
+                    logger.warning("Google login fetch_user failed: %s", fetch_err)
+                if user and user.get("secret"):
+                    # مستخدم موجود — إرجاع السرّ مباشرة
+                    json_response(self, {
+                        "status": "ok",
+                        "secret": user["secret"],
+                        "phone": google_email,
+                        "name": google_name,
+                        "avatar": google_picture,
+                        "provider": "google",
+                    })
+                    return
+                # مستخدم جديد — إنشائه
+                # أولاً: الإنشاء بالحقول الأساسية فقط (متوافق مع أي جدول users)
+                secret = new_secret()
+                try:
+                    upsert_user({
+                        "phone": phone_key,
+                        "secret": secret,
+                        "verified": True,
+                    })
+                except Exception as upsert_err:
+                    logger.warning("Google login upsert_user failed: %s", upsert_err)
+                    # إذا فشل Supabase — نُرجع السرّ محلياً (المستخدم يعمل بدون DB)
+                # ثانياً: محاولة إضافة بيانات Google الإضافية (لو الأعمدة موجودة)
+                try:
+                    patch_user(phone_key, {
+                        "google_email": google_email,
+                        "google_name": google_name,
+                        "google_picture": google_picture,
+                    })
+                except Exception:
+                    logger.debug("Google profile columns not in users table — skipping")
+                json_response(self, {
+                    "status": "ok",
+                    "secret": secret,
+                    "phone": google_email,
+                    "name": google_name,
+                    "avatar": google_picture,
+                    "provider": "google",
+                })
+                return
+            except Exception as google_exc:
+                logger.exception("Google login handler failed")
+                json_response(self, {"error": "google_login_failed", "detail": str(google_exc)}, status=500)
+                return
+        if path == "/api/analytics":
+            # استقبال بيانات التتبع من الواجهة
+            try:
+                if isinstance(payload, list) and payload:
+                    log_path = os.path.join(os.path.dirname(__file__), "..", "analytics.jsonl")
+                    with open(log_path, "a", encoding="utf-8") as f:
+                        for ev in payload:
+                            f.write(json.dumps(ev, ensure_ascii=False) + "\n")
+                json_response(self, {"ok": True, "count": len(payload) if isinstance(payload, list) else 0})
+            except Exception as e:
+                json_response(self, {"ok": False, "error": str(e)}, status=400)
+            return
         if path == "/api/analyze":
             job_id = str(payload.get("jobId") or "")
             _progress_push(job_id, "parse", "تحليل الطلب وفهم النية والمنطقة والنوع")
@@ -1242,15 +1394,26 @@ class Handler(BaseHTTPRequestHandler):
             token = self.headers.get("Authorization", "").replace("Bearer ", "")
             user = extract_user_from_token(token)
             user_id = user["user_id"] if user else ""
-            auth_result = authorize_request(user_id, "search")
-            if not auth_result["authorized"]:
-                json_response(self, {
-                    "error": "tier_limit",
-                    "message": auth_result["message"],
-                    "tier": auth_result["tier"],
-                    "upgrade": auth_result.get("upgrade"),
-                }, status=403)
-                return
+            # بديل: قبول user_secret من جسم الطلب (الواجهة الأمامية ترسله مباشرة)
+            if not user_id:
+                from backend.services.supabase_store import fetch_user_by_secret
+                _secret = str(payload.get("user_secret") or "").strip()
+                if _secret:
+                    _u = fetch_user_by_secret(_secret)
+                    if _u:
+                        user_id = _u.get("phone") or _secret[:8]
+            _source_mode = str(payload.get("sourceMode") or "local").strip()
+            # البحث المحلي مسموح بدون تسجيل — البحث الخارجي يتطلب حساب
+            if _source_mode != "local":
+                auth_result = authorize_request(user_id, "search")
+                if not auth_result["authorized"]:
+                    json_response(self, {
+                        "error": "tier_limit",
+                        "message": auth_result["message"],
+                        "tier": auth_result["tier"],
+                        "upgrade": auth_result.get("upgrade"),
+                    }, status=403)
+                    return
             try:
                 request = parse_request(text)
                 if payload.get("mode") in {"search", "valuation", "search_and_value"}:
@@ -1321,138 +1484,166 @@ class Handler(BaseHTTPRequestHandler):
                         if item.governorate in allowed_governorates
                     ]
                 listings = _filter_listings_by_explicit_location(listings, request, filter_overrides)
-                ranked = top_matches(request, listings, limit=100)
-                enriched = enrich_rankings(request, ranked, listings)
-                deduped = deduplicate_ranked(enriched)[:50]
-                _progress_push(job_id, "score", f"تقييم المطابقة والترتيب: {len(deduped)} نتيجة نهائية")
+                _fast = bool(payload.get("fast"))
+                if _fast:
+                    # ── الوضع السريع: نتائج فورية بدون تقييم مقارن (أقل من ثانية) ──
+                    ranked = top_matches(request, listings, limit=10)
+                    from backend.models import RankedListing
+                    deduped = []
+                    for t in ranked:
+                        listing_obj, score, reasons, warnings, match_breakdown = t
+                        deduped.append(RankedListing(
+                            listing=listing_obj, match_score=round(score, 1),
+                            valuation_label="", valuation_reason="",
+                            confidence=0.0, deal_score=0, recommendation_score=round(score, 1),
+                            market_median=None, price_ratio=None,
+                            match_breakdown=match_breakdown, recommendation_breakdown={},
+                            number_sources={}, reasons=reasons, warnings=warnings, comparables=[],
+                        ))
+                    _progress_push(job_id, "score", f"急速: {len(deduped)} نتيجة")
+                else:
+                    _rank_limit = 100
+                    ranked = top_matches(request, listings, limit=_rank_limit)
+                    enriched = enrich_rankings(request, ranked, listings)
+                    deduped = deduplicate_ranked(enriched)[:50]
+                    _progress_push(job_id, "score", f"تقييم المطابقة والترتيب: {len(deduped)} نتيجة نهائية")
 
-                # تصنيف تلقائي للنتائج: يصنف كل إعلان حسب 7 فئات (نوع العقار، مستوى الاستثمار، الأولوية، نوع المعاملة، مصدر البيانات، مستوى الثقة، الفئة المستهدفة)
-                _progress_push(job_id, "classify", "تصنيف النتائج تلقائيًا حسب الفئات")
-                try:
-                    from backend.services.listing_classifier import get_classifier
-                    classifier = get_classifier()
-                    for result in deduped:
-                        listing_dict = {
-                            "id": result.get("id", ""),
-                            "title": result.get("title", ""),
-                            "description": result.get("description", ""),
-                            "price": result.get("price", 0),
-                            "space": result.get("space", 0),
-                            "area": result.get("area", ""),
-                            "governorate": result.get("governorate", ""),
-                            "propertyType": result.get("propertyType", ""),
-                            "transaction": result.get("transaction", ""),
-                            "listingMode": result.get("listingMode", ""),
-                            "source": result.get("source", ""),
-                            "opportunityScore": result.get("opportunityScore", 0),
-                            "movement": result.get("movement", 0),
-                            "evidenceCount": result.get("evidenceCount", 0),
+                # ── الوضع السريع (fast mode) للمساعد العقاري: يتخطى التصنيف والتحليل والعملاء ──
+                if _fast:
+                    _progress_push(job_id, "report", "بناء التقرير السريع")
+                    ai_insights = {}
+                    report = build_report(
+                        request, deduped, local_count, external_statuses, ai_insights,
+                        include_local_source=use_local,
+                    )
+                else:
+                    # تصنيف تلقائي للنتائج: يصنف كل إعلان حسب 7 فئات
+                    _progress_push(job_id, "classify", "تصنيف النتائج تلقائيًا حسب الفئات")
+                    try:
+                        from backend.services.listing_classifier import get_classifier
+                        classifier = get_classifier()
+                        for result in deduped:
+                            _l = result.listing
+                            _raw = _l.raw if hasattr(_l, 'raw') and isinstance(_l.raw, dict) else {}
+                            listing_dict = {
+                                "id": _raw.get("id", _l.code),
+                                "title": _raw.get("title", _l.summary[:60] if _l.summary else ""),
+                                "description": _raw.get("description", _l.summary),
+                                "price": _l.price or _raw.get("price", 0),
+                                "space": _l.space or _raw.get("space", 0),
+                                "area": _l.area or _raw.get("area", ""),
+                                "governorate": _l.governorate or _raw.get("governorate", ""),
+                                "propertyType": _l.property_type or _raw.get("propertyType", ""),
+                                "transaction": _l.transaction or _raw.get("transaction", ""),
+                                "listingMode": _l.listing_mode or _raw.get("listingMode", ""),
+                                "source": _l.source or _raw.get("source", ""),
+                                "opportunityScore": _raw.get("opportunityScore", 0),
+                                "movement": _raw.get("movement", 0),
+                                "evidenceCount": _raw.get("evidenceCount", 0),
+                            }
+                            classification = classifier.classify_listing(listing_dict)
+                            _raw["classification"] = {
+                                "propertyType": classification.classifications.get("property_type", ""),
+                                "investmentLevel": classification.classifications.get("investment_level", ""),
+                                "priority": classification.classifications.get("priority", ""),
+                                "dealType": classification.classifications.get("deal_type", ""),
+                                "dataSource": classification.classifications.get("data_source", ""),
+                                "trustLevel": classification.classifications.get("trust_level", ""),
+                                "targetAudience": classification.classifications.get("target_audience", ""),
+                                "overallScore": classification.overall_score,
+                                "tags": classification.tags,
+                            }
+                        _progress_push(job_id, "classify", f"تم تصنيف {len(deduped)} إعلانًا")
+                    except Exception as classify_error:
+                        logger.warning("Classification failed: %s", classify_error)
+
+                    # Fetch AI professional analysis
+                    _progress_push(job_id, "report", "بناء التقرير والتحليل الاحترافي (قد يستغرق ثوانٍ)")
+                    ai_insights = generate_professional_analysis(request, deduped, external_statuses)
+                    
+                    report = build_report(
+                        request, deduped, local_count, external_statuses, ai_insights,
+                        include_local_source=use_local,
+                    )
+                    try:
+                        from backend.services.chat_agents import build_chat_guidance
+                        report["chatGuidance"] = build_chat_guidance(request, report, source_mode=source_mode)
+                    except Exception as chat_guidance_error:
+                        logger.warning("Chat guidance failed: %s", chat_guidance_error)
+
+                    # ربط العملاء المحتملين بنتائج التحليل
+                    try:
+                        from backend.services.opportunities import _load_clients, clients_from_demand_listings, match_clients_for_listing
+                        analyze_clients = _load_clients() + clients_from_demand_listings(listings)
+                        for result in report.get("results", []):
+                            if result.get("rental"):
+                                result["clients"] = []
+                                continue
+                            result["clients"] = match_clients_for_listing(
+                                analyze_clients,
+                                str(result.get("area") or ""),
+                                str(result.get("propertyType") or result.get("detailClass") or ""),
+                                result.get("price"),
+                            )
+                        for result in (report.get("similarExternal") or {}).get("items", []):
+                            result["clients"] = match_clients_for_listing(
+                                analyze_clients,
+                                str(result.get("area") or ""),
+                                str(result.get("propertyType") or ""),
+                                result.get("price"),
+                            )
+                        report["profitOpportunities"] = _profit_opportunities(report)
+                    except Exception as clients_error:
+                        logger.warning("Clients attach failed: %s", clients_error)
+                        report["profitOpportunities"] = _profit_opportunities(report)
+
+                if not _fast:
+                    try:
+                        report["persistence"] = persist_analysis(request, report, report["sourceStatus"])
+                    except Exception as persist_error:
+                        report["persistence"] = {
+                            "enabled": supabase_is_configured(),
+                            "status": "failed",
+                            "error": str(persist_error),
                         }
-                        classification = classifier.classify_listing(listing_dict)
-                        result["classification"] = {
-                            "propertyType": classification.classifications.get("property_type", ""),
-                            "investmentLevel": classification.classifications.get("investment_level", ""),
-                            "priority": classification.classifications.get("priority", ""),
-                            "dealType": classification.classifications.get("deal_type", ""),
-                            "dataSource": classification.classifications.get("data_source", ""),
-                            "trustLevel": classification.classifications.get("trust_level", ""),
-                            "targetAudience": classification.classifications.get("target_audience", ""),
-                            "overallScore": classification.overall_score,
-                            "tags": classification.tags,
-                        }
-                    _progress_push(job_id, "classify", f"تم تصنيف {len(deduped)} إعلانًا")
-                except Exception as classify_error:
-                    logger.warning("Classification failed: %s", classify_error)
 
-                # Fetch AI professional analysis
-                _progress_push(job_id, "report", "بناء التقرير والتحليل الاحترافي (قد يستغرق ثوانٍ)")
-                ai_insights = generate_professional_analysis(request, deduped, external_statuses)
-                
-                report = build_report(
-                    request,
-                    deduped,
-                    local_count,
-                    external_statuses,
-                    ai_insights,
-                    include_local_source=use_local,
-                )
-
-                # ربط العملاء المحتملين بنتائج التحليل: ما دام العرض بيعًا، يُعرض من يبحث عن شراء
-                # في نفس المنطقة/النوع/النطاق السعري (من ملف العملاء + Supabase) — الإيجار يُستثنى.
-                try:
-                    from backend.services.opportunities import _load_clients, clients_from_demand_listings, match_clients_for_listing
-                    analyze_clients = _load_clients() + clients_from_demand_listings(listings)
-                    for result in report.get("results", []):
-                        if result.get("rental"):
-                            result["clients"] = []
-                            continue
-                        result["clients"] = match_clients_for_listing(
-                            analyze_clients,
-                            str(result.get("area") or ""),
-                            str(result.get("propertyType") or result.get("detailClass") or ""),
-                            result.get("price"),
-                        )
-                    for result in (report.get("similarExternal") or {}).get("items", []):
-                        result["clients"] = match_clients_for_listing(
-                            analyze_clients,
-                            str(result.get("area") or ""),
-                            str(result.get("propertyType") or ""),
-                            result.get("price"),
-                        )
-                    report["profitOpportunities"] = _profit_opportunities(report)
-                except Exception as clients_error:
-                    logger.warning("Clients attach failed: %s", clients_error)
-                    report["profitOpportunities"] = _profit_opportunities(report)
-
-                try:
-                    report["persistence"] = persist_analysis(request, report, report["sourceStatus"])
-                except Exception as persist_error:
-                    report["persistence"] = {
-                        "enabled": supabase_is_configured(),
-                        "status": "failed",
-                        "error": str(persist_error),
-                    }
-
-                # حفظ طلب التقييم في user_valuation_requests (يظهر فورًا في لوحة العرض)
-                try:
-                    if supabase_is_configured() and request.areas:
-                        fair_value = report.get("valuation", {}).get("fairValue") or report.get("fairValue")
-                        valuation_result = report.get("valuation") or {}
-                        save_valuation_request(
-                            region=request.areas[0],
-                            property_type=request.property_type or "",
-                            land_area_m2=request.min_area or request.max_area,
-                            offered_price=request.budget,
-                            fair_value_estimated=fair_value or valuation_result.get("marketValue"),
-                            # الثقة كسر بين 0 و1 → تحويلها إلى نسبة مئوية صحيحة لعمود score (integer)
-                            score=round((getattr(deduped[0], "confidence", 0) or 0) * 100) if deduped else None,
-                            lang="ar",
-                        )
-                except Exception as ve:
-                    logger.warning("Could not save valuation request: %s", ve)
+                    # حفظ طلب التقييم في user_valuation_requests (يظهر فورًا في لوحة العرض)
+                    try:
+                        if supabase_is_configured() and request.areas:
+                            fair_value = report.get("valuation", {}).get("fairValue") or report.get("fairValue")
+                            valuation_result = report.get("valuation") or {}
+                            save_valuation_request(
+                                region=request.areas[0],
+                                property_type=request.property_type or "",
+                                land_area_m2=request.min_area or request.max_area,
+                                offered_price=request.budget,
+                                fair_value_estimated=fair_value or valuation_result.get("marketValue"),
+                                score=round((getattr(deduped[0], "confidence", 0) or 0) * 100) if deduped else None,
+                                lang="ar",
+                            )
+                    except Exception as ve:
+                        logger.warning("Could not save valuation request: %s", ve)
 
                 # مؤشر الطلب بجانب النتائج: من يبحث عن شراء/إيجار في نفس المنطقة
-                # (طلبات «مطلوب» المحلية + الخارجية المحصودة مثل قسم «مطلوب» في 4Sale)
-                # — يُعرض كقسم في صفحة النتائج.
-                try:
-                    # RankedListing يحمل العقار في .listing (لا .area مباشرة)
-                    top_area = deduped[0].listing.area if deduped else ""
-                    demand_source = list(local_demand_source)
-                    if supabase_is_configured():
-                        from backend.services.supabase_store import fetch_external_demand_rows
-
-                        demand_source.extend(fetch_external_demand_rows())
-                    report["demandIndicators"] = _demand_indicator_payload(demand_source, request, top_area)
-                except Exception as demand_error:
-                    logger.warning("Demand indicators failed: %s", demand_error)
-                    report["demandIndicators"] = {"count": 0, "buyRequests": 0, "rentRequests": 0, "scope": "", "items": []}
+                if not _fast:
+                    try:
+                        top_area = deduped[0].listing.area if deduped else ""
+                        demand_source = list(local_demand_source)
+                        if supabase_is_configured():
+                            from backend.services.supabase_store import fetch_external_demand_rows
+                            demand_source.extend(fetch_external_demand_rows())
+                        report["demandIndicators"] = _demand_indicator_payload(demand_source, request, top_area)
+                    except Exception as demand_error:
+                        logger.warning("Demand indicators failed: %s", demand_error)
+                        report["demandIndicators"] = {"count": 0, "buyRequests": 0, "rentRequests": 0, "scope": "", "items": []}
 
                 _progress_push(job_id, "done", f"اكتمل التقرير — {len(deduped)} نتيجة", results=len(deduped))
                 # تسجيل الاستخدام بعد البحث الناجح
-                try:
-                    record_usage(user_id, "search")
-                except Exception:
-                    pass
+                if not _fast:
+                    try:
+                        record_usage(user_id, "search")
+                    except Exception:
+                        pass
                 json_response(self, report)
             except Exception as exc:
                 logger.exception("Analysis failed")
@@ -1710,6 +1901,78 @@ class Handler(BaseHTTPRequestHandler):
             json_response(self, {"classifications": classifier.export_classifications()})
             return
         
+        # ─── إدارة الأدوار والصلاحيات ───
+        if path == "/api/roles":
+            # جلب قائمة الأدوار والصلاحيات
+            from backend.services.accounts import ROLES
+            json_response(self, {"roles": ROLES})
+            return
+        if path == "/api/user/role":
+            # جلب/تحديث دور المستخدم
+            from backend.services.accounts import ROLES, check_role_permission
+            from backend.services.supabase_store import fetch_user, patch_user
+            phone_raw = payload.get("phone") or self.headers.get("X-User-Phone", "")
+            role = payload.get("role") or ""
+            if phone_raw:
+                phone, _ = normalize_phone(phone_raw)
+                user = fetch_user(phone)
+                if role and role in ROLES:
+                    patch_user(phone, {"role": role})
+                    json_response(self, {"status": "ok", "role": role})
+                else:
+                    user_role = (user or {}).get("role", "user")
+                    json_response(self, {"role": user_role, "permissions": ROLES.get(user_role, {}).get("permissions", [])})
+            else:
+                json_response(self, {"error": "missing_phone"}, status=400)
+            return
+        if path == "/api/user/role/check":
+            # التحقق من صلاحية معينة
+            from backend.services.accounts import ROLES, check_role_permission
+            from backend.services.supabase_store import fetch_user
+            phone_raw = payload.get("phone") or self.headers.get("X-User-Phone", "")
+            permission = payload.get("permission") or ""
+            if phone_raw and permission:
+                phone, _ = normalize_phone(phone_raw)
+                user = fetch_user(phone)
+                user_role = (user or {}).get("role", "user")
+                allowed = check_role_permission(user_role, permission)
+                json_response(self, {"allowed": allowed, "role": user_role, "permission": permission})
+            else:
+                json_response(self, {"error": "missing_fields"}, status=400)
+            return
+
+        # ─── إدارة الخطط والأسعار ───
+        if path == "/api/tiers":
+            # جلب قائمة الخطط والأسعار
+            from backend.services.tier import list_tiers
+            json_response(self, {"tiers": list_tiers()})
+            return
+        if path == "/api/tier/current":
+            # جلب خطة المستخدم الحالية
+            from backend.services.server_tier import get_user_tier, get_tier_limits
+            token = self.headers.get("Authorization", "").replace("Bearer ", "")
+            user = extract_user_from_token(token)
+            user_id = user["user_id"] if user else ""
+            if user_id:
+                tier_limits = get_tier_limits(user_id)
+                json_response(self, tier_limits)
+            else:
+                json_response(self, {"tier": "anonymous", "features": {}})
+            return
+        if path == "/api/tier/upgrade":
+            # ترقية خطة المستخدم
+            from backend.services.server_tier import upgrade_user
+            token = self.headers.get("Authorization", "").replace("Bearer ", "")
+            user = extract_user_from_token(token)
+            user_id = user["user_id"] if user else ""
+            new_tier = payload.get("tier") or ""
+            if user_id and new_tier:
+                result = upgrade_user(user_id, new_tier)
+                json_response(self, result)
+            else:
+                json_response(self, {"error": "missing_user_or_tier"}, status=400)
+            return
+
         json_response(self, {"error": "Unknown endpoint"}, status=404)
 
     def log_message(self, format: str, *args) -> None:

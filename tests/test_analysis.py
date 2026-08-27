@@ -403,6 +403,37 @@ class AnalysisTests(unittest.TestCase):
         self.assertIn("الشرق", request.areas)
         self.assertIn("القبلة", request.areas)
 
+    def test_rental_request_matches_wanted_rent_intent(self) -> None:
+        """صيغة المستخدم «ابي ... للإيجار» طلب استئجار، وليست إعلان عرض للإيجار."""
+        request = parse_request("ابي شقة للإيجار في السالمية")
+
+        self.assertEqual(request.transaction, "مطلوب للإيجار")
+        self.assertEqual(request.areas, ["السالمية"])
+
+    def test_rental_listing_with_asking_price_stays_rent_offer(self) -> None:
+        """«مطلوب 400» داخل إعلان إيجار تعني السعر المطلوب لا طلب استئجار."""
+        request = parse_request("عندي شقة للايجار في السالمية مطلوب 400")
+
+        self.assertEqual(request.transaction, "للإيجار")
+        self.assertEqual(request.areas, ["السالمية"])
+
+    def test_broker_customer_rent_request_is_wanted_rent(self) -> None:
+        """صيغة الوسيط «عندي عميل/طلب ... إيجار» طلب عميل وليست عرض وحدة."""
+        request = parse_request("عندي عميل يبي شقة ايجار في السالمية")
+        request2 = parse_request("عندي طلب شقة ايجار في السالمية")
+
+        self.assertEqual(request.transaction, "مطلوب للإيجار")
+        self.assertEqual(request2.transaction, "مطلوب للإيجار")
+        self.assertEqual(request.areas, ["السالمية"])
+        self.assertEqual(request2.areas, ["السالمية"])
+
+    def test_area_word_without_unit_is_parsed_as_property_area(self) -> None:
+        """«مساحة 400» تكفي لاستخراج مساحة العقار حتى بدون كلمة متر."""
+        request = parse_request("مطلوب بيت في السالمية بحدود 300 ألف مساحة 400")
+
+        self.assertEqual(request.min_area, 400)
+        self.assertEqual(request.max_area, 400)
+
     def test_area_only_request_does_not_expand_governorate(self) -> None:
         """طلب منطقة محددة (السالمية) يبقى محصورًا فيها ولا يتوسع لمحافظة حولي كلها."""
         request = parse_request("ايجار شقة في السالمية")

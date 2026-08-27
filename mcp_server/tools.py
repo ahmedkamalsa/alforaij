@@ -327,10 +327,12 @@ def _evaluate_tool(params: dict[str, Any]) -> str:
     payload = _evaluate_code(code, request_text)
     if fmt == "markdown":
         result = payload["result"]
+        governorate = result.get("governorate", "")
+        governorate_suffix = f"({governorate})" if governorate else ""
         lines = [
             f"# تقييم الإعلان {code}",
             "",
-            f"- **الموقع**: {result.get('area', '')} {f'({result.get('governorate', '')})' if result.get('governorate') else ''}",
+            f"- **الموقع**: {result.get('area', '')} {governorate_suffix}",
             f"- **السعر**: {result.get('priceText', 'غير معلن')}",
             f"- **حكم السعر**: {result.get('valuationLabel', '—')}",
             f"- **السبب**: {result.get('valuationReason', '—')}",
@@ -516,6 +518,76 @@ def _opportunities_tool(params: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _answer_chat_query_tool(params: dict[str, Any]) -> str:
+    text = _require_string(params, "text")
+    include_external = _opt_bool(params, "include_external", False)
+    include_local = _opt_bool(params, "include_local", True)
+    default_source_mode = "all" if include_external and include_local else ("external" if include_external else "local")
+    source_mode = _opt_string(params, "source_mode") or default_source_mode
+    fmt = _opt_string(params, "format") or "json"
+
+    request = parse_request(text)
+    listings = load_listings() if include_local else []
+    local_count = len(listings)
+    source_statuses: list[dict[str, Any]] = []
+    external_warning = ""
+
+    if include_external:
+        try:
+            from backend.connectors.live_sources import search_external_sources
+
+            external_listings, source_statuses = search_external_sources(request)
+            listings.extend(external_listings)
+        except Exception as exc:
+            external_warning = f"تعذر فحص المصادر الخارجية: {type(exc).__name__}: {exc}"
+            source_statuses.append({
+                "name": "المصادر الخارجية",
+                "status": "failed",
+                "note": external_warning,
+            })
+
+    ranked = top_matches(request, listings, limit=40, min_results=3)
+    enriched = deduplicate_ranked(enrich_rankings(request, ranked, listings))[:20]
+    report = build_report(
+        request,
+        enriched,
+        local_count,
+        source_statuses,
+        include_local_source=include_local,
+    )
+    from backend.services.chat_agents import build_chat_guidance
+
+    guidance = build_chat_guidance(request, report, source_mode=source_mode)
+    report["chatGuidance"] = guidance
+    results = report.get("results") or []
+    top_evidence = []
+    if results:
+        top = results[0]
+        top_evidence = top.get("evidence") or top.get("comparables") or []
+
+    payload = {
+        "intent": guidance["intent"],
+        "regionDecision": guidance["regionDecision"],
+        "sourcePlan": guidance["sourcePlan"],
+        "answer": guidance["answer"],
+        "results": results[:10],
+        "warnings": (guidance.get("dataQuality") or {}).get("warnings") or ([] if not external_warning else [external_warning]),
+        "evidence": top_evidence,
+    }
+
+    if fmt == "markdown":
+        lines = ["# إجابة الشات", "", guidance["answer"], ""]
+        if payload["results"]:
+            lines.append("## أفضل النتائج")
+            for item in payload["results"][:5]:
+                lines.append(f"- {item.get('code')} — {item.get('area')} — {item.get('priceText')} — {round(float(item.get('recommendationScore') or 0))}/100")
+        if payload["warnings"]:
+            lines += ["", "## تنبيهات"]
+            lines.extend(f"- {warning}" for warning in payload["warnings"])
+        return "\n".join(lines)
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
 # ── سجل الأدوات ─────────────────────────────────────────────────────────
 
 ANNOTATIONS_READONLY = {
@@ -684,5 +756,25 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
         "annotations": ANNOTATIONS_READONLY,
         "handler": _opportunities_tool,
+    },
+    "alforaij_answer_chat_query": {
+        "name": "alforaij_answer_chat_query",
+        "description": (
+            "يجيب على سؤال شات عقاري بجواب مختصر مع النية والنطاق وخطة المصادر وجودة البيانات. "
+            "يعيد نفس بنية وكلاء الشات في المنصة: intent وregionDecision وsourcePlan وanswer وresults وwarnings وevidence."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "نص سؤال المستخدم أو طلبه العقاري"},
+                "include_external": {"type": "boolean", "default": False, "description": "محاولة فحص المصادر الخارجية الحية"},
+                "include_local": {"type": "boolean", "default": True, "description": "استخدام بيانات الفريج المحلية"},
+                "source_mode": {"type": "string", "description": "local / all / source / custom"},
+                "format": {"type": "string", "enum": ["json", "markdown"], "default": "json"},
+            },
+            "required": ["text"],
+        },
+        "annotations": ANNOTATIONS_READONLY,
+        "handler": _answer_chat_query_tool,
     },
 }

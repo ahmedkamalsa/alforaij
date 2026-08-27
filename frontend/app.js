@@ -240,11 +240,28 @@ async function readJsonResponse(response, context = "") {
   }
 }
 
+function apiErrorFromText(text, status, context = "") {
+  let message = String(text || "").trim();
+  const trimmed = message.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const data = JSON.parse(trimmed);
+      message = data.detail || data.message || data.error || message;
+    } catch {
+      // Keep raw text below.
+    }
+  }
+  if (!message) message = `HTTP ${status || ""}`.trim();
+  const err = new Error(context ? `${message} (${context})` : message);
+  err.status = status;
+  return err;
+}
+
 async function getJson(path) {
   if (STATIC_SNAPSHOT_MODE) return fetchStaticJson(path);
   try {
     const response = await fetch(apiUrl(path));
-    if (!response.ok) throw new Error(await response.text());
+    if (!response.ok) throw apiErrorFromText(await response.text(), response.status, path);
     return await readJsonResponse(response);
   } catch (err) {
     const fallback = staticDataUrl(path);
@@ -506,6 +523,10 @@ function extractedFiltersHtml(filters) {
       <b>${escapeHtml(item.label || "")}</b>${escapeHtml(item.value || "")}
     </span>
   `).join("")}</div>`;
+}
+
+function chatGuidanceAnswer(report) {
+  return String((report && report.chatGuidance && report.chatGuidance.answer) || "").trim();
 }
 
 function setStatus(text) {
@@ -844,11 +865,11 @@ async function postJson(path, payload) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!response.ok) throw new Error(await response.text());
+    if (!response.ok) throw apiErrorFromText(await response.text(), response.status, path);
     return await readJsonResponse(response, path);
   } catch (err) {
-    // أي مضيف بلا API (خادم ثابت محلي، رابط مضبوط غير متاح): التحليل يعمل داخل المتصفح على اللقطة
-    if (path === "/api/analyze") return staticAnalyzeReport(payload);
+    // التحليل الثابت مسموح فقط في STATIC_SNAPSHOT_MODE أعلاه. إذا رد API فعلي
+    // برفض صلاحية أو حد خطة فلا نخفي السبب بتقرير لقطة صفرية.
     if (path === "/api/clients") return staticSaveClient(payload);
     throw err;
   }
@@ -2972,7 +2993,7 @@ async function sendChat() {
           <p class="scope-note">منطقة البحث المكتشفة: ${escapeHtml(detectedAreas)} | تاريخ التحليل: ${escapeHtml(generatedAt)}</p>
           ${extractedFiltersHtml(report.extractedFilters)}
           ${scopeText}
-          <p>${formatSummary(summaryLead(report.summary || ''))}</p>
+          <p>${formatSummary(chatGuidanceAnswer(report) || summaryLead(report.summary || ''))}</p>
           <div class="chat-results-preview">${report.results && report.results.length ? `<strong>عدد النتائج:</strong> ${report.results.length} — أفضل توصية: ${Math.round(report.results[0].recommendationScore || 0)}/100` : 'لا توجد نتائج.'}</div>
           <div class="meta">${new Date().toLocaleTimeString("ar-KW-u-nu-latn")}</div>
         </div>`;
@@ -3646,7 +3667,8 @@ function renderPriceHistory(slot, rows) {
 function renderReport(report) {
   const summaryEl = $("summaryText");
   const summary = report.summary || "";
-  if (summaryEl) summaryEl.innerHTML = formatSummary(summaryLead(summary) || summary);
+  const conciseAnswer = chatGuidanceAnswer(report);
+  if (summaryEl) summaryEl.innerHTML = formatSummary(conciseAnswer || summaryLead(summary) || summary);
   const fullSummaryBox = $("fullSummaryBox");
   const fullSummaryText = $("fullSummaryText");
   if (fullSummaryBox && fullSummaryText) {
@@ -4564,6 +4586,12 @@ function accountLogout() {
   portfolioState.items = [];
   portfolioState.loaded = false;
   accountSave();
+  // مسح بيانات Google المحفوظة
+  try {
+    localStorage.removeItem("alforaij_user_name");
+    localStorage.removeItem("alforaij_user_avatar");
+    localStorage.removeItem("alforaij_user_provider");
+  } catch { /* ignore */ }
   renderAccountStatus();
   renderSavedSearches();
   portfolioShowHide();
@@ -4610,9 +4638,14 @@ async function supabaseRpc(name, args) {
 
 function normalizePhoneKw(raw) {
   const digits = String(raw || "").replace(/\D/g, "");
-  if (digits.startsWith("00965")) return "+965" + digits.slice(5);
-  if (digits.startsWith("965") && digits.length === 11) return "+" + digits;
-  if (digits.length === 8 && !digits.startsWith("0") && !digits.startsWith("1")) return "+965" + digits;
+  // Strip leading 00 international prefix
+  const d = digits.startsWith("00") ? digits.slice(2) : digits;
+  // Kuwaiti local 8-digit numbers (legacy — must come before generic rule)
+  if (d.length === 8 && /^[2-9]/.test(d)) return "+965" + d;
+  // Any international number with country code (8-15 digits, starts with non-zero)
+  if (d.length >= 8 && d.length <= 15 && !d.startsWith("0")) {
+    return "+" + d;
+  }
   return "";
 }
 
@@ -4629,7 +4662,13 @@ function renderAccountStatus() {
   if (!el) return;
   if (accountState.secret) {
     el.hidden = false;
-    el.innerHTML = `مسجّل ✓ — <b>${escapeHtml(accountState.phone || "")}</b>
+    const userName = localStorage.getItem("alforaij_user_name") || "";
+    const userAvatar = localStorage.getItem("alforaij_user_avatar") || "";
+    const provider = localStorage.getItem("alforaij_user_provider") || "phone";
+    const avatarHtml = userAvatar ? `<img src="${escapeHtml(userAvatar)}" alt="" class="account-avatar" referrerpolicy="no-referrer">` : "";
+    const displayName = userName || accountState.phone || "";
+    const providerBadge = provider === "google" ? ` <span class="provider-badge google">G</span>` : "";
+    el.innerHTML = `${avatarHtml} مسجّل ✓ — <b>${escapeHtml(displayName)}</b>${providerBadge}
       <button type="button" class="account-logout" id="accountLogoutBtn">تسجيل خروج</button>`;
     const btn = $("accountLogoutBtn");
     if (btn) btn.onclick = accountLogout;
@@ -4669,9 +4708,17 @@ function closeAccountModal() {
 async function accountRequestOtp() {
   const sendBtn = $("accountSendOtp");
   const raw = (($("accountPhone") || {}).value || "").trim();
-  const phone = normalizePhoneKw(raw);
+  const countryCodeEl = document.getElementById("phoneCountryCode");
+  const countryCode = countryCodeEl ? countryCodeEl.value : "";
+  // If user typed full international number, use normalizePhoneKw; otherwise combine with selector
+  let phone;
+  if (raw.startsWith("+")) {
+    phone = normalizePhoneKw(raw);
+  } else {
+    phone = normalizePhoneKw(countryCode + raw);
+  }
   if (!phone) {
-    showAccountMsg("أدخل رقم هاتف كويتي صحيح (مثال: 55512345)", true);
+    showAccountMsg("أدخل رقم الهاتف من القائمة ثم الرقم (مثال: 55512345)", true);
     return;
   }
   if (sendBtn) sendBtn.disabled = true;
@@ -4730,6 +4777,80 @@ async function accountVerifyOtp() {
     loadPortfolio();
   } finally {
     if (verifyBtn) verifyBtn.disabled = false;
+  }
+}
+
+// ── تسجيل الدخول عبر Google ──
+function googleLogin() {
+  // أولًا: config.js → ثانياً: localStorage → ثالثاً: الخادم
+  const CLIENT_ID = window.GOOGLE_CLIENT_ID || localStorage.getItem("alforaij_google_client_id") || "";
+  if (CLIENT_ID) {
+    _initGoogleSignIn(CLIENT_ID);
+    return;
+  }
+  // محاولة جلب Client ID من الخادم
+  fetch("/api/google-client-id")
+    .then(r => r.json())
+    .then(cfg => {
+      if (cfg.client_id) {
+        localStorage.setItem("alforaij_google_client_id", cfg.client_id);
+        _initGoogleSignIn(cfg.client_id);
+      } else {
+        showAccountMsg("تسجيل الدخول بـ Google غير متاح حاليًا — استخدم رقم الهاتف", true);
+      }
+    })
+    .catch(() => {
+      showAccountMsg("تعذر الاتصال — أعد المحاولة", true);
+    });
+}
+
+function _initGoogleSignIn(clientId) {
+  if (typeof google === "undefined" || !google.accounts) {
+    showAccountMsg("جاري تحميل Google — أعد المحاولة", true);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: clientId,
+    callback: _handleGoogleCredential,
+  });
+  google.accounts.id.prompt();
+}
+
+async function _handleGoogleCredential(response) {
+  if (!response || !response.credential) return;
+  showAccountMsg("جاري التحقق من حساب Google...", false);
+  try {
+    const res = await fetch("/api/google-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.secret) {
+      showAccountMsg(data.detail || "تعذر تسجيل الدخول بـ Google", true);
+      return;
+    }
+    accountState.secret = data.secret;
+    accountState.phone = data.phone || "";
+    accountSave();
+    // حفظ معلومات الملف الشخصي
+    try {
+      localStorage.setItem("alforaij_user_name", data.name || "");
+      localStorage.setItem("alforaij_user_avatar", data.avatar || "");
+      localStorage.setItem("alforaij_user_provider", data.provider || "phone");
+    } catch { /* ignore */ }
+    const stepPhone = $("accountStepPhone");
+    const stepOtp = $("accountStepOtp");
+    if (stepPhone) stepPhone.hidden = true;
+    if (stepOtp) stepOtp.hidden = true;
+    renderAccountStatus();
+    showAccountMsg(`تم تسجيل الدخول بنجاح ✓ — مرحباً ${escapeHtml(data.name || "")}`, false);
+    loadSavedSearches();
+    loadUserAlerts();
+    loadPortfolio();
+  } catch (e) {
+    showAccountMsg("خطأ في الاتصال — أعد المحاولة", true);
+    console.error("Google login error:", e);
   }
 }
 
@@ -6556,27 +6677,141 @@ function updateOppTabCount() {
 
 // ── التبويبات الرئيسية: يعرض قسمًا واحدًا في كل مرة بدل تكديس كل الأقسام تحت بعض ──
 function switchMainTab(name) {
+  if (name === "account") {
+    openAccountModal();
+    return;
+  }
+  const visiblePanels = name === "market" ? new Set(["board", "insights"]) : new Set([name]);
   document.querySelectorAll(".main-tab").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.mainTab === name);
   });
   document.querySelectorAll("[data-main-panel]").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.mainPanel === name);
+    panel.classList.toggle("active", visiblePanels.has(panel.dataset.mainPanel));
   });
   if (name === "opportunities") loadOpportunities(false);
-  if (name === "board") loadDashboardBoard();
-  if (name === "insights") loadInsights();
+  if (name === "market" || name === "board") loadDashboardBoard();
+  if (name === "market" || name === "insights") loadInsights();
   if (name === "developments") loadDevelopments();
 }
 
-// زر «اسأل المساعد» العائم: يقفز للبحث/الشات ويُركز الحقل فورًا من أي قسم
-const chatFab = document.getElementById("chatFab");
-if (chatFab) {
-  chatFab.addEventListener("click", () => {
-    switchMainTab("search");
-    const input = document.getElementById("chatInput");
-    if (input) input.focus();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+// زر «اسأل المساعد» العائم: يفتح صندوق المحادثة العائم
+let _assistantBound = false;
+function _bindAssistant() {
+  if (_assistantBound) return;
+  _assistantBound = true;
+  const chatFab = document.getElementById("chatFab");
+  const assistantOverlay = document.getElementById("assistantOverlay");
+  const assistantForm = document.getElementById("assistantForm");
+  const assistantInput = document.getElementById("assistantInput");
+  const assistantMessages = document.getElementById("assistantMessages");
+  const assistantCloseBtn = document.getElementById("assistantCloseBtn");
+  if (!assistantOverlay) return;
+  window._openAssistant = function() {
+    assistantOverlay.hidden = false;
+    document.body.style.overflow = "hidden";
+    setTimeout(() => assistantInput && assistantInput.focus(), 200);
+  };
+  window._closeAssistant = function() {
+    assistantOverlay.hidden = true;
+    document.body.style.overflow = "";
+  };
+  if (chatFab) chatFab.addEventListener("click", window._openAssistant);
+  if (assistantCloseBtn) assistantCloseBtn.addEventListener("click", window._closeAssistant);
+  assistantOverlay.addEventListener("click", (e) => {
+    if (e.target === assistantOverlay) window._closeAssistant();
   });
+  // assistant form submit
+  if (assistantForm) {
+    assistantForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      _submitAssistant();
+    });
+  }
+  if (assistantInput) {
+    assistantInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); _submitAssistant(); }
+    });
+  }
+  function _appendMsg(text, isUser) {
+    const div = document.createElement("div");
+    div.className = "assistant-msg " + (isUser ? "assistant-msg-user" : "assistant-msg-bot");
+    div.innerHTML = `<div class="assistant-msg-avatar">${isUser ? "\uD83D\uDC64" : "\uD83C\uDFE0"}</div><div class="assistant-msg-body">${escapeHtml(text)}</div>`;
+    assistantMessages.appendChild(div);
+    assistantMessages.scrollTop = assistantMessages.scrollHeight;
+  }
+  async function _submitAssistant() {
+    const queryText = (assistantInput ? assistantInput.value.trim() : "");
+    if (!queryText) return;
+    assistantInput.value = "";
+    _appendMsg(queryText, true);
+    // ── مؤشر التحميل مع تحديث دوري ──
+    const loadDiv = document.createElement("div");
+    loadDiv.className = "assistant-msg assistant-msg-bot assistant-msg-loading";
+    loadDiv.innerHTML = `<div class="assistant-msg-avatar">\uD83C\uDFE0</div><div class="assistant-msg-body"><span class="lp-spinner" aria-hidden="true"></span> جاري البحث في قاعدة الفريج...</div>`;
+    assistantMessages.appendChild(loadDiv);
+    assistantMessages.scrollTop = assistantMessages.scrollHeight;
+    const startTime = Date.now();
+    const loadInterval = setInterval(() => {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      if (loadDiv.isConnected) {
+        const bodyEl = loadDiv.querySelector(".assistant-msg-body");
+        if (bodyEl) bodyEl.innerHTML = `<span class="lp-spinner" aria-hidden="true"></span> جاري البحث... (${elapsed} ثانية)`;
+        assistantMessages.scrollTop = assistantMessages.scrollHeight;
+      }
+    }, 3000);
+    // ── إرسال الطلب مع مهلة 60 ثانية ──
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 60000);
+    try {
+      const userSecret = localStorage.getItem("alforaij_secret") || "";
+      const headers = { "Content-Type": "application/json" };
+      if (userSecret) headers["Authorization"] = "Bearer " + userSecret;
+      const jobId = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: headers,
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          text: queryText,
+          sourceMode: "local",
+          jobId: jobId,
+          fast: true,
+          user_secret: userSecret || "",
+        }),
+      });
+      const data = await res.json();
+      clearInterval(loadInterval);
+      clearTimeout(timeoutId);
+      loadDiv.remove();
+      if (data.error && !data.summary && (!data.results || !data.results.length)) {
+        // عرض رسالة خطأ واضحة بدل الكود التقني
+        const errMsg = data.message || data.error || "تعذر الحصول على النتائج. حاول مرة أخرى.";
+        _appendMsg(errMsg, false);
+      } else {
+        // بناء عرض النتائج بشكل منسق من ملخص التقرير + النتائج
+        let summary = data.summary || data.answer || "";
+        if (typeof summary === "object") summary = JSON.stringify(summary, null, 2).slice(0, 1200);
+        // إضافة عدد النتائج إن وُجد
+        const resultCount = (data.results && data.results.length) || 0;
+        const countNote = resultCount > 0 ? `\n\n📊 عدد النتائج: ${resultCount} نتيجة` : "";
+        _appendMsg(summary + countNote, false);
+      }
+    } catch (err) {
+      clearInterval(loadInterval);
+      clearTimeout(timeoutId);
+      loadDiv.remove();
+      if (err.name === "AbortError") {
+        _appendMsg("⏰ انتهت المهلة (60 ثانية). حاول البحث في نطاق أضيق مثل: بيت 400م في الفردوس", false);
+      } else {
+        _appendMsg("خطأ في الاتصال بالخادم. تأكد من تشغيل السيرفر والاتصال بالإنترنت.", false);
+      }
+    }
+  }
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", _bindAssistant);
+} else {
+  _bindAssistant();
 }
 
 // أزرار «لماذا مجاني وأدق» — قفزة مباشرة إلى البحث أو الفرص
@@ -6700,16 +6935,14 @@ function renderDevelopments() {
   }
 
   if (sourcesEl) {
+    // عرض المصادر بشكل مختصر فقط (بدون التفاصيل التقنية)
     const sources = data.sources || [];
-    sourcesEl.innerHTML = sources.length
-      ? `<div class="source-grid">${sources.map((s) => `
-        <div class="source-card ${s.status === "success" ? "source-ok" : "source-muted"}">
-          <h4>${escapeHtml(s.name)}</h4>
-          <p class="source-meta">${escapeHtml(s.fetchMethod || "")} · ${escapeHtml(s.note || "")}</p>
-          <p class="source-meta">${escapeHtml(s.endpoint || "")}</p>
-        </div>
-      `).join("")}</div>`
-      : '<div class="empty small">لا توجد بيانات مصادر في هذه اللقطة.</div>';
+    const okCount = sources.filter(s => s.status === 'success').length;
+    if (sources.length) {
+      sourcesEl.innerHTML = `<p class="source-summary-bar tone-ok">وكيل الاكتشاف: جمع ${items.length} خبرًا من ${okCount}/${sources.length} مصدر نشط</p>`;
+    } else {
+      sourcesEl.innerHTML = '';
+    }
   }
 
   const countEl = $("tabCountDevelopments");
@@ -6719,6 +6952,13 @@ function renderDevelopments() {
 function bindMainTabs() {
   document.querySelectorAll(".main-tab").forEach((btn) => {
     btn.addEventListener("click", () => switchMainTab(btn.dataset.mainTab));
+  });
+  document.querySelectorAll("[data-more-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const wrap = btn.closest("details");
+      if (wrap) wrap.open = false;
+      switchMainTab(btn.dataset.moreTab);
+    });
   });
 }
 
@@ -7663,3 +7903,241 @@ async function boot() {
 
 boot();
 
+// ── نظام التتبع والتحليل + تصدير PDF/Excel ────────────────────────────
+const Analytics = {
+  _events: [],
+  init() {
+    try { this._events = JSON.parse(localStorage.getItem("alforaij_analytics") || "[]"); } catch { this._events = []; }
+    this.track("pageview", { page: location.pathname, title: document.title });
+    this._trackClicks();
+    this._trackSearchInterests();
+    setInterval(() => this.flush(), 30000);
+  },
+  track(event, data) {
+    this._events.push({ event, data, ts: Date.now(), page: location.pathname });
+    localStorage.setItem("alforaij_analytics", JSON.stringify(this._events.slice(-500)));
+  },
+  flush() {
+    const batch = this._events.splice(0);
+    localStorage.setItem("alforaij_analytics", JSON.stringify(this._events));
+    if (batch.length > 0 && navigator.sendBeacon) {
+      try { navigator.sendBeacon("/api/analytics", JSON.stringify(batch)); } catch {}
+    }
+  },
+  _trackClicks() {
+    document.addEventListener("click", (e) => {
+      const el = e.target.closest("button, a, [data-track]");
+      if (!el) return;
+      const label = el.textContent.trim().slice(0, 60) || el.getAttribute("aria-label") || el.dataset.track || "";
+      const tag = el.tagName;
+      this.track("click", { label, tag, id: el.id || "" });
+    }, true);
+  },
+  _trackSearchInterests() {
+    const origSend = window.sendChat;
+    if (typeof origSend === "function") {
+      const patched = async function() {
+        const input = document.getElementById("chatInput");
+        const q = (input ? input.value.trim() : "");
+        if (q) Analytics.track("search", { query: q, len: q.length });
+        return origSend.apply(this, arguments);
+      };
+      window.sendChat = patched;
+    }
+  },
+  getInsights() {
+    const clicks = {};
+    const searches = {};
+    const pages = {};
+    this._events.forEach(e => {
+      if (e.event === "click") { const k = e.data.label; clicks[k] = (clicks[k] || 0) + 1; }
+      if (e.event === "search") { const k = e.data.query; searches[k] = (searches[k] || 0) + 1; }
+      if (e.event === "pageview") { const k = e.data.page; pages[k] = (pages[k] || 0) + 1; }
+    });
+    return { clicks, searches, pages, total: this._events.length };
+  },
+};
+try { Analytics.init(); } catch {}
+
+// ── تصدير نتائج الشات كـ PDF ──────────────────────
+function exportChatPDF() {
+  const msgs = document.querySelectorAll("#chatWindow .chat-msg, #assistantMessages .assistant-msg");
+  if (!msgs.length) { alert("لا توجد رسائل للتصدير"); return; }
+  let text = "منصة الفريج — نتائج البحث" + "\n" + "=".repeat(40) + "\n\n";
+  msgs.forEach(m => {
+    const isBot = m.classList.contains("chat-msg-bot") || m.classList.contains("assistant-msg-bot");
+    const body = (m.querySelector(".chat-msg-body, .assistant-msg-body") || m).textContent.trim();
+    text += (isBot ? "🤖 المساعد: " : "👤 أنت: ") + body + "\n\n";
+  });
+  text += "\n" + "=".repeat(40) + "\n" + "تصدير من منصة الفريج — " + new Date().toLocaleDateString("ar");
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "alforaij-results.txt";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── تصدير نتائج الشات كـ Excel (CSV) ────────────────
+function exportChatExcel() {
+  const msgs = document.querySelectorAll("#chatWindow .chat-msg, #assistantMessages .assistant-msg");
+  if (!msgs.length) { alert("لا توجد رسائل للتصدير"); return; }
+  let csv = "\uFEFFالمرسل,الرسالة,الوقت\n";
+  msgs.forEach(m => {
+    const isBot = m.classList.contains("chat-msg-bot") || m.classList.contains("assistant-msg-bot");
+    const body = (m.querySelector(".chat-msg-body, .assistant-msg-body") || m).textContent.trim().replace(/"/g, '""');
+    csv += `"${isBot ? "المساعد" : "المستخدم"}","${body}","${new Date().toLocaleTimeString("ar")}"\n`;
+  });
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "alforaij-results.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── تتبع تتبع النقرات في لوحة التحكم ──────────────
+function getAnalyticsDashboard() {
+  const insights = Analytics.getInsights();
+  const topClicks = Object.entries(insights.clicks).sort((a,b) => b[1] - a[1]).slice(0, 10);
+  const topSearches = Object.entries(insights.searches).sort((a,b) => b[1] - a[1]).slice(0, 10);
+  const topPages = Object.entries(insights.pages).sort((a,b) => b[1] - a[1]).slice(0, 10);
+  return { totalEvents: insights.total, topClicks, topSearches, topPages };
+}
+
+// ── لوحة التحليلات المتقدمة ──────────────────────
+(async function _initAnalyticsDashboard() {
+  const root = $("analyticsDashboard");
+  if (!root) return;
+
+  function _bar(items, maxVal) {
+    if (!items || !items.length) return "<p class=\"muted\">لا توجد بيانات</p>";
+    const mx = maxVal || Math.max(...items.map(i => i.count));
+    return items.map(i => {
+      const pct = mx > 0 ? (i.count / mx * 100) : 0;
+      const label = i.area || i.source || i.type || i.query || i.transaction || "";
+      return `<div class="stat-bar">
+        <span class="stat-bar-label">${escapeHtml(label)}</span>
+        <div style="flex:1"><div class="stat-bar-fill" style="width:${pct}%"></div></div>
+        <span class="stat-bar-count">${i.count}</span>
+      </div>`;
+    }).join("");
+  }
+
+  function _render(d) {
+    const o = d.overview || {};
+    const sp = d.searchPatterns || {};
+    const ms = d.marketStats || {};
+    const trends = d.priceTrends || {};
+    const daily = d.dailyActivity || {};
+    const po = d.priceOverview || {};
+
+    let html = "";
+
+    // ── ملخص عام ──
+    html += `<div class="analytics-card">
+      <h3>📋 ملخص عام</h3>
+      <div class="big-number">${o.totalSearches || 0}</div>
+      <div style="color:var(--text-secondary);font-size:0.85rem;margin:4px 0 16px">بحث مسجل</div>
+      <div class="stat-row"><span>إعلانات السوق</span><span>${o.totalMarketListings || 0}</span></div>
+      <div class="stat-row"><span>المناطق المشمولة</span><span>${o.uniqueAreas || 0}</span></div>
+      <div class="stat-row"><span>متوسط سعر البحث</span><span>${(o.avgSearchPrice || 0).toLocaleString()} د.ك</span></div>
+    </div>`;
+
+    // ── أسعار السوق ──
+    html += `<div class="analytics-card">
+      <h3>💰 إحصائيات الأسعار</h3>
+      <div class="big-number">${(po.median || 0).toLocaleString()}</div>
+      <div style="color:var(--text-secondary);font-size:0.85rem;margin:4px 0 16px">وسيط السعر (د.ك)</div>
+      <div class="stat-row"><span>أقل سعر</span><span>${(po.min || 0).toLocaleString()} د.ك</span></div>
+      <div class="stat-row"><span>أعلى سعر</span><span>${(po.max || 0).toLocaleString()} د.ك</span></div>
+      <div class="stat-row"><span>متوسط</span><span>${(po.avg || 0).toLocaleString()} د.ك</span></div>
+      <div class="stat-row"><span>عدد العينات</span><span>${po.count || 0}</span></div>
+    </div>`;
+
+    // ── أكثر المناطق بحثًا ──
+    html += `<div class="analytics-card">
+      <h3>📍 المناطق الأكثر بحثًا</h3>
+      ${_bar((sp.topAreas || []).slice(0, 8))}
+    </div>`;
+
+    // ── أنواع العقارات ──
+    html += `<div class="analytics-card">
+      <h3>🏠 أنواع العقارات</h3>
+      ${_bar(sp.propertyTypes || [])}
+    </div>`;
+
+    // ── أنواع المعاملات ──
+    html += `<div class="analytics-card">
+      <h3>🔄 أنواع المعاملات</h3>
+      ${_bar(sp.transactionTypes || [])}
+    </div>`;
+
+    // ── مصادر السوق ──
+    html += `<div class="analytics-card">
+      <h3>🌐 مصادر الإعلانات</h3>
+      ${_bar(ms.topSources || [])}
+    </div>`;
+
+    // ── النشاط اليومي ──
+    if (daily.dates && daily.dates.length) {
+      const maxDaily = Math.max(...daily.searches);
+      const bars = daily.searches.map((c, i) => {
+        const h = maxDaily > 0 ? (c / maxDaily * 100) : 0;
+        return `<div class="analytics-chart-bar" style="height:${h}%" data-tip="${daily.dates[i]}: ${c} بحث"></div>`;
+      }).join("");
+      const labels = daily.dates.length > 1
+        ? `<div class="analytics-chart-labels"><span>${daily.dates[0]}</span><span>${daily.dates[daily.dates.length - 1]}</span></div>`
+        : "";
+      html += `<div class="analytics-card analytics-wide">
+        <h3>📈 النشاط اليومي (آخر 30 يوم)</h3>
+        <div class="analytics-chart">${bars}</div>
+        ${labels}
+      </div>`;
+    }
+
+    // ── أسعار حسب المنطقة ──
+    const ap = ms.areaPrices || {};
+    const apKeys = Object.keys(ap).slice(0, 8);
+    if (apKeys.length) {
+      const rows = apKeys.map(a => {
+        const s = ap[a];
+        return `<div class="stat-row">
+          <span>${escapeHtml(a)}</span>
+          <span>وسيط: ${(s.median || 0).toLocaleString()} د.ك (${s.count} إعلان)</span>
+        </div>`;
+      }).join("");
+      html += `<div class="analytics-card analytics-wide">
+        <h3>📊 متوسط الأسعار حسب المنطقة</h3>
+        ${rows}
+      </div>`;
+    }
+
+    root.innerHTML = html;
+  }
+
+  async function _load() {
+    root.innerHTML = "<p class=\"muted\">جاري تحميل البيانات…</p>";
+    try {
+      const res = await fetch("/api/analytics-dashboard", { cache: "no-store" });
+      if (!res.ok) throw new Error(res.status);
+      const data = await res.json();
+      _render(data);
+    } catch (err) {
+      root.innerHTML = `<p class=\"muted\">تعذر تحميل البيانات: ${escapeHtml(String(err))}</p>`;
+    }
+  }
+
+  window._refreshAnalytics = _load;
+
+  // تحميل عند فتح التبويب
+  const tabs = document.querySelectorAll("[data-main-tab='analytics']");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      if (!root.dataset.loaded) {
+        root.dataset.loaded = "1";
+        _load();
+      }
+    });
+  });
+})();
