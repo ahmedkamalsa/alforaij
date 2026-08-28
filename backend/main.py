@@ -1738,6 +1738,11 @@ class Handler(BaseHTTPRequestHandler):
             result = authorize_request(user_id, feature)
             json_response(self, result)
             return
+        if path == "/api/ai/providers":
+            # حالة مزوّدات الذكاء الاصطناعي
+            from backend.services.ai_router import get_available_providers
+            json_response(self, {"providers": get_available_providers()})
+            return
         if path == "/api/tier/pricing":
             # عرض الخطط والأسعار (للصفحة العامة)
             from backend.services.tier import list_tiers

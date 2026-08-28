@@ -61,6 +61,13 @@ AGENT_ROUTER_API_URL = os.getenv("AGENT_ROUTER_API_URL", "https://api.agentroute
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
 WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "")
 WHATSAPP_SENDER_NAME = os.getenv("WHATSAPP_SENDER_NAME", "فريق الفريج العقاري")
+
+# AI Router — مزوّدات الذكاء الاصطناعي المجانية
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_AI_STUDIO_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+AI_PROVIDER_ORDER = os.getenv("AI_PROVIDER_ORDER", "ollama,gemini,openrouter,agentrouter")
 SEED_LISTINGS_PATH = Path(os.getenv("ALFORAIJ_SEED_LISTINGS", DATA_DIR / "seed_listings.json"))
 BOARD_HTML_PATH = Path(
     os.getenv(
