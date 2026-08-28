@@ -195,7 +195,7 @@ class TestProviderStatus(unittest.TestCase):
         for p in providers:
             self.assertIn("name", p)
             self.assertIn("status", p)
-            self.assertIn(p["name"], ["ollama", "gemini", "openrouter", "agentrouter"])
+            self.assertIn(p["name"], ["freellmapi", "ollama", "gemini", "openrouter", "agentrouter"])
 
 
 if __name__ == "__main__":

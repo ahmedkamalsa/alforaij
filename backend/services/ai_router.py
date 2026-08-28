@@ -2,14 +2,15 @@
 AI Router — محوّل ذكي بين مزوّدات الذكاء الاصطناعي المجانية.
 
 تسلسل الأولوية (Fallback Chain):
-  1. Ollama (محلي — مجاني بلا حدود، أسرع رد)
-  2. Google AI Studio / Gemini (مجاني 1M توكن/يوم، ممتاز بالعربية)
-  3. OpenRouter (مجاني — نماذج متعددة)
-  4. AgentRouter (الخادم الحالي — كاحتياطي)
+  1. FreeLLMAPI (مجاني — 34 مزوّد، 635 نموذج، 7.4B توكن/شهر، Fallback تلقائي)
+  2. Ollama (محلي — مجاني بلا حدود، أسرع رد)
+  3. Google AI Studio / Gemini (مجاني 1M توكن/يوم، ممتاز بالعربية)
+  4. OpenRouter (مجاني — نماذج متعددة)
+  5. AgentRouter (الخادم الحالي — كاحتياطي)
 
 Usage:
     from backend.services.ai_router import ai_chat
-    result = ai_chat("ystem prompt", "user message", response_format="json")
+    result = ai_chat("system prompt", "user message", response_format="json")
 """
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # ── مهل الاتصال لكل مزوّد ──
+_FREELLMAPI_TIMEOUT = 15
 _OLLAMA_TIMEOUT = 15
 _GEMINI_TIMEOUT = 15
 _OPENROUTER_TIMEOUT = 15
@@ -31,7 +33,58 @@ _AGENTROUTER_TIMEOUT = 12
 
 
 # ══════════════════════════════════════════════════════════════════
-# 1. Ollama —_local, free, unlimited
+# 1. FreeLLMAPI — 34 providers, 635 models, 7.4B tokens/month
+# ══════════════════════════════════════════════════════════════════
+def _try_freellmapi(
+    system: str,
+    user: str,
+    model: str = "",
+    temperature: float = 0.4,
+) -> dict | None:
+    """Try FreeLLMAPI — unified gateway for 34 free providers.
+
+    Requires:
+      - FREELLMAPI_URL (default: http://127.0.0.1:5050/v1)
+      - FREELLMAPI_KEY (from FreeLLMAPI dashboard tray popover)
+    """
+    api_url = os.getenv("FREELLMAPI_URL", "http://127.0.0.1:5050/v1") + "/chat/completions"
+    api_key = os.getenv("FREELLMAPI_KEY", "")
+    if not api_key:
+        return None
+    model = model or os.getenv("FREELLMAPI_MODEL", "google/gemini-2.0-flash")
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "temperature": temperature,
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        api_url,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_FREELLMAPI_TIMEOUT) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            choices = result.get("choices", [])
+            if choices:
+                content = choices[0].get("message", {}).get("content", "")
+                if content:
+                    return {"content": content, "provider": "freellmapi", "model": model}
+    except Exception as e:
+        logger.debug("FreeLLMAPI unavailable: %s", e)
+    return None
+
+
+# ══════════════════════════════════════════════════════════════════
+# 2. Ollama — local, free, unlimited
 # ══════════════════════════════════════════════════════════════════
 def _try_ollama(
     system: str,
@@ -242,9 +295,10 @@ def _set_cache(system: str, user: str, result: dict) -> None:
 # AI Chat — الواجهة الرئيسية
 # ══════════════════════════════════════════════════════════════════
 # ترتيب المزوّدين (يمكن تعديله عبر متغير البيئة AI_PROVIDER_ORDER)
-_DEFAULT_PROVIDERS = ["ollama", "gemini", "openrouter", "agentrouter"]
+_DEFAULT_PROVIDERS = ["freellmapi", "ollama", "gemini", "openrouter", "agentrouter"]
 
 _PROVIDER_MAP = {
+    "freellmapi": _try_freellmapi,
     "ollama": _try_ollama,
     "gemini": _try_gemini,
     "openrouter": _try_openrouter,
@@ -351,6 +405,8 @@ def get_available_providers() -> list[dict[str, Any]]:
             status = "configured" if (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_KEY")) else "no_key"
         elif name == "openrouter":
             status = "configured" if os.getenv("OPENROUTER_API_KEY") else "no_key"
+        elif name == "freellmapi":
+            status = "configured" if os.getenv("FREELLMAPI_KEY") else "no_key"
         elif name == "agentrouter":
             from backend.config import AGENT_ROUTER_API_KEY
             status = "configured" if AGENT_ROUTER_API_KEY else "no_key"

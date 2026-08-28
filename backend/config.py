@@ -67,7 +67,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_AI_STUDIO_
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
-AI_PROVIDER_ORDER = os.getenv("AI_PROVIDER_ORDER", "ollama,gemini,openrouter,agentrouter")
+AI_PROVIDER_ORDER = os.getenv("AI_PROVIDER_ORDER", "freellmapi,ollama,gemini,openrouter,agentrouter")
+FREELLMAPI_URL = os.getenv("FREELLMAPI_URL", "http://127.0.0.1:5050/v1")
+FREELLMAPI_KEY = os.getenv("FREELLMAPI_KEY", "")
+FREELLMAPI_MODEL = os.getenv("FREELLMAPI_MODEL", "google/gemini-2.0-flash")
 SEED_LISTINGS_PATH = Path(os.getenv("ALFORAIJ_SEED_LISTINGS", DATA_DIR / "seed_listings.json"))
 BOARD_HTML_PATH = Path(
     os.getenv(
