@@ -4723,8 +4723,25 @@ async function accountRequestOtp() {
   }
   if (sendBtn) sendBtn.disabled = true;
   try {
-    const res = await supabaseRpc("register_user", { p_phone: phone });
-    if (!res || !res.code) {
+    // Try Supabase RPC first, fall back to backend /api/register
+    let res = await supabaseRpc("register_user", { p_phone: phone });
+    if (!res || !res.code || res.message || (res.error && !res.status)) {
+      // Fallback: call backend /api/register which supports international numbers + WhatsApp delivery
+      try {
+        const apiRes = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: phone }),
+        });
+        const apiData = await apiRes.json();
+        if (apiRes.ok && (apiData.code || apiData.delivery)) {
+          res = apiData; // {status: 'ok', delivery: 'on_screen', code: '...', expires_in_seconds: 600}
+        }
+      } catch {
+        /* backend unavailable */
+      }
+    }
+    if (!res || (!res.code && !res.status)) {
       showAccountMsg("تعذر إرسال الرمز — أعد المحاولة بعد قليل", true);
       return;
     }
@@ -4760,7 +4777,33 @@ async function accountVerifyOtp() {
   }
   if (verifyBtn) verifyBtn.disabled = true;
   try {
-    const res = await supabaseRpc("verify_otp_code", { p_phone: accountState.phone, p_code: code });
+    // Try Supabase RPC first, fall back to backend /api/verify-otp
+    let res = await supabaseRpc("verify_otp_code", { p_phone: accountState.phone, p_code: code });
+    if (!res || !res.secret || res.message || (res.error && !res.status)) {
+      // Fallback: call backend /api/verify-otp (retry up to 2x if no_otp — background upsert may still be in flight)
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const apiRes = await fetch("/api/verify-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: accountState.phone, code: code }),
+          });
+          const apiData = await apiRes.json();
+          if (apiRes.ok && apiData.secret) {
+            res = apiData;
+            break;
+          }
+          if (apiData.error === "no_otp" && attempt === 0) {
+            await new Promise(r => setTimeout(r, 2000)); // wait for background upsert
+            continue;
+          }
+          res = apiData;
+          break;
+        } catch {
+          break;
+        }
+      }
+    }
     if (!res || !res.secret) {
       showAccountMsg("الرمز غير صحيح أو منتهي — أعد المحاولة أو أرسل رمزًا جديدًا", true);
       return;

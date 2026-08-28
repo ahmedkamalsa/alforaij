@@ -5,7 +5,7 @@
 -- المحلي (نقطتا /api/register و/api/verify-otp) يبقى مسارًا مكمّلًا للتسليم
 -- عبر واتساب حين تُضبط الأسرار.
 
--- التسجيل: يتحقق من الصيغة الكويتية (+965[2-9]XXXXXXXX)، يفرض نافذة 15 دقيقة
+-- التسجيل: يتحقق من الصيغة الدولية (E.164: +XXXXXXXXXX، 8-15 رقمًا)، يفرض نافذة 15 دقيقة
 -- بين إعادة الإرسال، يبطل الرمز القديم ويصدر جديدًا (6 أرقام من gen_random_uuid).
 create or replace function register_user(p_phone text)
 returns json
@@ -18,7 +18,8 @@ declare
   v_digest text;
   v_user users%rowtype;
 begin
-  if p_phone !~ '^\+965[2-9][0-9]{7}$' then
+  -- يقبل أي رقم دولي صحيح: + متبوعة 8-15 رقمًا (صيغة E.164)
+  if p_phone !~ '^\+[0-9]{8,15}$' then
     raise exception 'invalid phone';
   end if;
   select * into v_user from users where phone = p_phone;
@@ -54,7 +55,8 @@ declare
   v_digest text;
   v_secret text;
 begin
-  if p_phone !~ '^\+965[2-9][0-9]{7}$' or p_code is null or p_code = '' then
+  -- يقبل أي رقم دولي صحيح: + متبوعة 8-15 رقمًا (صيغة E.164)
+  if p_phone !~ '^\+[0-9]{8,15}$' or p_code is null or p_code = '' then
     raise exception 'invalid input';
   end if;
   select * into v_user from users where phone = p_phone;

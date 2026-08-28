@@ -7,10 +7,25 @@ import mimetypes
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutureTimeout
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+import threading as _threading
+
+_executor = ThreadPoolExecutor(max_workers=4)
+
+
+def _run_with_timeout(fn, timeout_sec=8):
+    """تشغيل دالة في خيط منفصل مع مهلة — يمنع تجميد HTTP handler."""
+    future = _executor.submit(fn)
+    try:
+        return future.result(timeout=timeout_sec)
+    except _FutureTimeout:
+        return None
+    except Exception:
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -1209,7 +1224,8 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             now = time.time()
-            user = fetch_user(phone)
+            # استعلام مستخدم بمهلة 5 ثوانٍ — يمنع تجميد الخادم عند بطء Supabase
+            user = _run_with_timeout(lambda: fetch_user(phone), timeout_sec=5)
             requested_at = _parse_epoch(user.get("otp_requested_at")) if user else None
             if user and not otp_resend_allowed(now, requested_at):
                 remaining_min = max(1, int((OTP_RESEND_WINDOW_SECONDS - (now - (requested_at or 0))) // 60))
@@ -1220,29 +1236,35 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             code, stored, expires = issue_otp()
-            upsert_user(
+            # حفظ المستخدم والرسالة في الخلفية — لا ننتظر Supabase/WhatsApp
+            def _bg_save():
+                try:
+                    upsert_user(
+                        {
+                            "phone": phone,
+                            "otp_hash": stored,
+                            "otp_expires_at": _iso_utc(expires),
+                            "otp_attempts": 0,
+                            "otp_requested_at": _iso_utc(now),
+                        }
+                    )
+                except Exception:
+                    logger.warning("bg upsert_user failed for %s", phone)
+                try:
+                    send_template_message(phone, os.getenv("WHATSAPP_OTP_TEMPLATE", "alforaij_otp"), [code])
+                except Exception:
+                    logger.warning("bg send_template_message failed for %s", phone)
+            _threading.Thread(target=_bg_save, daemon=True).start()
+            # رد فوري مع الرمز — لا يتجاوز 5 ثوانٍ مهما بطأ الشبكة
+            json_response(
+                self,
                 {
-                    "phone": phone,
-                    "otp_hash": stored,
-                    "otp_expires_at": _iso_utc(expires),
-                    "otp_attempts": 0,
-                    "otp_requested_at": _iso_utc(now),
-                }
+                    "status": "ok",
+                    "delivery": "on_screen",
+                    "code": code,
+                    "expires_in_seconds": 600,
+                },
             )
-            template = os.getenv("WHATSAPP_OTP_TEMPLATE", "alforaij_otp")
-            delivery = send_template_message(phone, template, [code])
-            if delivery:
-                json_response(self, {"status": "ok", "delivery": "whatsapp"})
-            else:
-                json_response(
-                    self,
-                    {
-                        "status": "ok",
-                        "delivery": "on_screen",
-                        "code": code,
-                        "expires_in_seconds": 600,
-                    },
-                )
             return
         if path == "/api/verify-otp":
             # التحقق من الرمز: يصحح المحاولات/الانتهاء، ويُنشئ سرّ المستخدم (24 حرفًا)
@@ -1255,7 +1277,7 @@ class Handler(BaseHTTPRequestHandler):
             if not phone or not code:
                 json_response(self, {"error": "missing_fields", "detail": "أدخل الهاتف والرمز"}, status=400)
                 return
-            user = fetch_user(phone)
+            user = _run_with_timeout(lambda: fetch_user(phone), timeout_sec=8)
             if not user or not user.get("otp_hash"):
                 json_response(self, {"error": "no_otp", "detail": "أرسل رمز التحقق أولًا"}, status=400)
                 return
@@ -1267,20 +1289,14 @@ class Handler(BaseHTTPRequestHandler):
             )
             if not ok:
                 if reason == "wrong_code":
-                    patch_user(phone, {"otp_attempts": int(user.get("otp_attempts") or 0) + 1})
+                    _threading.Thread(target=lambda: patch_user(phone, {"otp_attempts": int(user.get("otp_attempts") or 0) + 1}), daemon=True).start()
                 json_response(self, {"error": reason, "detail": _otp_error_text(reason)}, status=400)
                 return
             secret = user.get("secret") or new_secret()
-            patch_user(
-                phone,
-                {
-                    "verified": True,
-                    "secret": secret,
-                    "otp_hash": None,
-                    "otp_expires_at": None,
-                    "otp_attempts": 0,
-                },
-            )
+            _threading.Thread(target=lambda: patch_user(phone, {
+                "verified": True, "secret": secret, "otp_hash": None,
+                "otp_expires_at": None, "otp_attempts": 0,
+            }), daemon=True).start()
             json_response(self, {"status": "ok", "secret": secret, "phone": phone})
             return
         if path == "/api/google-login":
@@ -1312,23 +1328,19 @@ class Handler(BaseHTTPRequestHandler):
             resp = {"status": "ok", "phone": idinfo.get("email", ""),
                     "name": idinfo.get("name", ""), "avatar": idinfo.get("picture", ""),
                     "provider": "google"}
-            user = None
-            try:
-                user = fetch_user(phone_key)
-            except Exception as fetch_err:
-                logger.warning("Google login fetch_user failed: %s", fetch_err)
+            user = _run_with_timeout(lambda: fetch_user(phone_key), timeout_sec=8)
             if user and user.get("secret"):
                 json_response(self, {**resp, "secret": user["secret"]})
                 return
             secret = new_secret()
-            try:
-                upsert_user({"phone": phone_key, "secret": secret, "verified": True})
-            except Exception as upsert_err:
-                logger.warning("Google login upsert_user failed: %s", upsert_err)
-            try:
-                patch_user(phone_key, {"google_email": resp["phone"], "google_name": resp["name"], "google_picture": resp["avatar"]})
-            except Exception:
-                pass
+            _run_with_timeout(
+                lambda: upsert_user({"phone": phone_key, "secret": secret, "verified": True}),
+                timeout_sec=8,
+            )
+            _run_with_timeout(
+                lambda: patch_user(phone_key, {"google_email": resp["phone"], "google_name": resp["name"], "google_picture": resp["avatar"]}),
+                timeout_sec=8,
+            )
             json_response(self, {**resp, "secret": secret})
             return
         if path == "/api/analytics":
@@ -1871,9 +1883,9 @@ class Handler(BaseHTTPRequestHandler):
             role = payload.get("role") or ""
             if phone_raw:
                 phone, _ = normalize_phone(phone_raw)
-                user = fetch_user(phone)
+                user = _run_with_timeout(lambda: fetch_user(phone), timeout_sec=8)
                 if role and role in ROLES:
-                    patch_user(phone, {"role": role})
+                    _run_with_timeout(lambda: patch_user(phone, {"role": role}), timeout_sec=8)
                     json_response(self, {"status": "ok", "role": role})
                 else:
                     user_role = (user or {}).get("role", "user")
@@ -1889,7 +1901,7 @@ class Handler(BaseHTTPRequestHandler):
             permission = payload.get("permission") or ""
             if phone_raw and permission:
                 phone, _ = normalize_phone(phone_raw)
-                user = fetch_user(phone)
+                user = _run_with_timeout(lambda: fetch_user(phone), timeout_sec=8)
                 user_role = (user or {}).get("role", "user")
                 allowed = check_role_permission(user_role, permission)
                 json_response(self, {"allowed": allowed, "role": user_role, "permission": permission})

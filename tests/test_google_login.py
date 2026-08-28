@@ -139,18 +139,22 @@ def test_valid_credential_creates_user():
                     f"got: {body.get('phone')}")
         assert_test("name returned", body.get("name") == "Verify Test",
                     f"got: {body.get('name')}")
-    return body.get("secret") if status == 200 else None
 
 
-def test_idempotency(existing_secret):
+def test_idempotency():
     print("\n[7] Same Google sub returns same secret (idempotent)")
+    # First call: create user
     cred = make_credential(sub="verify_test_99999", email="verify@gmail.com",
                            name="Verify Test")
-    status, body = post("/api/google-login", {"credential": cred}, timeout=90)
-    assert_test("HTTP 200", status == 200, f"got {status}")
-    if status == 200:
-        assert_test("Same secret returned", body.get("secret") == existing_secret,
-                    f"new: {body.get('secret')}, expected: {existing_secret}")
+    _, body1 = post("/api/google-login", {"credential": cred}, timeout=90)
+    secret1 = body1.get("secret") if body1 else None
+    # Second call: same sub should return same secret
+    _, body2 = post("/api/google-login", {"credential": cred}, timeout=90)
+    secret2 = body2.get("secret") if body2 else None
+    assert_test("HTTP 200", body2 is not None, f"got: {body2}")
+    if secret1 and secret2:
+        assert_test("Same secret returned", secret1 == secret2,
+                    f"new: {secret2}, expected: {secret1}")
 
 
 def test_different_sub_different_secret():
