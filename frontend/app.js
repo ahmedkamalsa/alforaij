@@ -4782,19 +4782,17 @@ async function accountVerifyOtp() {
 
 // ── تسجيل الدخول عبر Google ──
 function googleLogin() {
-  // أولًا: config.js → ثانياً: localStorage → ثالثاً: الخادم
   const CLIENT_ID = window.GOOGLE_CLIENT_ID || localStorage.getItem("alforaij_google_client_id") || "";
   if (CLIENT_ID) {
-    _initGoogleSignIn(CLIENT_ID);
+    _startGoogleSignIn(CLIENT_ID);
     return;
   }
-  // محاولة جلب Client ID من الخادم
   fetch("/api/google-client-id")
     .then(r => r.json())
     .then(cfg => {
       if (cfg.client_id) {
         localStorage.setItem("alforaij_google_client_id", cfg.client_id);
-        _initGoogleSignIn(cfg.client_id);
+        _startGoogleSignIn(cfg.client_id);
       } else {
         showAccountMsg("تسجيل الدخول بـ Google غير متاح حاليًا — استخدم رقم الهاتف", true);
       }
@@ -4804,15 +4802,12 @@ function googleLogin() {
     });
 }
 
-function _initGoogleSignIn(clientId) {
+function _startGoogleSignIn(clientId) {
   if (typeof google === "undefined" || !google.accounts) {
     showAccountMsg("جاري تحميل Google — أعد المحاولة", true);
     return;
   }
-  google.accounts.id.initialize({
-    client_id: clientId,
-    callback: _handleGoogleCredential,
-  });
+  google.accounts.id.initialize({ client_id: clientId, callback: _handleGoogleCredential });
   google.accounts.id.prompt();
 }
 

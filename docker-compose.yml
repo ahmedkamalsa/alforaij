@@ -1,14 +1,21 @@
+version: '3.8'
+
 services:
-  research-assistant:
-    image: python:3.13-slim
-    working_dir: /app
-    volumes:
-      - .:/app
-      - ../vs/site/index.html:/vs/site/index.html:ro
-    environment:
-      ALFORAIJ_ASSISTANT_HOST: 0.0.0.0
-      ALFORAIJ_ASSISTANT_PORT: 8000
-      ALFORAIJ_BOARD_HTML: /vs/site/index.html
-    command: python -m backend.main
+  alforaij:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

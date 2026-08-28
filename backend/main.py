@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import mimetypes
@@ -29,6 +30,7 @@ from backend.services.supabase_store import (
     supabase_data_summary,
 )
 from backend.services.valuation import enrich_rankings
+from backend.models import PropertyRequest, RankedListing
 from backend.services.security import SecurityMiddleware
 
 
@@ -346,8 +348,6 @@ def _dashboard_market_records(selected: set[str], area_map: dict[str, str]) -> l
     if not harvested and (not selected or selected & market_names):
         try:
             from backend.connectors.market_ads import search as search_market_ads
-            from backend.models import PropertyRequest
-
             listings, _status = search_market_ads(PropertyRequest(raw_text=""))
         except Exception as exc:
             logger.warning("Dashboard live market records skipped: %s", exc)
@@ -1284,96 +1284,53 @@ class Handler(BaseHTTPRequestHandler):
             json_response(self, {"status": "ok", "secret": secret, "phone": phone})
             return
         if path == "/api/google-login":
-            # تسجيل دخول عبر Google: التحقق من JWT credential ثم إنشاء/جلب المستخدم
-            # يُلتف خطأ Supabase بأمان — لا يُجمّد الخادم
+            from backend.services.accounts import new_secret
+            from backend.services.supabase_store import fetch_user, upsert_user, patch_user
+            credential = payload.get("credential") or ""
+            if not credential:
+                json_response(self, {"error": "missing_credential", "detail": "لم يتم إرسال بيانات Google"}, status=400)
+                return
+            # Decode Google Identity Services JWT payload
             try:
-                from backend.services.accounts import new_secret
-                from backend.services.supabase_store import fetch_user, upsert_user, patch_user
-                credential = payload.get("credential") or ""
-                if not credential:
-                    json_response(self, {"error": "missing_credential", "detail": "لم يتم إرسال بيانات Google"}, status=400)
-                    return
-                # تحليل JWT credential من Google Identity Services
-                import base64, json as _json
-                try:
-                    parts = credential.split(".")
-                    if len(parts) != 3:
-                        raise ValueError("Invalid JWT format")
-                    # فك تشفير الـ payload (الجزء الثاني)
-                    payload_b64 = parts[1]
-                    # إضافة padding لو ناقص
-                    padding = 4 - len(payload_b64) % 4
-                    if padding != 4:
-                        payload_b64 += "=" * padding
-                    idinfo = _json.loads(base64.urlsafe_b64decode(payload_b64))
-                except Exception as e:
-                    logger.warning("Google credential decode failed: %s", e)
-                    json_response(self, {"error": "invalid_credential", "detail": "بيانات Google غير صالحة"}, status=400)
-                    return
-                # التحقق من issuer وaudience
-                allowed_issuers = {"accounts.google.com", "https://accounts.google.com"}
-                if idinfo.get("iss") not in allowed_issuers:
-                    json_response(self, {"error": "invalid_issuer"}, status=400)
-                    return
-                google_sub = idinfo.get("sub") or ""
-                google_email = idinfo.get("email") or ""
-                google_name = idinfo.get("name") or ""
-                google_picture = idinfo.get("picture") or ""
-                if not google_sub:
-                    json_response(self, {"error": "no_sub", "detail": "لا يوجد معرّف Google"}, status=400)
-                    return
-                # استخدام google_sub كبديل للهاتف (معرّف فريد)
-                phone_key = f"google:{google_sub}"
-                user = None
-                try:
-                    user = fetch_user(phone_key)
-                except Exception as fetch_err:
-                    logger.warning("Google login fetch_user failed: %s", fetch_err)
-                if user and user.get("secret"):
-                    # مستخدم موجود — إرجاع السرّ مباشرة
-                    json_response(self, {
-                        "status": "ok",
-                        "secret": user["secret"],
-                        "phone": google_email,
-                        "name": google_name,
-                        "avatar": google_picture,
-                        "provider": "google",
-                    })
-                    return
-                # مستخدم جديد — إنشائه
-                # أولاً: الإنشاء بالحقول الأساسية فقط (متوافق مع أي جدول users)
-                secret = new_secret()
-                try:
-                    upsert_user({
-                        "phone": phone_key,
-                        "secret": secret,
-                        "verified": True,
-                    })
-                except Exception as upsert_err:
-                    logger.warning("Google login upsert_user failed: %s", upsert_err)
-                    # إذا فشل Supabase — نُرجع السرّ محلياً (المستخدم يعمل بدون DB)
-                # ثانياً: محاولة إضافة بيانات Google الإضافية (لو الأعمدة موجودة)
-                try:
-                    patch_user(phone_key, {
-                        "google_email": google_email,
-                        "google_name": google_name,
-                        "google_picture": google_picture,
-                    })
-                except Exception:
-                    logger.debug("Google profile columns not in users table — skipping")
-                json_response(self, {
-                    "status": "ok",
-                    "secret": secret,
-                    "phone": google_email,
-                    "name": google_name,
-                    "avatar": google_picture,
-                    "provider": "google",
-                })
+                parts = credential.split(".")
+                if len(parts) != 3:
+                    raise ValueError("Invalid JWT format")
+                b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
+                idinfo = json.loads(base64.urlsafe_b64decode(b64))
+            except Exception as e:
+                logger.warning("Google credential decode failed: %s", e)
+                json_response(self, {"error": "invalid_credential", "detail": "بيانات Google غير صالحة"}, status=400)
                 return
-            except Exception as google_exc:
-                logger.exception("Google login handler failed")
-                json_response(self, {"error": "google_login_failed", "detail": str(google_exc)}, status=500)
+            if idinfo.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+                json_response(self, {"error": "invalid_issuer"}, status=400)
                 return
+            google_sub = idinfo.get("sub") or ""
+            if not google_sub:
+                json_response(self, {"error": "no_sub", "detail": "لا يوجد معرّف Google"}, status=400)
+                return
+            phone_key = f"google:{google_sub}"
+            resp = {"status": "ok", "phone": idinfo.get("email", ""),
+                    "name": idinfo.get("name", ""), "avatar": idinfo.get("picture", ""),
+                    "provider": "google"}
+            user = None
+            try:
+                user = fetch_user(phone_key)
+            except Exception as fetch_err:
+                logger.warning("Google login fetch_user failed: %s", fetch_err)
+            if user and user.get("secret"):
+                json_response(self, {**resp, "secret": user["secret"]})
+                return
+            secret = new_secret()
+            try:
+                upsert_user({"phone": phone_key, "secret": secret, "verified": True})
+            except Exception as upsert_err:
+                logger.warning("Google login upsert_user failed: %s", upsert_err)
+            try:
+                patch_user(phone_key, {"google_email": resp["phone"], "google_name": resp["name"], "google_picture": resp["avatar"]})
+            except Exception:
+                pass
+            json_response(self, {**resp, "secret": secret})
+            return
         if path == "/api/analytics":
             # استقبال بيانات التتبع من الواجهة
             try:
@@ -1488,7 +1445,6 @@ class Handler(BaseHTTPRequestHandler):
                 if _fast:
                     # ── الوضع السريع: نتائج فورية بدون تقييم مقارن (أقل من ثانية) ──
                     ranked = top_matches(request, listings, limit=10)
-                    from backend.models import RankedListing
                     deduped = []
                     for t in ranked:
                         listing_obj, score, reasons, warnings, match_breakdown = t

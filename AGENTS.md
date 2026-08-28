@@ -6,10 +6,11 @@
 - On Windows, prefix Python commands with `PYTHONIOENCODING=utf-8` — Arabic output otherwise breaks stdout.
 - `npx skills find` returns low-install forks (e.g. a 130-install `just-scrape` clone); cross-check results against the skills.sh leaderboard before recommending — the canonical package usually lives under the original owner's repo.
 - PIL cannot shape Arabic; use `arabic_reshaper` + `python-bidi` (both installed). Arabic-capable system fonts exist at `C:/Windows/Fonts/` (e.g. `arabtype.ttf`).
+- `docx` npm package is **not preinstalled** — requires `npm install docx` before use. Tables need dual widths: `columnWidths` on table AND `width` on every cell, both in `WidthType.DXA` (PERCENTAGE breaks in Google Docs). Trailing commas in JS arrays with Unicode content can cause parsing issues.
 
 ## Verification environment (Freebuff Preview)
 - `preview_screenshot` is **unavailable** in this environment ("no frames") — verify rendering via `preview_snapshot` + `preview_evaluate` geometry probes + `preview_logs` instead.
-- The Preview server serves **only the registered HTML file**; sibling asset paths 404. To display fonts/images in a preview doc, embed them as data URIs.
+- The Preview server serves **only the registered HTML file**; sibling asset paths 404. To display fonts/images in a preview doc, embed them as base64 data URIs. Resize images to ≤400px wide first to keep HTML under 30KB.
 - Console 404s during dev against a static server are `/api/*` fallback noise — console messages don't carry URLs, so use **response-level** tracking to see which requests fail. On real static hosting `STATIC_SNAPSHOT_MODE` skips `/api/*` entirely.
 - The app honors `prefers-color-scheme` when no localStorage preference exists (headless Chromium defaults to light) — theme-toggle checks must account for which theme actually applies.
 
@@ -26,6 +27,11 @@
 ## Architecture & constraints
 - **area_governorate_map import chain**: `main.py` re-exports `_area_governorate_map`, `_normalize_dashboard_place`, `_normalize_governorate_name` from `request_parser.py` (with `_` prefix aliases, `# noqa: E402`). Tests and scripts import from `main.py`, not directly from `request_parser.py`. If you move these functions, update 12+ import sites across `tests/` and `scripts/`.
 - Deliberately dependency-free: stdlib Python + static HTML/JS/CSS. **No package.json, no Tailwind, no Node build** — don't add dependencies.
+- **Python import shadowing in handler methods**: `import os` inside a conditional block in `do_GET` shadows the module-level `os` for the entire function, causing `UnboundLocalError` on earlier code. Error message says "cannot access local variable 'os'" — looks like a missing import, not shadowing. Fix: remove all local `import os` from handler methods since it's already at module level.
+- **Supabase query latency**: `fetch_user`/`upsert_user` can take 20-30s when Supabase is slow from this environment. Must wrap in try/except with short timeouts to prevent server hangs. The `/api/google-login` endpoint needs explicit error handling around these calls.
+- **Chat assistant fast mode**: `enrich_rankings` processes 100 results sequentially with `comparable_pool` calls → 22+ seconds. Add `fast: true` flag to skip enrichment, classification, AI analysis, and client matching → 0.46 seconds. Frontend sends `sourceMode: "local"` + `fast: true` for chat.
+- **Google Sign-In auth flow**: Uses Google Identity Services (GIS) — frontend gets credential JWT, sends to `/api/google-login`, backend decodes payload (base64), checks issuer (`accounts.google.com`), creates user in Supabase with `google:{sub}` as phone key. `GOOGLE_CLIENT_ID` env var controls activation; without it, button shows "غير متاح". User profile columns (`google_email`, `google_name`) are optional — upsert with basic fields first, then patch extras in try/except.
+- **Google JWT decoding**: Simple base64 decode of payload segment (no signature verification in dev). Must pad base64 with `=` to length % 4. Allowed issuers: `{"accounts.google.com", "https://accounts.google.com"}`.
 - Deployed sites are static snapshots (`STATIC_SNAPSHOT_MODE`): no live API on hosted URLs — all numbers visitors see are snapshot data. The live backend (`http.server` stdlib, port 8000) is not hosted anywhere.
 - A PDF report subsystem exists and is tested: `backend/services/pdf_report.py` (reportlab + arabic_reshaper/bidi, Tahoma→DejaVu→Helvetica fallback) with `tests/test_pdf_report.py` (9 tests) — including a dedicated demand-indicator page when the report carries `demandIndicators` and generators in `scripts/generate_*_pdf.py`; `reports/*.pdf` are git-tracked deliverables. It loads logos from `frontend/assets/` via `__file__` (not CWD) — deleting/moving those PNGs silently degrades headers to a drawn «ف» fallback.
 - **Three** workflows deploy on push to `main`, all watching `frontend/**`: `deploy-static.yml` (Netlify prod), `deploy-cloudflare-pages.yml`, and `deploy-alforaijboard.yml` (force-pushes the static frontend to the gh-pages branch of `ahmedkamalsa/alforaijboard` — live at `https://ahmedkamalsa.github.io/alforaijboard/`; needs `ALFORAIJBOARD_TOKEN`). Netlify/CF deploys are **guarded**: missing secrets emit `::warning::` and skip, never fail the workflow. That gh-pages URL serves the same unified app — it went stale once and showed the removed «لوحة الأرقام والفرص» button, which is why the workflow was re-added; never delete it while the URL must stay current.
@@ -34,6 +40,8 @@
 ## Design system (frontend/styles.css)
 - Brand identity: navy `#0a2f91` + gold `#e2c968`; Kufi display + Tajawal body; glass panels. Token layers live in `:root` (brand gold 100–900, navy 100–600, radius scale, ring, motion tokens) — consumed only in the identity block; ~150 hardcoded radius values remain elsewhere (drift 7/9/10/14px around the 8/10px norm).
 - Brand button = circular icon + official name, navy/gold with hover color swap. Badge adapts on small screens (hide English sub-line, shrink name).
+- **localStorage returns strings, not JSON**: `localStorage.getItem("alforaij_secret")` returns a plain string. Using `JSON.parse("")` throws `SyntaxError` caught by generic `catch` → displays "connection error" misleadingly. Fix: use `localStorage.getItem()` directly.
+- **Frontend/backend field mismatch**: Chat assistant frontend checks `data.answer` but backend returns `data.summary`. Fix: check `data.summary || data.answer`.
 
 ## Product decisions (user corrections — respect these)
 - The «المصادر والتشغيل» tab was **deliberately deleted** — product has 5 main tabs (search / opportunities / board / insights / developments). Do not re-add it; tests assert 5.
