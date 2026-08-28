@@ -1372,8 +1372,8 @@ class Handler(BaseHTTPRequestHandler):
                     if _u:
                         user_id = _u.get("phone") or _secret[:8]
             _source_mode = str(payload.get("sourceMode") or "local").strip()
-            # البحث المحلي مسموح بدون تسجيل — البحث الخارجي يتطلب حساب
-            if _source_mode != "local":
+            # البحث المحلي والشامل (all) مسموح بدون تسجيل — البحث بمصدر محدد فقط يتطلب حساب
+            if _source_mode not in ("local", "all"):
                 auth_result = authorize_request(user_id, "search")
                 if not auth_result["authorized"]:
                     json_response(self, {
