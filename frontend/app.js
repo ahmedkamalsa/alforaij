@@ -4602,6 +4602,22 @@ function accountLogout() {
 
 accountLoad();
 
+// ── إخفاء زر Google إذا لم يكن Client ID متاحاً ──
+fetch("/api/google-client-id")
+  .then(r => r.json())
+  .then(cfg => {
+    if (!cfg.client_id) {
+      const wrap = $("googleSignInWrap");
+      if (wrap) wrap.style.display = "none";
+    } else {
+      localStorage.setItem("alforaij_google_client_id", cfg.client_id);
+    }
+  })
+  .catch(() => {
+    const wrap = $("googleSignInWrap");
+    if (wrap) wrap.style.display = "none";
+  });
+
 // قاعدة Supabase (عنوان + مفتاح anon): تُقرأ من /api/live-db التي يقدمها الخادم حيًا
 // أو اللقطة الثابتة على الموقع المنشور — أي فشل يُبتلع صامتًا (درس فحص الجوال).
 let _supabaseBaseCache = null;
@@ -4683,6 +4699,12 @@ function openAccountModal() {
   modal.hidden = false;
   renderAccountStatus();
   portfolioShowHide();
+  // إخفاء زر Google إذا لم يكن Client ID متاحاً
+  const googleWrap = $("googleSignInWrap");
+  if (googleWrap) {
+    const cid = window.GOOGLE_CLIENT_ID || localStorage.getItem("alforaij_google_client_id") || "";
+    googleWrap.style.display = cid ? "" : "none";
+  }
   const phoneEl = $("accountPhone");
   const stepPhone = $("accountStepPhone");
   const stepOtp = $("accountStepOtp");
