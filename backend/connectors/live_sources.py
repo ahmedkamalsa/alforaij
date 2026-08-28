@@ -873,18 +873,26 @@ def search_q8aqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
         seen_codes.add(code)
         raw_items.append((href, title_clean, code))
 
-    # توسيع Q8Aqar: قراءة صفحات التفاصيل نفسها لتحسين السعر/المساحة (فقط لما تكون ناقصة أو محتاجة تحقق)
-    # نقتصر على العناصر التي تفتقر للسعر أو المساحة لئلا نطيل زمن التحليل بلا فائدة
+    # توسيع Q8Aqar: قراءة صفحات التفاصيل نفسها لتحسين السعر/المساحة/الوصف/نوع الإعلان
+    # نقرأ حتى 5 صفحات تفاصيل للحصول على معلومات إضافية
     need_detail = [
         href for href, _t, _c in raw_items
         if not (extract_price_from_title(_t) or parse_price(_t)) or not extract_space_from_title(_t)
     ]
+    # أيضاً نقرأ صفحات التفاصيل للحصول على الوصف ونوع الإعلان حتى لو كان السعر متوفر
+    if len(need_detail) < 5:
+        extra_hrefs = [href for href, _t, _c in raw_items if href not in need_detail][:5 - len(need_detail)]
+        need_detail.extend(extra_hrefs)
     detail = search_q8aqar_details(need_detail) if need_detail else {}
     detail_linked = 0
     for href, title_clean, code in raw_items:
         price = extract_price_from_title(title_clean) or parse_price(title_clean)
         space = extract_space_from_title(title_clean)
-        extra_price, extra_space = detail.get(href, (None, None))
+        detail_data = detail.get(href, {})
+        extra_price = detail_data.get("price")
+        extra_space = detail_data.get("space")
+        extra_description = detail_data.get("description", "")
+        extra_listing_type = detail_data.get("listing_type", "")
         if extra_price and (not price or abs(extra_price - price) / price > 0.05):
             price = extra_price
             detail_linked += 1
@@ -1022,6 +1030,7 @@ def _scan_link_listings(
     code_part: int | None = None,
     min_title_len: int = 5,
     flags: int = re.S | re.I,
+    skip_area_filter: bool = False,
 ) -> tuple[list[Listing], int]:
     """فحص روابط إعلانات (نمط <a href>…</a>) في صفحة مصدر رابطي.
 
@@ -1058,7 +1067,12 @@ def _scan_link_listings(
             fallback_type=request.property_type,
             space_override=space,
         )
-        if request_matches_listing(request, listing):
+        if skip_area_filter:
+            # للمصادر الرابطية: لا نفلتر بالمنطقة — عناوين الروابط لا تحمل أسماء مناطق
+            if request.property_type and request.property_type not in (listing.property_type + " " + listing.detail_class):
+                continue
+            listings.append(listing)
+        elif request_matches_listing(request, listing):
             listings.append(listing)
     return listings, candidates
 
@@ -1116,7 +1130,7 @@ def search_nabdaqar(request: PropertyRequest) -> tuple[list[Listing], dict[str, 
 
 
 def _detail_fields(body: str) -> dict[str, Any]:
-    """استخراج السعر والمساحة والمنطقة والمحافظة والهاتف من صفحة تفاصيل إعلان.
+    """استخراج السعر والمساحة والمنطقة والمحافظة والهاتف والوصف من صفحة تفاصيل إعلان.
 
     الوسوم الوصفية أولًا ثم JSON-LD ثم نص صريح — لكل حقل على حدة حتى يكتمل
     الإعلان من صفحة التفاصيل عندما لا تحمل القائمة السابقة الحقل. الهاتف يُستخرج
@@ -1125,6 +1139,8 @@ def _detail_fields(body: str) -> dict[str, Any]:
     price, space = _detail_price_space(body)
     area, governorate = _detail_place(body)
     phone = _detail_phone(body)
+    description = _detail_description(body)
+    listing_type = _detail_listing_type(body)
     fields: dict[str, Any] = {}
     if price is not None:
         fields["price"] = price
@@ -1136,7 +1152,53 @@ def _detail_fields(body: str) -> dict[str, Any]:
         fields["governorate"] = governorate
     if phone:
         fields["phone"] = phone
+    if description:
+        fields["description"] = description
+    if listing_type:
+        fields["listing_type"] = listing_type
     return fields
+
+
+def _detail_description(body: str) -> str:
+    """استخراج وصف الإعلان من صفحة التفاصيل.
+
+    يبحث عن:
+    1) og:description
+    2) meta description
+    3) وسم الوصف الرئيسي
+    """
+    # 1) og:description
+    og_match = re.search(r'<meta\s+property="og:description"\s+content="([^"]+)"', body, re.I)
+    if og_match:
+        desc = clean_text(og_match.group(1))
+        if len(desc) > 20:
+            return desc[:500]
+    # 2) meta description
+    meta_match = re.search(r'<meta\s+name="description"\s+content="([^"]+)"', body, re.I)
+    if meta_match:
+        desc = clean_text(meta_match.group(1))
+        if len(desc) > 20:
+            return desc[:500]
+    # 3) وسم الوصف الرئيسي
+    desc_match = re.search(r'<div[^>]+class="[^"]*description[^"]*"[^>]*>(.*?)</div>', body, re.S)
+    if desc_match:
+        desc = clean_text(desc_match.group(1))
+        if len(desc) > 20:
+            return desc[:500]
+    return ""
+
+
+def _detail_listing_type(body: str) -> str:
+    """تحديد نوع الإعلان: مباشر أو مكتب.
+
+    يبحث عن:
+    1) اسم المستخدم/الوكالة في الصفحة
+    2) وجود "agent" أو "office" أو "agency" في HTML
+    """
+    # البحث عن إشارات لمكتب عقاري
+    if re.search(r'agency|office|agent|مكتب|وكالة|وسيط', body, re.I):
+        return "مكتب"
+    return "مباشر"
 
 
 # أرقام معروفة لدعم المواقع (ليست أرقام معلنين) — تُستبعد من الاستخراج دائمًا
@@ -1319,27 +1381,27 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def search_q8aqar_details(hrefs: list[str]) -> dict[str, tuple[float | None, float | None]]:
-    """قراءة صفحات التفاصيل نفسها لاستخراج السعر والمساحة (توسيع Q8Aqar).
+def search_q8aqar_details(hrefs: list[str]) -> dict[str, dict[str, Any]]:
+    """قراءة صفحات التفاصيل نفسها لاستخراج التفاصيل الكاملة (توسيع Q8Aqar).
 
-    يُجلب حتى 3 صفحات بالتوازي حتى لا يطيل زمن التحليل (الفشل في صفحة لا يوقف الباقي).
-    يعيد {href: (price, space)} للمواقع التي نجح استخراجها.
+    يُجلب حتى 5 صفحات بالتوازي حتى لا يطيل زمن التحليل (الفشل في صفحة لا يوقف الباقي).
+    يعيد {href: {price, space, description, listing_type}} للمواقع التي نجح استخراجها.
     """
-    detail: dict[str, tuple[float | None, float | None]] = {}
+    detail: dict[str, dict[str, Any]] = {}
     if not hrefs:
         return detail
 
-    def _fetch_one(href: str) -> tuple[str, float | None, float | None]:
+    def _fetch_one(href: str) -> tuple[str, dict[str, Any]]:
         body, _status, _ms, error, _attempts = fetch_url(href)
         if not body or error:
-            return href, None, None
-        price, space = _detail_price_space(body)
-        return href, price, space
+            return href, {}
+        fields = _detail_fields(body)
+        return href, fields
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        for href, price, space in pool.map(_fetch_one, hrefs[:3]):
-            if price or space:
-                detail[href] = (price, space)
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        for href, fields in pool.map(_fetch_one, hrefs[:5]):
+            if fields:
+                detail[href] = fields
     return detail
 
 
@@ -1559,25 +1621,17 @@ def search_sakan(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any
 
 
 def search_aqarat(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
-    """منصة Aqarat (مصدر توسعة جديد في الخطة): البحث عن إعلانات عقارية كويتية."""
-    area_query = " ".join(request.areas) if request.areas else ""
-    prop_word = request.property_type or "عقار"
-    transaction_word = transaction_from_request(request)
-    search_q = f"{prop_word} {transaction_word} {area_query}".strip()
-    url = f"https://aqarat.com/search?q={urllib.parse.quote(search_q)}"
-    body, status, ms, error, attempts = fetch_url(url)
-    listings, candidates = _scan_link_listings(
-        request,
-        source="Aqarat",
-        base_url="https://aqarat.com",
-        body=body,
-        href_pattern=r'<a\s+href="([^"]*(?:property|listing|real-estate|detail)[^"]*)"[^>]*>(.*?)</a>',
-        code_prefix="AQR",
-    )
-    return listings[:50], _link_search_result(
-        "Aqarat", listings, candidates, ms, url, error, body,
-        f"تم فحص {candidates} إعلانًا في Aqarat.", attempts,
-    )
+    """منصة Aqarat — النطاق aqarat.com أصبح صفحة GoDaddy Parking (discontinued)."""
+    return [], {
+        "name": "Aqarat",
+        "status": "discontinued",
+        "records": 0,
+        "candidates": 0,
+        "attempts": 0,
+        "responseMs": 0,
+        "url": "https://aqarat.com",
+        "note": "النطاق aqarat.com أصبح صفحة GoDaddy Parking — تم إيقاف الخدمة.",
+    }
 
 
 # 4Sale انتقلت إلى نطاق q84sale.com (النطاقات القديمة kuwait.4sale.com / 4sale.com.kw
@@ -1622,6 +1676,7 @@ def search_four_sale(request: PropertyRequest) -> tuple[list[Listing], dict[str,
             body=body,
             href_pattern=r'<a[^>]*href="(/en/listing/[^"]+)"[^>]*>(.*?)</a>',
             code_prefix="4S",
+            skip_area_filter=True,
         )
         candidates += page_candidates
         listings.extend(page_listings)
@@ -1793,12 +1848,9 @@ def scan_four_sale_wanted(
 def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
     """
     Bu3qar / Boshamlan (بوعقار / بوشملان) is a prominent Kuwait real estate platform.
+    Uses /products-for-sale/ page which returns 20+ product-details links per page.
     """
-    area_query = " ".join(request.areas) if request.areas else ""
-    prop_word = request.property_type or "عقار"
-    transaction_word = transaction_from_request(request)
-    search_q = f"{prop_word} {transaction_word} {area_query}".strip()
-    url = f"https://www.bu3qar.com/?s={urllib.parse.quote(search_q)}"
+    url = "https://www.bu3qar.com/products-for-sale/%D8%B9%D9%82%D8%A7%D8%B1%D8%A7%D8%AA-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%8A-%D8%A7%D9%84%D9%83%D9%88%D9%8A%D8%AA"
     body, status, ms, error, attempts = fetch_url(url)
     listings: list[Listing] = []
     candidates = 0
@@ -1828,12 +1880,15 @@ def search_bu3qar(request: PropertyRequest) -> tuple[list[Listing], dict[str, An
                 fallback_type=request.property_type,
                 space_override=space,
             )
-            if request_matches_listing(request, listing):
-                listings.append(listing)
+            # للمصادر الرابطية: لا نفلتر بالمنطقة هنا —olibres titles لا تحمل أسماء مناطق
+            # فلترة المنطقة تتم في main.py بعد جمع كل المصادر
+            if request.property_type and request.property_type not in (listing.property_type + " " + listing.detail_class):
+                continue
+            listings.append(listing)
 
     return listings[:50], _link_search_result(
-        "بوعقار / بوشملان (Bu3qar)", listings, candidates, ms, url, error, body,
-        f"تم فحص {candidates} إعلان في بوعقار / بوشملان.", attempts,
+        "بوعقار / بو哳ان (Bu3qar)", listings, candidates, ms, url, error, body,
+        f"تم فحص {candidates} إعلان في بوعقار / بو哳ان.", attempts,
     )
 
 
@@ -2320,10 +2375,112 @@ def search_bayut(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any
     return _candidate_attempt("Bayut", url, request, _parse)
 
 
+def search_findq8(request: PropertyRequest) -> tuple[list[Listing], dict[str, Any]]:
+    """
+    FindQ8 Real Estate — دليل الكويت العقاري.
+    يبحث في صفحة النتائج ويستخرج الإعلانات من HTML.
+    """
+    mode = "house4sale" if transaction_from_request(request) == "للبيع" else "house4rent"
+    area_query = " ".join(request.areas) if request.areas else ""
+    
+    # بناء رابط البحث
+    if area_query:
+        url = f"https://www.findq8.com/en/properties/house/?q={urllib.parse.quote(area_query)}"
+    else:
+        url = "https://www.findq8.com/en/properties/house/"
+    
+    body, status, ms, error, attempts = fetch_url(url)
+    listings: list[Listing] = []
+    candidates = 0
+    
+    if body:
+        # استخراج الإعلانات من HTML
+        # البحث عن عناصر article مع روابط الإعلانات
+        article_pattern = re.compile(
+            r'<article\s+class="item[^"]*"[^>]*>(.*?)</article>',
+            re.S
+        )
+        
+        for article_html in article_pattern.findall(body):
+            candidates += 1
+            
+            # استخراج رابط الإعلان
+            link_match = re.search(
+                r'href="(https://www\.findq8\.com/en/properties/house/[^"]+\.html)"',
+                article_html
+            )
+            if not link_match:
+                continue
+            
+            href = link_match.group(1)
+            code = "FQ8-" + href.rstrip("/").split("/")[-1].replace(".html", "")
+            
+            # استخراج العنوان
+            title_match = re.search(r'<a[^>]+title="([^"]+)"', article_html)
+            title = clean_text(title_match.group(1)) if title_match else ""
+            
+            # استخراج السعر (الصيغة: $ 270.00 أو KD 245,000.00)
+            price_match = re.search(r'class="price-tag"[^>]*>\s*<span>\s*([\$ KDد.ك]*\s*[\d,\.]+)', article_html, re.S)
+            price = None
+            if price_match:
+                price_text = price_match.group(1).strip()
+                # إزالة الرموز
+                price_text = re.sub(r'[\$ KDد.ك]', '', price_text).strip()
+                price_text = price_text.replace(',', '')
+                try:
+                    price_val = float(price_text)
+                    # إذا السعر صغير جداً (أقل من 1000)، فهو بالآلاف
+                    if 0 < price_val < 1000:
+                        price = price_val * 1000
+                    else:
+                        price = price_val
+                except ValueError:
+                    pass
+            
+            # استخراج المساحة
+            space_match = re.search(r'class="square_feet"[^>]*>([\d,\.]+)', article_html)
+            space = None
+            if space_match:
+                space_text = space_match.group(1).replace(",", "")
+                try:
+                    space = float(space_text)
+                except ValueError:
+                    pass
+            
+            # إنشاء الإعلان
+            listing = listing_from_text(
+                source="FindQ8",
+                code=code,
+                url=href,
+                title=title,
+                description=title,
+                price=price,
+                transaction=detect_transaction(title, transaction_from_request(request)),
+                fallback_type=request.property_type,
+                space_override=space,
+            )
+            
+            if request_matches_listing(request, listing):
+                listings.append(listing)
+    
+    note = f"تم فحص {candidates} رابطًا"
+    return listings[:50], {
+        "name": "FindQ8",
+        "status": "success" if listings else ("no_results" if not error else "failed"),
+        "records": len(listings),
+        "candidates": candidates,
+        "attempts": attempts,
+        "responseMs": ms,
+        "url": url,
+        "note": error or note,
+    }
+
+
 SEARCHERS: list[tuple[str, Any]] = [
     ("OpenSooq", search_opensooq),
     ("Mourjan", search_mourjan),
     ("Q8Aqar", search_q8aqar),
+    ("FindQ8", search_findq8),
     ("Sakan", search_sakan),
     ("Waseet", search_waseet),
     ("NabdAqar", search_nabdaqar),

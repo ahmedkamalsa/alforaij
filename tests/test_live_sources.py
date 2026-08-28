@@ -183,12 +183,17 @@ class LiveSourceParsingTests(unittest.TestCase):
         from backend.connectors import live_sources
 
         request = parse_request("بيت للبيع في خيطان")
-        for searcher in (live_sources.search_aqarat, live_sources.search_four_sale):
-            with mock.patch.object(live_sources, "fetch_url", return_value=("", 0, 1.0, "net down", 4)):
-                listings, status = searcher(request)
-            self.assertEqual(listings, [])
-            self.assertEqual(status["status"], "failed")
-            self.assertEqual(status["attempts"], 4)
+        # Aqarat is discontinued — returns immediately without fetching
+        listings, status = live_sources.search_aqarat(request)
+        self.assertEqual(listings, [])
+        self.assertEqual(status["status"], "discontinued")
+
+        # 4Sale still fetches and tolerates failures
+        with mock.patch.object(live_sources, "fetch_url", return_value=("", 0, 1.0, "net down", 4)):
+            listings, status = live_sources.search_four_sale(request)
+        self.assertEqual(listings, [])
+        self.assertEqual(status["status"], "failed")
+        self.assertEqual(status["attempts"], 4)
 
     def test_four_sale_falls_back_to_opensooq_on_failure(self) -> None:
         """عند تعذر الوصول إلى 4Sale يُجرَّب المصدر البديل OpenSooq بنفس الشروط مع إفصاح شفاف."""
