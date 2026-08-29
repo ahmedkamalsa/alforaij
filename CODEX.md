@@ -4,9 +4,10 @@
 
 منصة **الفريج** هي نظام متكامل للبحث والتقييم العقاري في الكويت، يعمل على:
 - **Python 3.11** (Backend) — خادم HTTP مدمج بدون Flask/Django
-- **Vanilla JS** (Frontend) — واجهة واحدة متكاملة (8800+ سطر)
-- **Supabase** (Database) — PostgreSQL كخدمة
-- **6 مصادر بيانات** — 3000+ إعلان عقاري
+- **Vanilla JS** (Frontend) — واجهة واحدة متكاملة (8944+ سطر)
+- **Supabase** (Database) — PostgreSQL كخدمة (متصل وفعال)
+- **6+ مصادر بيانات** — 3024 إعلان عقاري (182 فريج + 2842 خارجي)
+- **المؤشرات الذكية**: Trust Score + Confidence Interval + Explanation Factors + Mortgage + Insurance + Smart Alerts
 
 ---
 
@@ -275,7 +276,13 @@ def _calculate_confidence_interval(market_median, confidence, comparables_count)
 - **الاختبارات:** `tests/test_smart_alerts.py` (14 اختبار)
 - **الأنواع:** انخفاض السعر + فرصة جديدة + سعر أقل من المتوسط
 
-### 4. Confidence Intervals (نطاق الثقة)
+### 4. Insurance Calculator (حاسبة التأمين العقاري)
+- **الملف:** `backend/services/insurance_calculator.py`
+- **الاختبارات:** `tests/test_insurance_calculator.py` (15 اختبار)
+- **الأنواع:** تأمين ممتلكات + محتويات + مسؤولية مدنية + شامل
+- **الخصومات:** عقار جديد (15%) + نظام أمان (10%) + إنذار حريق (5%) + تأمين طويل (8%)
+
+### 5. Confidence Intervals (نطاق الثقة)
 - **الملف:** `backend/services/valuation.py`
 - **الوظيفة:** `_calculate_confidence_interval()` + `_build_explanation_factors()`
 
@@ -287,12 +294,16 @@ def _calculate_confidence_interval(market_median, confidence, comparables_count)
 |---------|--------|
 | **إجمالي الملفات** | 100+ ملف |
 | **Backend (Python)** | 20,000+ سطر |
-| **Frontend (JS)** | 8,800+ سطر |
-| **CSS** | 9,600+ سطر |
-| **الاختبارات** | 662 اختبار (0 فاشل) |
+| **Frontend (JS)** | 8,944+ سطر |
+| **CSS** | 9,845+ سطر |
+| **الاختبارات** | 678 اختبار (0 فاشل) |
 | **API Endpoints** | 50+ endpoint |
 | **جداول قاعدة البيانات** | 16 جدول |
-| **البيانات** | 3,000+ إعلان |
+| **البيانات** | 3,024 إعلان (182 فريج + 2842 خارجي) |
+| **Supabase Tables** | 13 جدول فعال |
+| **.saved_reports** | 752 تقرير محفوظ |
+| **.listing_evidence** | 76,525 دليل |
+| **.source_runs** | 5,822 تشغيل مصدر |
 
 ---
 
@@ -383,6 +394,28 @@ docker run -p 8000:8000 alforaij
 1. 📊 تحسين الأداء (caching, lazy loading)
 2. 📊 تحسين SEO (meta tags, structured data)
 3. 📊 إضافة offline support (Service Worker)
+
+---
+
+## ✅ الإصلاحات الأخيرة (هذه الجلسة)
+
+### 1. إصلاح رقم الهاتف
+- **المشكلة:** `+2001064955051` بدلاً من `+201064955051` (صفر زائد)
+- **الحل:** Backend يحذف الصفر الزائد بعد رمز الدولة + Frontend ينسّق الرقم أثناء الكتابة
+- **الملف:** `backend/services/accounts.py` + `frontend/app.js`
+
+### 2. تقرير PDF مع كل المؤشرات
+- **الأقسام الجديدة:** Trust Score + Confidence Interval + Explanation Factors + Insurance
+- **الملف:** `backend/services/pdf_report.py`
+- **الأزرار:** زر PDF موجود في الواجهة
+
+### 3. تسجيل الدخول بـ Apple
+- **الملف:** `backend/main.py` + `frontend/app.js`
+- **الحالة:** جاهز (يحتاج Apple Service ID)
+
+### 4. بيانات Supabase المتصلة
+- **الحالة:** متصل وفعال
+- **البيانات:** 3,024 إعلان + 752 تقرير + 76,525 دليل + 5,822 تشغيل مصدر
 
 ---
 
