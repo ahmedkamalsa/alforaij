@@ -5657,6 +5657,76 @@ summary {
   font-weight: 700;
 }
 
+/* ── Trust Score: مؤشر ثقة الإعلان ── */
+.trust-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.trust-score-badge.trusted {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.trust-score-badge.moderate {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.trust-score-badge.low {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.trust-score-badge .trust-icon {
+  font-size: 13px;
+}
+.trust-score-details {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.trust-score-details .trust-factor {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+.trust-score-details .trust-factor-name {
+  color: var(--text-secondary);
+}
+.trust-score-details .trust-factor-score {
+  font-weight: 700;
+  font-size: 11px;
+}
+.trust-score-alerts {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  font-size: 11px;
+  color: #dc2626;
+}
+.trust-score-alerts.info {
+  background: rgba(59, 130, 246, 0.06);
+  border-color: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+[data-theme="light"] .trust-score-details {
+  background: #f8f9fa;
+  border-color: #e5e7eb;
+}
+
 /* الفرص الأكثر طلبًا */
 .hot-list {
   display: grid;

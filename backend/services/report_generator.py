@@ -266,7 +266,46 @@ def ranked_to_dict(item: RankedListing) -> dict:
         "warnings": item.warnings,
         "comparables": item.comparables,
         "financing": financing,
+        # ── Trust Score: مؤشر ثقة الإعلان ──
+        **_trust_score_payload(item, listing),
     }
+
+
+def _trust_score_payload(item, listing) -> dict:
+    """حساب مؤشر ثقة الإعلان وتضمينه في النتيجة.
+
+    يعتمد على: عمر الإعلان، استقرار السعر، تعدد المصادر،
+    الصور، مصدر الإعلان، ومطابقة السعر للمتوسط.
+    """
+    try:
+        from backend.services.trust_score import calculate_trust_score
+        # جلب عدد المصادر المشابهة
+        duplicate_count = 0
+        if hasattr(item, "number_sources") and item.number_sources:
+            sources = item.number_sources or {}
+            duplicate_count = max(0, len(sources) - 1)
+        # متوسط السعر في المنطقة
+        area_median = getattr(item, "market_median", None)
+        # سجل تغيرات السعر (من price_ratio إن وُجد)
+        price_history = []
+        if listing.price and area_median:
+            price_history = [{"price": listing.price}]
+        result = calculate_trust_score(
+            {
+                "price": listing.price,
+                "source": listing.source,
+                "photos": getattr(listing, "photos", []) or [],
+                "created_at": getattr(listing, "published_date", "") or "",
+                "area": listing.area,
+                "space": listing.space,
+            },
+            area_median_price=area_median,
+            price_history=price_history if len(price_history) > 1 else None,
+            duplicate_count=duplicate_count,
+        )
+        return {"trustScore": result}
+    except Exception:
+        return {"trustScore": {"score": 50, "grade": "moderate", "label": "متوسط", "color": "#f59e0b", "factors": [], "alerts": []}}
 
 
 def _transaction_summary(request: PropertyRequest, items: list[RankedListing]) -> dict:

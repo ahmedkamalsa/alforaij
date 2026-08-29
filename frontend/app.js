@@ -4196,6 +4196,20 @@ function renderReport(report) {
       trustEl.textContent = trust.label ? `ثقة المصدر: ${trust.label} (${Math.round(trust.score || 0)}%)` : "";
       trustEl.title = trust.reason || "";
     }
+    // ── Trust Score Badge: مؤشر ثقة الإعلان ──
+    const ts = item.trustScore || {};
+    const trustScoreEl = node.querySelector(".trust-score-section");
+    if (trustScoreEl && ts.score != null) {
+      const grade = ts.grade || "moderate";
+      const icon = grade === "trusted" ? "✅" : grade === "low" ? "🔴" : "🟡";
+      trustScoreEl.innerHTML = `
+        <span class="trust-score-badge ${grade}" title="درجة ثقة الإعلان: ${ts.score}/100">
+          <span class="trust-icon">${icon}</span> ثقة ${ts.score}/100
+        </span>
+        ${ts.alerts && ts.alerts.length ? `<div class="trust-score-alerts${ts.alerts[0].startsWith('ℹ') ? ' info' : ''}">${ts.alerts.join(' · ')}</div>` : ""}
+        ${ts.factors && ts.factors.length ? `<details class="trust-score-details"><summary>تفاصيل التقييم</summary>${ts.factors.map(f => `<div class="trust-factor"><span class="trust-factor-name">${f.name}: ${f.detail}</span><span class="trust-factor-score" style="color:${f.score >= f.max * 0.7 ? '#16a34a' : f.score >= f.max * 0.4 ? '#d97706' : '#dc2626'}">${f.score}/${f.max}</span></div>`).join('')}</details>` : ""}
+      `;
+    }
     const insights = node.querySelector(".result-insights");
     if (insights) insights.insertAdjacentHTML("afterend", propertyProfileHtml(item.propertyProfile));
     const decisionEl = node.querySelector(".decision-line");
