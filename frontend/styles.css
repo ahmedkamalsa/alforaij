@@ -3978,6 +3978,64 @@ button.results-source-chip:hover {
   gap: 12px;
 }
 
+/* ── خريطة العقارات (Leaflet) ── */
+.map-toggle-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.map-container {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  margin-bottom: 12px;
+  box-shadow: 0 4px 16px rgba(2, 6, 16, .25);
+}
+.property-map {
+  width: 100%;
+  height: 360px;
+  background: #e8edf3;
+}
+@media (max-width: 640px) {
+  .property-map { height: 260px; }
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 10px;
+  font-family: 'Tajawal', 'Noto Kufi Arabic', sans-serif;
+  direction: rtl;
+  text-align: right;
+  min-width: 180px;
+}
+.leaflet-popup-content {
+  margin: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.leaflet-popup-content .popup-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+.leaflet-popup-content .popup-price {
+  color: var(--green);
+  font-weight: 600;
+  font-size: 15px;
+}
+.leaflet-popup-content .popup-area {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.leaflet-popup-content .popup-score {
+  display: inline-block;
+  background: var(--blue);
+  color: #fff;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
 .result-card {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);

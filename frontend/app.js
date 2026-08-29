@@ -3461,6 +3461,139 @@ function applySimpleMode() {
   if (btn) btn.title = on ? "العودة للتحليل المفصل الكامل" : "بطاقات أكبر واتصال مباشر بلا جداول تحليلية";
 }
 
+// ── خريطة العقارات (Leaflet + OpenStreetMap) ──
+// إحداثيات المناطق الكويتية الرئيسية
+const KUWAIT_AREAS = {
+  "الفريدوس": [29.27, 47.97], "الفردوس": [29.27, 47.97],
+  "النهضة": [29.31, 47.93], "ال经": [29.31, 47.93],
+  "صباح الناصر": [29.25, 48.05], "صباح السالم": [29.25, 48.05],
+  "الجابرية": [29.28, 47.99], "الجهراء": [29.35, 47.65],
+  "حولي": [29.34, 48.00], "السالمية": [29.33, 48.08],
+  "العاصمة": [29.38, 47.98], "شرق": [29.38, 47.98],
+  "المنقف": [29.18, 48.12], "ال Ahmadi": [29.08, 48.08],
+  "الأحمدي": [29.08, 48.08], "الفحيحيل": [29.05, 48.13],
+  "الفنطاس": [29.15, 48.10], "الرقة": [29.22, 47.95],
+  "الخزان": [29.20, 47.93], "المسايل": [29.27, 48.07],
+  "بيان": [29.30, 48.05], "الصليبيخات": [29.32, 47.96],
+  "ال Ribaeen": [29.35, 47.95], "ال Ribaeen": [29.35, 47.95],
+  "الرابية": [29.29, 48.02], "الفيج": [29.36, 47.82],
+  "مبارك الكبير": [29.20, 48.07], "الخيران": [29.26, 47.85],
+  "海湾": [29.25, 47.90], "ال.url": [29.33, 48.01],
+  "بوحليفة": [29.07, 48.10], "أبو حليفة": [29.07, 48.10],
+  "المنصورية": [29.24, 48.00], "ال Winnipeg": [29.36, 48.02],
+  "ال kuwait": [29.37, 47.97],
+  // Default Kuwait center
+  "_default": [29.32, 48.00]
+};
+let _leafletMap = null;
+let _markerGroup = null;
+
+function _geocodeArea(area) {
+  if (!area) return KUWAIT_AREAS["_default"];
+  const norm = area.trim();
+  if (KUWAIT_AREAS[norm]) return KUWAIT_AREAS[norm];
+  // بحث جزئي
+  for (const [key, coords] of Object.entries(KUWAIT_AREAS)) {
+    if (key === "_default") continue;
+    if (norm.includes(key) || key.includes(norm)) return coords;
+  }
+  return null;
+}
+
+function _ensureMap() {
+  const container = document.getElementById("propertyMap");
+  if (!container) return null;
+  if (_leafletMap) { _leafletMap.invalidateSize(); return _leafletMap; }
+  _leafletMap = L.map(container, {
+    center: [29.32, 48.00],
+    zoom: 11,
+    zoomControl: true,
+    attributionControl: true,
+  });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap",
+    maxZoom: 18,
+  }).addTo(_leafletMap);
+  _markerGroup = L.featureGroup().addTo(_leafletMap);
+  return _leafletMap;
+}
+
+function _scoreColor(score) {
+  if (score >= 75) return "#22c55e";  // أخضر — لقطة
+  if (score >= 50) return "#3b82f6";  // أزرق — جيد
+  if (score >= 30) return "#f59e0b";  // برتقالي — متوسط
+  return "#94a3b8";                   // رمادي — ضعيف
+}
+
+function renderMapMarkers(results) {
+  const map = _ensureMap();
+  if (!map || !_markerGroup) return;
+  _markerGroup.clearLayers();
+  let placed = 0;
+  for (const item of (results || [])) {
+    const coords = _geocodeArea(item.area);
+    if (!coords) continue;
+    // إضافة عشوائية بسيطة لمنع تراكب العلامات
+    const lat = coords[0] + (Math.random() - 0.5) * 0.008;
+    const lng = coords[1] + (Math.random() - 0.5) * 0.008;
+    const score = Math.round(item.recommendationScore || item.matchScore || 0);
+    const color = _scoreColor(score);
+    const icon = L.divIcon({
+      className: "",
+      html: `<div style="background:${color};color:#fff;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;font-size:11px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid #fff;">${score}</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+    const popup = [
+      `<div class="popup-title">${escapeHtml(item.code || "")} — ${escapeHtml(item.area || "")}</div>`,
+      `<div class="popup-price">${escapeHtml(item.priceText || (item.price ? item.price.toLocaleString() + " د.ك" : "—"))}</div>`,
+      `<div class="popup-area">${item.space ? item.space + " م²" : ""} ${item.propertyType ? "· " + item.propertyType : ""}</div>`,
+      `<div class="popup-score">توصية ${score}/100</div>`,
+      item.originalUrl ? `<div style="margin-top:6px"><a href="${escapeHtml(item.originalUrl)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:12px;">فتح المصدر ↗</a></div>` : "",
+    ].join("");
+    const marker = L.marker([lat, lng], { icon }).bindPopup(popup, { maxWidth: 260 });
+    _markerGroup.addLayer(marker);
+    placed++;
+  }
+  if (placed > 0) {
+    map.fitBounds(_markerGroup.getBounds().pad(0.15));
+  }
+}
+
+let _mapVisible = false;
+function toggleMapView() {
+  _mapVisible = !_mapVisible;
+  const container = $("mapContainer");
+  if (container) container.hidden = !_mapVisible;
+  if (_mapVisible && _leafletMap) {
+    setTimeout(() => _leafletMap.invalidateSize(), 100);
+  }
+}
+
+function showMapIfResults(results) {
+  const btn = $("mapToggleBtn");
+  if (!btn) return;
+  if (results && results.length > 0) {
+    btn.hidden = false;
+    // Auto-show map on first results
+    if (!_mapVisible && !_leafletMap) {
+      _mapVisible = true;
+      const container = $("mapContainer");
+      if (container) container.hidden = false;
+      setTimeout(() => {
+        renderMapMarkers(results);
+        if (_leafletMap) _leafletMap.invalidateSize();
+      }, 200);
+    } else if (_mapVisible) {
+      renderMapMarkers(results);
+    }
+  } else {
+    btn.hidden = true;
+    const container = $("mapContainer");
+    if (container) container.hidden = true;
+  }
+}
+
 function countByNormalized(items, pick) {
   const counts = {};
   for (const item of items) {
@@ -4052,6 +4185,8 @@ function renderReport(report) {
   applySimpleFilters();
   // تحديث البطاقات العائمة بعد إعادة رسم النتائج
   if (window.hoverCard) hoverCard.refresh();
+  // تحديث الخريطة بالنتائج الجديدة
+  showMapIfResults(results);
 }
 
 function downloadReport() {

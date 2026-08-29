@@ -19,6 +19,8 @@
   <script src="components/lucide-icons.js?v=20260819-modern"></script>
   <link rel="stylesheet" href="components/hover-card-v2.css?v=20260819-modern">
   <link rel="stylesheet" href="components/install-prompt.css?v=20260819-modern">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -329,6 +331,12 @@
         <div id="savedSearchesBox" class="saved-searches-box" hidden></div>
         <div id="resultsSources" class="results-sources" hidden></div>
         <div id="demandIndicatorBox" class="results-demand" hidden></div>
+        <div class="map-toggle-row">
+          <button id="mapToggleBtn" class="save-search-btn" type="button" onclick="toggleMapView()" hidden>🗺️ الخريطة</button>
+        </div>
+        <div id="mapContainer" class="map-container" hidden>
+          <div id="propertyMap" class="property-map"></div>
+        </div>
         <div id="results" class="results"></div>
       </section>
 
