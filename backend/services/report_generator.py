@@ -268,6 +268,10 @@ def ranked_to_dict(item: RankedListing) -> dict:
         "financing": financing,
         # ── Trust Score: مؤشر ثقة الإعلان ──
         **_trust_score_payload(item, listing),
+        # ── Confidence Interval: نطاق الثقة (ChatGPT recommendation) ──
+        **_confidence_interval_payload(item),
+        # ── Explanation Factors: عوامل التقييم المفصلة ──
+        **_explanation_factors_payload(item),
     }
 
 
@@ -306,6 +310,47 @@ def _trust_score_payload(item, listing) -> dict:
         return {"trustScore": result}
     except Exception:
         return {"trustScore": {"score": 50, "grade": "moderate", "label": "متوسط", "color": "#f59e0b", "factors": [], "alerts": []}}
+
+
+def _confidence_interval_payload(item) -> dict:
+    """إضافة نطاق الثقة من التقييم."""
+    try:
+        valuation = getattr(item, "valuation", None) or {}
+        low = getattr(item, "valuation_low", None)
+        high = getattr(item, "valuation_high", None)
+        ci_pct = getattr(item, "confidence_interval_pct", None)
+        # محاولة من result dict إن وُجد
+        if low is None and hasattr(item, "__dict__"):
+            d = item.__dict__ if hasattr(item, "__dict__") else {}
+            low = d.get("valuation_low")
+            high = d.get("valuation_high")
+            ci_pct = d.get("confidence_interval_pct")
+        if low is not None and high is not None:
+            return {
+                "confidenceInterval": {
+                    "low": low,
+                    "high": high,
+                    "pct": ci_pct,
+                    "label": f"±{ci_pct:.0f}%" if ci_pct else "",
+                    "display": f"{low:,.0f} – {high:,.0f} د.ك" if low and high else "",
+                }
+            }
+    except Exception:
+        pass
+    return {"confidenceInterval": {}}
+
+
+def _explanation_factors_payload(item) -> dict:
+    """إضافة عوامل التقييم المفصلة."""
+    try:
+        factors = getattr(item, "explanation_factors", None)
+        if factors is None and hasattr(item, "__dict__"):
+            factors = item.__dict__.get("explanation_factors")
+        if factors:
+            return {"explanationFactors": factors}
+    except Exception:
+        pass
+    return {"explanationFactors": []}
 
 
 def _transaction_summary(request: PropertyRequest, items: list[RankedListing]) -> dict:

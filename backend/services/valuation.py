@@ -64,6 +64,11 @@ class ValuationResult:
     capital_value: float | None = None  # قيمة العقار التقديرية (أساس العائد)
     capital_value_kind: str = ""  # official_transactions | official | benchmark | missing
     rental_yield_percent: float | None = None  # الإيجار السنوي ÷ قيمة العقار
+    # ── Confidence Interval: نطاق الثقة (الميزة الجديدة) ──
+    valuation_low: float | None = None   # الحد الأدنى لنطاق الثقة
+    valuation_high: float | None = None  # الحد الأعلى لنطاق الثقة
+    confidence_interval_pct: float | None = None  # نسبة عدم اليقين (±10% مثلاً)
+    explanation_factors: list[dict[str, Any]] | None = None  # عوامل التقييم المفصلة
 
 
 def is_rental(listing: Listing) -> bool:
@@ -544,6 +549,13 @@ def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
         deal_score = DEAL_SCORE_OVER
 
     confidence = min(CONFIDENCE_MAX, CONFIDENCE_BASE + len(clean) * CONFIDENCE_PER_COMPARABLE)
+    # ── Confidence Interval: نطاق الثقة ──
+    ci_pct, val_low, val_high = _calculate_confidence_interval(market, confidence, len(clean))
+    # ── Explanation Factors: عوامل التقييم ──
+    explanation = _build_explanation_factors(
+        price=price, market=market, space=target.space,
+        comparables_count=len(clean), scope=scope, confidence=confidence,
+    )
     return ValuationResult(
         label=label,
         reason=reason,
@@ -552,8 +564,65 @@ def price_label(target: Listing, comps: list[Listing]) -> ValuationResult:
         market_median=market,
         price_ratio=ratio,
         evidence=evidence,
+        valuation_low=val_low,
+        valuation_high=val_high,
+        confidence_interval_pct=ci_pct,
+        explanation_factors=explanation,
         **common,
     )
+
+
+def _calculate_confidence_interval(
+    market_median: float | None,
+    confidence: float,
+    comparables_count: int,
+) -> tuple[float | None, float | None, float | None]:
+    """حساب نطاق الثقة: ±X% حول الوسيط.
+
+    كلما زادت الثقة، قل النطاق.
+    - ثقة 90% → ±5%
+    - ثقة 70% → ±12%
+    - ثقة 50% → ±20%
+    """
+    if not market_median or market_median <= 0:
+        return None, None, None
+    # نسبة عدم اليقين: كلما زادت الثقة، قلّت النسبة
+    ci_pct = max(5, min(25, round(25 - confidence * 20, 1)))
+    low = market_median * (1 - ci_pct / 100)
+    high = market_median * (1 + ci_pct / 100)
+    return ci_pct, round(low), round(high)
+
+
+def _build_explanation_factors(
+    price: float,
+    market: float | None,
+    space: float | None,
+    comparables_count: int,
+    scope: str,
+    confidence: float,
+) -> list[dict[str, Any]]:
+    """بناء عوامل التقييم المفصلة — تظهر في بطاقة Property Intelligence."""
+    factors = []
+    if market and price:
+        ratio = price / market
+        if ratio < 0.9:
+            factors.append({"label": "السعر مقابل السوق", "value": f"{ratio:.0%} من المتوسط", "impact": "positive", "detail": "السعر أقل من السوق — فرصة جيدة"})
+        elif ratio < 1.1:
+            factors.append({"label": "السعر مقابل السوق", "value": f"{ratio:.0%} من المتوسط", "impact": "neutral", "detail": "السعر قريب من المتوسط"})
+        else:
+            factors.append({"label": "السعر مقابل السوق", "value": f"{ratio:.0%} من المتوسط", "impact": "negative", "detail": "السعر أعلى من السوق"})
+    if space and price:
+        sqm = price / space
+        factors.append({"label": "سعر المتر المربع", "value": f"{sqm:,.0f} د.ك/م²", "impact": "info", "detail": "يُقارن بسعر متر المنطقة"})
+    if comparables_count >= 5:
+        factors.append({"label": "عدد المقارنات", "value": f"{comparables_count} عقار", "impact": "positive", "detail": "بيانات كافية للتقييم"})
+    elif comparables_count >= 2:
+        factors.append({"label": "عدد المقارنات", "value": f"{comparables_count} عقارات", "impact": "neutral", "detail": "بيانات محدودة — التقييم استرشادي"})
+    else:
+        factors.append({"label": "عدد المقارنات", "value": f"{comparables_count}", "impact": "negative", "detail": "بيانات غير كافية"})
+    factors.append({"label": "نطاق المقارنة", "value": scope, "impact": "info", "detail": ""})
+    factors.append({"label": "درجة الثقة", "value": f"{confidence:.0%}", "impact": "positive" if confidence >= 0.7 else ("neutral" if confidence >= 0.5 else "negative"), "detail": ""})
+    return factors
 
 
 def _try_seed_override(target: Listing, market: float, price: float, evidence: list[dict[str, Any]]) -> float:

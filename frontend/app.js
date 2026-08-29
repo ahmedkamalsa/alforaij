@@ -4210,6 +4210,31 @@ function renderReport(report) {
         ${ts.factors && ts.factors.length ? `<details class="trust-score-details"><summary>تفاصيل التقييم</summary>${ts.factors.map(f => `<div class="trust-factor"><span class="trust-factor-name">${f.name}: ${f.detail}</span><span class="trust-factor-score" style="color:${f.score >= f.max * 0.7 ? '#16a34a' : f.score >= f.max * 0.4 ? '#d97706' : '#dc2626'}">${f.score}/${f.max}</span></div>`).join('')}</details>` : ""}
       `;
     }
+    // ── Confidence Interval: نطاق الثقة ──
+    const ci = item.confidenceInterval || {};
+    const ciEl = node.querySelector(".confidence-interval-section");
+    if (ciEl && ci.low != null && ci.high != null) {
+      ciEl.innerHTML = `
+        <div class="ci-box">
+          <span class="ci-label">نطاق الثقة</span>
+          <span class="ci-range">${latinDigits(ci.display)}</span>
+          <span class="ci-pct">${ci.label}</span>
+        </div>
+      `;
+    }
+    // ── Explanation Factors: عوامل التقييم ──
+    const ef = item.explanationFactors || [];
+    const efEl = node.querySelector(".explanation-factors-section");
+    if (efEl && ef.length) {
+      efEl.innerHTML = ef.map(f => {
+        const tone = f.impact === 'positive' ? '#16a34a' : f.impact === 'negative' ? '#dc2626' : f.impact === 'neutral' ? '#d97706' : '#6b7280';
+        return '<div class="ef-item">'
+          + '<span class="ef-label">' + f.label + '</span>'
+          + '<span class="ef-value" style="color:' + tone + '">' + f.value + '</span>'
+          + (f.detail ? '<span class="ef-detail">' + f.detail + '</span>' : '')
+          + '</div>';
+      }).join("");
+    }
     const insights = node.querySelector(".result-insights");
     if (insights) insights.insertAdjacentHTML("afterend", propertyProfileHtml(item.propertyProfile));
     const decisionEl = node.querySelector(".decision-line");

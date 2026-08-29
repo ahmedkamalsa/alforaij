@@ -5881,6 +5881,68 @@ summary {
   border-color: #e5e7eb;
 }
 
+/* ── Confidence Interval: نطاق الثقة ── */
+.confidence-interval-section {
+  margin-top: 6px;
+}
+.ci-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  font-size: 12px;
+}
+.ci-label {
+  color: var(--muted);
+  font-weight: 700;
+}
+.ci-range {
+  font-weight: 800;
+  color: var(--blue);
+  font-size: 13px;
+}
+.ci-pct {
+  color: var(--blue);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* ── Explanation Factors: عوامل التقييم ── */
+.explanation-factors-section {
+  margin-top: 6px;
+}
+.ef-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
+  border-bottom: 1px solid var(--line);
+}
+.ef-item:last-child {
+  border-bottom: none;
+}
+.ef-label {
+  color: var(--muted);
+  min-width: 100px;
+  font-weight: 600;
+}
+.ef-value {
+  font-weight: 800;
+  font-size: 12px;
+}
+.ef-detail {
+  color: var(--muted);
+  font-size: 10px;
+}
+[data-theme="light"] .ci-box {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
 /* الفرص الأكثر طلبًا */
 .hot-list {
   display: grid;
