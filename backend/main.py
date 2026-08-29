@@ -1927,6 +1927,19 @@ class Handler(BaseHTTPRequestHandler):
             result = compare_neighborhoods(areas)
             json_response(self, result)
             return
+        if path == "/api/invest/insurance":
+            # حاسبة التأمين العقاري
+            from backend.services.insurance_calculator import compare_insurance_options
+            price = float(payload.get("price") or 0)
+            contents = float(payload.get("contents_value") or 0)
+            age = int(payload.get("building_age") or 0)
+            years = int(payload.get("years") or 1)
+            if price <= 0:
+                json_response(self, {"error": "أدخل قيمة العقار"}, status=400)
+                return
+            result = compare_insurance_options(price, contents, age, years)
+            json_response(self, result)
+            return
         if path == "/api/invest/forecast":
             # توقع العائد المستقبلي
             from backend.services.investment_calculator import forecast_return

@@ -318,6 +318,30 @@
         <p class="sim-note">قارن أقساط وأسعار فائدة KFH، KBK، CBK، وبوبيان — يُنصح بزيادة الدفعة المقدمة إذا تجاوز القسط 40% من الراتب.</p>
       </details>
 
+      <details class="insurance-calc" id="insuranceCalc">
+        <summary><svg class="hero-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> حاسبة التأمين العقاري</summary>
+        <div class="insurance-fields">
+          <label>قيمة العقار (د.ك)
+            <input id="insurancePrice" type="number" min="0" step="1000" inputmode="decimal" placeholder="مثال: 300000" autocomplete="off">
+          </label>
+          <label>قيمة المحتويات (د.ك) — اختياري
+            <input id="insuranceContents" type="number" min="0" step="1000" inputmode="decimal" placeholder="مثال: 50000" autocomplete="off">
+          </label>
+          <label>عمر البناء (سنوات)
+            <input id="insuranceAge" type="number" min="0" max="100" step="1" value="5" inputmode="decimal" autocomplete="off">
+          </label>
+          <label>المدة (سنوات)
+            <input id="insuranceYears" type="number" min="1" max="10" step="1" value="1" inputmode="decimal" autocomplete="off">
+          </label>
+          <button id="insuranceCalcBtn" type="button" class="primary">قارن خيارات التأمين</button>
+        </div>
+        <div class="insurance-results" id="insuranceResults" hidden>
+          <div class="insurance-summary" id="insuranceSummary"></div>
+          <div class="insurance-options" id="insuranceOptions"></div>
+        </div>
+        <p class="sim-note">قارن تكلفة تأمين الممتلكات والمحتويات والمسؤولية المدنية — الخصومات متاحة للعقار الجديد ونظام الأمان.</p>
+      </details>
+
       <details class="advanced-fields">
         <summary>خيارات متقدمة</summary>
         <div class="fields">

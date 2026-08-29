@@ -5008,6 +5008,135 @@ button.results-source-chip:hover {
   color: var(--blue);
 }
 
+/* ── حاسبة التأمين العقاري ── */
+.insurance-calc {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, .03);
+  padding: 12px 14px;
+}
+.insurance-calc summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--blue);
+}
+.insurance-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.insurance-fields label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.insurance-fields input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+}
+.insurance-results {
+  margin-top: 14px;
+}
+.insurance-summary {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+  margin-bottom: 12px;
+  color: #059669;
+}
+.insurance-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.insurance-option-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  padding: 14px;
+  position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.insurance-option-card:hover {
+  border-color: var(--blue);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.insurance-option-card.best {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+}
+.insurance-option-card.best::after {
+  content: "✅ الأقل تكلفة";
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  font-size: 11px;
+  font-weight: 800;
+}
+.insurance-option-card .ins-type {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.insurance-option-card .ins-desc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.insurance-option-card .ins-annual {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+  margin: 8px 0;
+}
+.insurance-option-card .ins-annual small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.insurance-option-card .ins-details {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.insurance-option-card .ins-details strong {
+  color: var(--text);
+}
+.insurance-option-card .ins-features {
+  margin-top: 8px;
+  padding: 0;
+  list-style: none;
+}
+.insurance-option-card .ins-features li {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 2px 0;
+}
+.insurance-option-card .ins-features li::before {
+  content: "• ";
+  color: #10b981;
+}
+[data-theme="light"] .insurance-summary {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
 /* شارة فجوة السعر: السعر المطلوب مقابل وسيط المنطقة */
 .price-gap-badge {
   display: inline-block;

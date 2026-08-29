@@ -7743,6 +7743,87 @@ function renderMortgageResults(data) {
   }).join("");
 }
 
+// ─── حاسبة التأمين العقاري ───
+function initInsuranceCalculator() {
+  const btn = $("insuranceCalcBtn");
+  if (!btn) return;
+  btn.addEventListener("click", runInsuranceComparison);
+}
+
+async function runInsuranceComparison() {
+  const price = Number($("insurancePrice")?.value || 0);
+  const contents = Number($("insuranceContents")?.value || 0);
+  const age = Number($("insuranceAge")?.value || 0);
+  const years = Number($("insuranceYears")?.value || 1);
+
+  if (price <= 0) {
+    alert("أدخل قيمة العقار أولاً");
+    return;
+  }
+
+  const btn = $("insuranceCalcBtn");
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch("/api/invest/insurance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        price: price,
+        contents_value: contents,
+        building_age: age,
+        years: years,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+    renderInsuranceResults(data);
+  } catch (e) {
+    console.error("Insurance comparison error:", e);
+    alert("خطأ في الاتصال — أعد المحاولة");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function renderInsuranceResults(data) {
+  const container = $("insuranceResults");
+  const summaryEl = $("insuranceSummary");
+  const optionsEl = $("insuranceOptions");
+  if (!container || !summaryEl || !optionsEl) return;
+
+  container.hidden = false;
+
+  // ملخص
+  const rec = data.recommendation || {};
+  summaryEl.innerHTML = '<div>🛡️ مقارنة خيارات التأمين لعقار <strong>' + formatMoney(data.property_value) + '</strong> د.ك</div>' +
+    (rec.summary ? '<div style="margin-top:6px">🎯 ' + rec.summary + '</div>' : '');
+
+  // بطاقات الخيارات
+  const bestType = data.best_option?.insurance_type;
+  optionsEl.innerHTML = (data.options || []).map(opt => {
+    const isBest = opt.insurance_type === bestType;
+    const featuresHtml = (opt.features || []).map(f => '<li>' + f + '</li>').join("");
+    const discountsHtml = (opt.discounts || []).map(d => d.name + ': -' + (d.percent * 100).toFixed(0) + '%').join(', ');
+    return '<div class="insurance-option-card' + (isBest ? ' best' : '') + '">' +
+      '<div class="ins-type">' + opt.type_name + ' <span style="font-weight:400;font-size:11px;color:var(--muted)">' + opt.type_name_en + '</span></div>' +
+      '<div class="ins-desc">' + opt.description + '</div>' +
+      '<div class="ins-annual">' + formatMoney(opt.total_annual) + ' <small>د.ك/سنة</small></div>' +
+      '<div class="ins-details">' +
+        '<div>النسبة: <strong>' + opt.final_rate.toFixed(2) + '%</strong></div>' +
+        '<div>الشهري: <strong>' + formatMoney(opt.monthly_cost) + '</strong> د.ك</div>' +
+        '<div>الإجمالي: <strong>' + formatMoney(opt.total_cost) + '</strong> د.ك</div>' +
+        (opt.total_discount > 0 ? '<div>الخصم: <strong style="color:#10b981">-' + opt.total_discount + '%</strong></div>' : '') +
+        (discountsHtml ? '<div style="font-size:10px">(' + discountsHtml + ')</div>' : '') +
+      '</div>' +
+      '<ul class="ins-features">' + featuresHtml + '</ul>' +
+    '</div>';
+  }).join("");
+}
+
 // ترتيب سجلات اللوحة (الأحدث / السعر الأعلى / الأقل / المنطقة أبجديا)
 function sortBoardRows(rows) {
   const sort = $("boardSortFilter")?.value || "newest";
@@ -8515,6 +8596,7 @@ async function boot() {
   initAreaChips();
   initDealSimulator();
   initMortgageCalculator();
+  initInsuranceCalculator();
   initSmartAlerts();
   initMetricsRegistry();
   initMarketChat();
