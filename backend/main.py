@@ -1122,83 +1122,7 @@ class Handler(BaseHTTPRequestHandler):
             from backend.services.push_notifications import get_stats
             json_response(self, get_stats())
             return
-        if path == "/api/smart-alerts/check" and self.command == "POST":
-            # فحص التنبيهات الذكية للمستخدم
-            from backend.services.smart_alerts import detect_price_drops, detect_new_listings
-            from backend.services.supabase_store import fetch_saved_searches
-            secret = str(payload.get("user_secret") or "").strip()
-            if not secret:
-                json_response(self, {"error": "missing_secret", "detail": "سجل الدخول أولاً"}, status=401)
-                return
-            # جلب الأبحاث المحفوظة للمستخدم
-            searches = [s for s in fetch_saved_searches() if s.get("user_secret") == secret]
-            # فحص انخفاض الأسعار (من market_listings)
-            price_drops = []
-            new_listings = []
-            if supabase_is_configured():
-                try:
-                    from backend.services.supabase_store import _fetch_rows, SUPABASE_URL, SUPABASE_KEY
-                    # جلب أحدث الإعلانات
-                    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_listings?select=code,area,price,property_type,source&order=created_at.desc&limit=100") or []
-                    # متوسطات الأسعار من price_trends
-                    trends = _fetch_rows(f"{SUPABASE_URL}/rest/v1/price_trends?select=area,median_price&order=month.desc") or []
-                    medians = {}
-                    for t in (trends or []):
-                        a = t.get("area") or ""
-                        if a and a not in medians:
-                            medians[a] = _to_float(t.get("median_price")) or 0
-                    listings = [{"code": r.get("code"), "area": r.get("area"), "price": _to_float(r.get("price")), "priceText": f"{float(r.get('price') or 0):,.0f} د.ك", "propertyType": r.get("property_type")} for r in (rows or [])]
-                    price_drops = detect_price_drops(listings, medians)
-                except Exception as e:
-                    logger.warning("Smart alerts price check failed: %s", e)
-            json_response(self, {
-                "status": "ok",
-                "priceDrops": price_drops[:10],
-                "newListings": new_listings[:10],
-                "savedSearches": len(searches),
-                "total": len(price_drops) + len(new_listings),
-            })
-            return
-        if path == "/api/smart-alerts/subscribe" and self.command == "POST":
-            # اشتراك في تنبيهات منطقة معينة
-            area = str(payload.get("area") or "").strip()
-            secret = str(payload.get("user_secret") or "").strip()
-            alert_type = str(payload.get("alert_type") or "price_drop").strip()
-            if not area or not secret:
-                json_response(self, {"error": "missing_fields", "detail": "حدد المنطقة وسجل الدخول"}, status=400)
-                return
-            # حفظ الاشتراك في saved_searches
-            if supabase_is_configured():
-                try:
-                    from backend.services.supabase_store import upsert_saved_search
-                    upsert_saved_search({
-                        "user_secret": secret,
-                        "name": f"تنبيه {area}",
-                        "request": f"تنبيهات في {area}",
-                        "areas": [area],
-                        "alert_enabled": True,
-                    })
-                except Exception as e:
-                    logger.warning("Alert subscribe failed: %s", e)
-            json_response(self, {"status": "ok", "message": f"اشتراك تنبيهات {area} تم بنجاح"})
-            return
-        if path == "/api/smart-alerts/unsubscribe" and self.command == "POST":
-            # إلغاء اشتراك التنبيهات
-            area = str(payload.get("area") or "").strip()
-            secret = str(payload.get("user_secret") or "").strip()
-            if not area or not secret:
-                json_response(self, {"error": "missing_fields"}, status=400)
-                return
-            if supabase_is_configured():
-                try:
-                    from backend.services.supabase_store import _delete_rows, SUPABASE_URL
-                    _delete_rows(f"{SUPABASE_URL}/rest/v1/saved_searches?user_secret=eq.{secret}&name=eq.تنبيه {area}")
-                except Exception as e:
-                    logger.warning("Alert unsubscribe failed: %s", e)
-            json_response(self, {"status": "ok", "message": f"تم إلغاء اشتراك تنبيهات {area}"})
-            return
-        if path == "/api/smart-alerts/list" and self.command == "GET":
-            # عرض التنبيهات النشطة للمستخدم
+        if path == "/api/smart-alerts/list":
             secret = self.headers.get("X-User-Secret", "").strip()
             if not secret:
                 json_response(self, {"alerts": [], "total": 0})
@@ -2197,6 +2121,74 @@ class Handler(BaseHTTPRequestHandler):
             filt = payload.get("filter")
             result = send_push_notification(title, body, data, target, filt)
             json_response(self, result)
+            return
+
+        # ── Smart Alerts: تنبيهات ذكية للسعر والفرص الجديدة ──
+        if path == "/api/smart-alerts/check":
+            from backend.services.smart_alerts import detect_price_drops, detect_new_listings
+            from backend.services.supabase_store import fetch_saved_searches
+            secret = str(payload.get("user_secret") or "").strip()
+            if not secret:
+                json_response(self, {"error": "missing_secret", "detail": "سجل الدخول أولاً"}, status=401)
+                return
+            searches = [s for s in fetch_saved_searches() if s.get("user_secret") == secret]
+            price_drops = []
+            new_listings = []
+            if supabase_is_configured():
+                try:
+                    from backend.services.supabase_store import _fetch_rows, SUPABASE_URL
+                    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_listings?select=code,area,price,property_type,source&order=created_at.desc&limit=100") or []
+                    trends = _fetch_rows(f"{SUPABASE_URL}/rest/v1/price_trends?select=area,median_price&order=month.desc") or []
+                    medians = {}
+                    for t in (trends or []):
+                        a = t.get("area") or ""
+                        if a and a not in medians:
+                            medians[a] = _to_float(t.get("median_price")) or 0
+                    listings = [{"code": r.get("code"), "area": r.get("area"), "price": _to_float(r.get("price")), "priceText": f"{float(r.get('price') or 0):,.0f} د.ك", "propertyType": r.get("property_type")} for r in (rows or [])]
+                    price_drops = detect_price_drops(listings, medians)
+                except Exception as e:
+                    logger.warning("Smart alerts price check failed: %s", e)
+            json_response(self, {
+                "status": "ok",
+                "priceDrops": price_drops[:10],
+                "newListings": new_listings[:10],
+                "savedSearches": len(searches),
+                "total": len(price_drops) + len(new_listings),
+            })
+            return
+        if path == "/api/smart-alerts/subscribe":
+            area = str(payload.get("area") or "").strip()
+            secret = str(payload.get("user_secret") or "").strip()
+            if not area or not secret:
+                json_response(self, {"error": "missing_fields", "detail": "حدد المنطقة وسجل الدخول"}, status=400)
+                return
+            if supabase_is_configured():
+                try:
+                    from backend.services.supabase_store import upsert_saved_search
+                    upsert_saved_search({
+                        "user_secret": secret,
+                        "name": f"تنبيه {area}",
+                        "request": f"تنبيهات في {area}",
+                        "areas": [area],
+                        "alert_enabled": True,
+                    })
+                except Exception as e:
+                    logger.warning("Alert subscribe failed: %s", e)
+            json_response(self, {"status": "ok", "message": f"اشتراك تنبيهات {area} تم بنجاح"})
+            return
+        if path == "/api/smart-alerts/unsubscribe":
+            area = str(payload.get("area") or "").strip()
+            secret = str(payload.get("user_secret") or "").strip()
+            if not area or not secret:
+                json_response(self, {"error": "missing_fields"}, status=400)
+                return
+            if supabase_is_configured():
+                try:
+                    from backend.services.supabase_store import _delete_rows, SUPABASE_URL
+                    _delete_rows(f"{SUPABASE_URL}/rest/v1/saved_searches?user_secret=eq.{secret}&name=eq.تنبيه {area}")
+                except Exception as e:
+                    logger.warning("Alert unsubscribe failed: %s", e)
+            json_response(self, {"status": "ok", "message": f"تم إلغاء اشتراك تنبيهات {area}"})
             return
 
         json_response(self, {"error": "Unknown endpoint"}, status=404)
