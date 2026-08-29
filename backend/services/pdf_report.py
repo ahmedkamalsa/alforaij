@@ -526,6 +526,12 @@ def build_pdf(report: dict | None, *, title: str | None = None, client_recommend
         # ---- مقارنة التمويل العقاري ----
         if not top.get("rental"):
             _mortgage_comparison_section(story, top, styles)
+        # ---- مؤشر ثقة الإعلان التفصيلي ----
+        _trust_score_section(story, top, styles)
+        # ---- عوامل التقييم المفصلة ----
+        _explanation_factors_section(story, top, styles)
+        # ---- تقدير التأمين العقاري ----
+        _insurance_section(story, top, styles)
 
     # ---- مؤشر الطلب: من يبحث عن شراء/إيجار في نفس المنطقة (صفحة مخصصة بجانب ملخص التقييم) ----
     demand = report.get("demandIndicators") or {}
@@ -688,6 +694,21 @@ def _detail_top_result(story: list, item: dict, styles: dict[str, ParagraphStyle
         ("الثقة", f"{conf}%"),
         ("السبب", reason),
     ]
+
+    # نطاق الثقة (Confidence Interval)
+    ci = item.get("confidenceInterval") or {}
+    if ci.get("display"):
+        summary_rows.append(("نطاق الثقة", ci["display"]))
+    elif ci.get("low") is not None and ci.get("high") is not None:
+        summary_rows.append(("نطاق الثقة", f"{ci['low']:,.0f} – {ci['high']:,.0f} د.ك"))
+
+    # مؤشر ثقة الإعلان (Trust Score)
+    ts = item.get("trustScore") or {}
+    if ts.get("score") is not None:
+        ts_score = ts["score"]
+        ts_label = ts.get("label") or "متوسط"
+        ts_color = ts.get("color") or "#f59e0b"
+        summary_rows.append(("ثقة الإعلان", f"{ts_score}/100 — {ts_label}"))
     url = item.get("originalUrl") or ""
     if url:
         summary_rows.append((
@@ -913,6 +934,156 @@ def _mortgage_comparison_section(story: list, top_item: dict, styles: dict[str, 
         # ملاحظة
         story.append(Paragraph(
             ar("ملاحظة: الفوائد تقريبية وتتغير حسب العميل والتأمين. يُنصح بزيادة الدفعة المقدمة إذا تجاوز القسط 40% من الراتب."),
+            styles["small"]
+        ))
+    except Exception:
+        pass
+
+
+def _trust_score_section(story: list, item: dict, styles: dict[str, ParagraphStyle]) -> None:
+    """قسم مؤشر ثقة الإعلان التفصيلي مع العوامل والتنبيهات."""
+    ts = item.get("trustScore") or {}
+    score = ts.get("score")
+    if score is None:
+        return
+    story.append(PageBreak())
+    _heading(story, "مؤشر ثقة الإعلان (Trust Score)")
+    grade = ts.get("grade") or "moderate"
+    label = ts.get("label") or "متوسط"
+    score_rows = [
+        ("الدرجة", f"{score} من 100"),
+        ("التقييم", label),
+        ("المستوى", grade),
+    ]
+    if ts.get("color"):
+        color_name = {
+            "#22c55e": "موثق (أخضر)",
+            "#f59e0b": "متوسط (أصفر)",
+            "#ef4444": "مشبوه (أحمر)",
+        }.get(ts["color"], ts["color"])
+        score_rows.append(("اللون", color_name))
+    story.append(_info_table(score_rows, [40 * mm, 140 * mm]))
+    story.append(Spacer(1, 6))
+
+    # عوامل الثقة
+    factors = ts.get("factors") or []
+    if factors:
+        story.append(Paragraph(ar("عوامل التقييم:"), styles["box_title"]))
+        story.append(Spacer(1, 2))
+        header = [
+            Paragraph(ar("العامل"), styles["cell_head"]),
+            Paragraph(ar("الوزن"), styles["cell_head"]),
+            Paragraph(ar("النتيجة"), styles["cell_head"]),
+            Paragraph(ar("الشرح"), styles["cell_head"]),
+        ]
+        rows = [header]
+        for f in factors:
+            rows.append([
+                Paragraph(ar(f.get("name") or "—"), styles["cell"]),
+                Paragraph(ar(str(f.get("weight") or "—")), styles["cell"]),
+                Paragraph(ar(str(f.get("value") or "—")), styles["cell"]),
+                Paragraph(ar(f.get("reason") or "—"), styles["cell"]),
+            ])
+        table = Table(rows, colWidths=[38 * mm, 18 * mm, 28 * mm, 96 * mm], repeatRows=1, hAlign="RIGHT")
+        table.setStyle(_data_table_style())
+        story.append(KeepTogether(table))
+        story.append(Spacer(1, 6))
+
+    # تنبيهات الثقة
+    alerts = ts.get("alerts") or []
+    if alerts:
+        story.append(Paragraph(ar("تنبيهات:"), styles["box_title"]))
+        story.append(Spacer(1, 2))
+        for alert in alerts:
+            icon = alert.get("icon") or "⚠️"
+            text = alert.get("text") or alert.get("message") or "—"
+            story.append(Paragraph(ar(f"{icon} {text}"), styles["body"]))
+            story.append(Spacer(1, 1))
+
+
+def _explanation_factors_section(story: list, item: dict, styles: dict[str, ParagraphStyle]) -> None:
+    """قسم عوامل التقييم المفصلة (Explanation Factors)."""
+    factors = item.get("explanationFactors") or []
+    if not factors:
+        return
+    story.append(PageBreak())
+    _heading(story, "عوامل التقييم المفصلة")
+    story.append(Paragraph(
+        ar("العوامل التي أثرت على تقييم هذا العقار — كل عامل مع درجته ونسبة تأثيره."),
+        styles["body"]
+    ))
+    story.append(Spacer(1, 4))
+    header = [
+        Paragraph(ar("#"), styles["cell_head"]),
+        Paragraph(ar("العامل"), styles["cell_head"]),
+        Paragraph(ar("النوع"), styles["cell_head"]),
+        Paragraph(ar("التفاصيل"), styles["cell_head"]),
+    ]
+    rows = [header]
+    for index, f in enumerate(factors, start=1):
+        icon = f.get("icon") or ""
+        label = f.get("label") or f.get("text") or "—"
+        ftype = f.get("type") or "info"
+        detail = f.get("detail") or f.get("value") or "—"
+        type_label = {"positive": "إيجابي", "negative": "سلبي", "neutral": "محايد", "info": "معلومات"}.get(ftype, ftype)
+        rows.append([
+            Paragraph(ar(str(index)), styles["cell"]),
+            Paragraph(ar(f"{icon} {label}"), styles["cell"]),
+            Paragraph(ar(type_label), styles["cell"]),
+            Paragraph(ar(str(detail)), styles["cell"]),
+        ])
+    table = Table(rows, colWidths=[10 * mm, 50 * mm, 24 * mm, 96 * mm], repeatRows=1, hAlign="RIGHT")
+    table.setStyle(_data_table_style())
+    story.append(KeepTogether(table))
+
+
+def _insurance_section(story: list, item: dict, styles: dict[str, ParagraphStyle]) -> None:
+    """قسم تقدير التأمين العقاري."""
+    price = item.get("price")
+    if not price or price <= 0:
+        return
+    try:
+        from backend.services.insurance_calculator import calculate_insurance
+        result = calculate_insurance(price, contents_value=50000, building_age=5, years=1)
+        if not result:
+            return
+        story.append(PageBreak())
+        _heading(story, "تقدير التأمين العقاري")
+        story.append(Paragraph(
+            ar(f"تقدير تكاليف التأمين للعقار بقيمة {money(price)} د.ك (عمر البناء 5 سنوات، محتويات 50,000 د.ك)"),
+            styles["body"]
+        ))
+        story.append(Spacer(1, 4))
+        header = [
+            Paragraph(ar("نوع التأمين"), styles["cell_head"]),
+            Paragraph(ar("القسط السنوي"), styles["cell_head"]),
+            Paragraph(ar("القسط الشهري"), styles["cell_head"]),
+            Paragraph(ar("الوصف"), styles["cell_head"]),
+        ]
+        rows = [header]
+        for ins in result.get("types", []):
+            rows.append([
+                Paragraph(ar(ins.get("name") or "—"), styles["cell"]),
+                Paragraph(ar(money(ins.get("annual", 0))), styles["cell"]),
+                Paragraph(ar(money(ins.get("monthly", 0))), styles["cell"]),
+                Paragraph(ar(ins.get("description") or "—"), styles["cell"]),
+            ])
+        table = Table(rows, colWidths=[40 * mm, 28 * mm, 28 * mm, 84 * mm], repeatRows=1, hAlign="RIGHT")
+        table.setStyle(_data_table_style())
+        story.append(KeepTogether(table))
+        story.append(Spacer(1, 6))
+        # الخصومات
+        discounts = result.get("discounts") or []
+        if discounts:
+            story.append(Paragraph(ar("الخصومات المتاحة:"), styles["box_title"]))
+            story.append(Spacer(1, 2))
+            for d in discounts:
+                story.append(Paragraph(ar(f"• {d.get('name') or ''}: خصم {d.get('percent', 0)}%"), styles["body"]))
+                story.append(Spacer(1, 1))
+        # ملاحظة
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(
+            ar("ملاحظة: التقدير تقريبي. التأمين الفعلي يعتمد على الموقع والتشطيب وسقف البناء."),
             styles["small"]
         ))
     except Exception:
