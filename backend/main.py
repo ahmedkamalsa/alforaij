@@ -1177,6 +1177,9 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             json_response(self, {"error": "Invalid JSON"}, status=400)
             return
+        if not isinstance(payload, dict):
+            json_response(self, {"error": "Invalid JSON"}, status=400)
+            return
         path = urlparse(self.path).path
         text = _security.sanitize(str(payload.get("text") or ""))
         if path == "/api/parse":
