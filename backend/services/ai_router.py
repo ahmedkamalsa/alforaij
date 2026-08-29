@@ -25,11 +25,11 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # ── مهل الاتصال لكل مزوّد ──
-_FREELLMAPI_TIMEOUT = 15
-_OLLAMA_TIMEOUT = 15
-_GEMINI_TIMEOUT = 15
-_OPENROUTER_TIMEOUT = 15
-_AGENTROUTER_TIMEOUT = 12
+_FREELLMAPI_TIMEOUT = 5
+_OLLAMA_TIMEOUT = 5
+_GEMINI_TIMEOUT = 5
+_OPENROUTER_TIMEOUT = 5
+_AGENTROUTER_TIMEOUT = 5
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -334,7 +334,13 @@ def ai_chat(
     else:
         providers = list(_DEFAULT_PROVIDERS)
 
+    import time as _time
+    _total_start = _time.time()
+    _TOTAL_TIMEOUT = 10  # حد أقصى 10 ثوانٍ لكل المزوّدين مجتمعين
     for provider_name in providers:
+        if _time.time() - _total_start > _TOTAL_TIMEOUT:
+            logger.warning("AI total timeout reached (%.0fs) — stopping after %d providers", _TOTAL_TIMEOUT, providers.index(provider_name))
+            break
         fn = _PROVIDER_MAP.get(provider_name)
         if not fn:
             continue

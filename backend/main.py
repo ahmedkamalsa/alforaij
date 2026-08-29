@@ -1528,8 +1528,8 @@ class Handler(BaseHTTPRequestHandler):
                         _timeout_per_source = 5.0
                         _progress_push(job_id, "external", f"الوضع السريع: فحص {len(selected_sources)} مصادر سريعة فقط")
                     else:
-                        _timeout_per_source = 0  # بدون حد في الوضع الكامل
-                        _progress_push(job_id, "external", "بدء فحص المصادر الخارجية بالتوازي")
+                        _timeout_per_source = 10.0  # مهلة 10 ثوانٍ لكل مصدر في الوضع الكامل
+                        _progress_push(job_id, "external", "بدء فحص المصادر الخارجية بالتوازي (مهلة 10ث/مصدر)")
                     external_listings, external_statuses = search_external_sources(
                         request,
                         selected_sources=selected_sources,
@@ -1589,11 +1589,14 @@ class Handler(BaseHTTPRequestHandler):
                         ))
                     _progress_push(job_id, "score", f"急速: {len(deduped)} نتيجة")
                 else:
-                    _rank_limit = 100
+                    _t0 = time.time()
+                    _rank_limit = 50
                     ranked = top_matches(request, listings, limit=_rank_limit)
+                    _t1 = time.time()
                     enriched = enrich_rankings(request, ranked, listings)
+                    _t2 = time.time()
                     deduped = deduplicate_ranked(enriched)[:50]
-                    _progress_push(job_id, "score", f"تقييم المطابقة والترتيب: {len(deduped)} نتيجة نهائية")
+                    _progress_push(job_id, "score", f"تقييم المطابقة والترتيب: {len(deduped)} نتيجة نهائية ({_t2 - _t1:.1f}ث تقييم + {_t1 - _t0:.1f}ث مطابقة)")
 
                 # ── الوضع السريع (fast mode) للمساعد العقاري: يتخطى التصنيف والتحليل والعملاء ──
                 if _fast:
@@ -1645,13 +1648,17 @@ class Handler(BaseHTTPRequestHandler):
                         logger.warning("Classification failed: %s", classify_error)
 
                     # Fetch AI professional analysis
+                    _t3 = time.time()
                     _progress_push(job_id, "report", "بناء التقرير والتحليل الاحترافي (قد يستغرق ثوانٍ)")
                     ai_insights = generate_professional_analysis(request, deduped, external_statuses)
+                    _t4 = time.time()
                     
                     report = build_report(
                         request, deduped, local_count, external_statuses, ai_insights,
                         include_local_source=use_local,
                     )
+                    _t5 = time.time()
+                    logger.info("Timing: enrich=%.1fs classify+ai=%.1fs report=%.1fs", _t2 - _t0, _t4 - _t3, _t5 - _t4)
                     try:
                         from backend.services.chat_agents import build_chat_guidance
                         report["chatGuidance"] = build_chat_guidance(request, report, source_mode=source_mode)

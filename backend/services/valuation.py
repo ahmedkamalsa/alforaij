@@ -834,12 +834,38 @@ def number_sources(listing: Listing, valuation: ValuationResult) -> dict[str, An
     }
 
 
+def _enrich_single(listing, request, all_listings):
+    """تأثير واحد على نتيجة واحدة — للتشغيل بالتوازي."""
+    comps = comparable_pool(listing, all_listings, request)
+    valuation = price_label(listing, comps)
+    return comps, valuation
+
+
 def enrich_rankings(request: PropertyRequest, ranked, all_listings: list[Listing]) -> list[RankedListing]:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     output: list[RankedListing] = []
-    for item in ranked:
-        listing, score, reasons, warnings, match_breakdown = item
-        comps = comparable_pool(listing, all_listings, request)
-        valuation = price_label(listing, comps)
+    # حد أقصى 20 نتيجة للتقييم — يوفّر الوقت بشكل كبير
+    ranked = ranked[:20]
+    # تشغيل المقارنات والتقييم بالتوازي (كل نتيجة مستقلة)
+    enrich_cache: dict[int, tuple] = {}  # id(listing) -> (comps, valuation)
+    with ThreadPoolExecutor(max_workers=min(8, len(ranked) or 1)) as executor:
+        futures = {
+            executor.submit(_enrich_single, listing, request, all_listings): id(listing)
+            for listing, score, reasons, warnings, match_breakdown in ranked
+        }
+        for future in as_completed(futures):
+            listing_id = futures[future]
+            try:
+                comps, valuation = future.result()
+                enrich_cache[listing_id] = (comps, valuation)
+            except Exception:
+                pass
+    # إعادة الطلب بالأصل + بناء النتائج
+    for ranked_item in ranked:
+        listing, score, reasons, warnings, match_breakdown = ranked_item
+        if id(listing) not in enrich_cache:
+            continue
+        comps, valuation = enrich_cache[id(listing)]
         if valuation.evidence:
             reasons.append(f"تم استخدام مقارنات داخل {valuation.comparable_scope}")
         else:
