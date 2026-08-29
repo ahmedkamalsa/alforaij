@@ -1410,18 +1410,27 @@ class Handler(BaseHTTPRequestHandler):
                 external_statuses = []
                 if use_external:
                     selected_sources = selected_sources_payload or ([selected_source] if source_mode == "source" and selected_source else None)
-                    _progress_push(job_id, "external", "بدء فحص المصادر الخارجية بالتوازي")
+                    # ── الوضع السريع: مصادر سريعة فقط + مهلة 8 ثوانٍ لكل مصدر ──
+                    _fast_flag = bool(payload.get("fast"))
+                    if _fast_flag and not selected_sources:
+                        from backend.connectors.live_sources import FAST_MODE_SOURCES
+                        selected_sources = FAST_MODE_SOURCES
+                        _timeout_per_source = 5.0
+                        _progress_push(job_id, "external", f"الوضع السريع: فحص {len(selected_sources)} مصادر سريعة فقط")
+                    else:
+                        _timeout_per_source = 0  # بدون حد في الوضع الكامل
+                        _progress_push(job_id, "external", "بدء فحص المصادر الخارجية بالتوازي")
                     external_listings, external_statuses = search_external_sources(
                         request,
                         selected_sources=selected_sources,
-                        # name موحّد من مفتاح السجل في بدء وانتهاء كل مصدر (بعض الحالات النهائية
-                        # تحمل اسمًا مختلفًا للعرض) — حتى يعرض العميل صفًا واحدًا لكل مصدر.
                         progress_cb=lambda name, st: _progress_source_event(job_id, name, st),
+                        timeout_per_source=_timeout_per_source,
                     )
                     # وكيل إكمال التفاصيل: الإعلانات القادمة من صفحات القوائم كثيرًا ما تنقصها
                     # السعر أو المساحة أو المنطقة — يقرأ صفحة التفاصيل لكل إعلان ناقص ويكمّلها
                     # قبل فلتر الأسعار والمطابقة بالفلاتر (حتى لا يُسقط إعلان صالح بسبب بيانات ناقصة).
-                    _enrich = enrich_listings_from_details(external_listings)
+                    # ── الوضع السريع: تخطّي إكمال التفاصيل لتوفير الوقت ──
+                    _enrich = {} if _fast_flag else enrich_listings_from_details(external_listings)
                     if _enrich.get("enriched"):
                         _progress_push(job_id, "enrich", _enrich["note"])
                         external_statuses.append({

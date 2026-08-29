@@ -2669,13 +2669,27 @@ def log_source_run(status: dict[str, Any]) -> None:
     )
 
 
+# أسرع المصادر وأكثرها موثوقية — تُستخدم في الوضع السريع لتجنّب المصادر البطيئة
+FAST_MODE_SOURCES: list[str] = [
+    "OpenSooq",
+    "Mourjan",
+    "Q8Aqar",
+    "FindQ8",
+    "Yebtah",
+    "Waseet",
+    "4Sale",
+]
+
+
 def search_external_sources(
     request: PropertyRequest,
     selected_sources: list[str] | None = None,
     progress_cb: Callable[[str, dict], None] | None = None,
+    timeout_per_source: float = 0,
 ) -> tuple[list[Listing], list[dict[str, Any]]]:
     """تشغيل كل المصادر بالتوازي لتقليل زمن الانتظار الإجمالي بدل التسلسل (حتى 84 ثانية سابقًا).
 
+    timeout_per_source (ثانية): الحد الأقصى لكل مصدر. إذا تجاوزه يُتخطّى. 0 = بدون حد.
     يسجّل نتيجة كل مصدر (الحالة + السبب + المدة + عدد المحاولات) مرة واحدة لكل تشغيل
     عبر log_source_run مع منع تكرار الرسالة نفسها في الفحص الدوري.
 
@@ -2696,6 +2710,7 @@ def search_external_sources(
                 "note": f"لا يوجد مصدر مطابق للاختيار: {', '.join(sorted(selected))}",
             }
         ]
+    import concurrent.futures as _cf
     with ThreadPoolExecutor(max_workers=len(searchers)) as pool:
         futures: dict = {}
         for name, search in searchers:
@@ -2704,7 +2719,20 @@ def search_external_sources(
                 progress_cb(name, {"name": name, "status": "running", "records": 0, "candidates": 0})
         for future, name in futures.items():
             try:
-                source_listings, status = future.result()
+                if timeout_per_source > 0:
+                    source_listings, status = future.result(timeout=timeout_per_source)
+                else:
+                    source_listings, status = future.result()
+            except _cf.TimeoutError:
+                logger.info("External source '%s' timed out after %.1fs — skipped", name, timeout_per_source)
+                source_listings = []
+                status = {
+                    "name": name,
+                    "status": "timeout",
+                    "records": 0,
+                    "candidates": 0,
+                    "note": f"تجاوز المهلة {timeout_per_source:.0f}ث — تم التخطي",
+                }
             except Exception as exc:  # حماية: أي خطأ غير متوقع في مصدر لا يوقف التحليل
                 logger.warning("External source '%s' failed unexpectedly: %s", name, exc)
                 source_listings = []
