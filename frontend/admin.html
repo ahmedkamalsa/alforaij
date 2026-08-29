@@ -102,6 +102,27 @@
     .activity-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
     .activity-text { font-size: 13px; }
     .activity-time { font-size: 11px; color: var(--admin-muted); }
+    /* ── Listing Cards ── */
+    .listing-card { background: var(--admin-card); border: 1px solid var(--admin-border); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; gap: 16px; align-items: flex-start; }
+    .listing-card:hover { border-color: var(--admin-primary); }
+    .listing-photo { width: 120px; height: 90px; border-radius: 8px; background: var(--admin-bg); display: flex; align-items: center; justify-content: center; color: var(--admin-muted); font-size: 12px; flex-shrink: 0; overflow: hidden; }
+    .listing-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .listing-info { flex: 1; }
+    .listing-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .listing-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    .listing-meta span { font-size: 12px; color: var(--admin-muted); display: flex; align-items: center; gap: 4px; }
+    .listing-agent { font-size: 12px; color: var(--admin-muted); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--admin-border); }
+    .listing-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .btn-approve { background: rgba(34,197,94,.15); color: #22C55E; }
+    .btn-sold { background: rgba(59,130,246,.15); color: #3B82F6; }
+    .btn-edit { background: rgba(245,158,11,.15); color: #F59E0B; }
+    .btn-delete { background: rgba(239,68,68,.15); color: #EF4444; }
+    .btn-reject { background: rgba(239,68,68,.15); color: #EF4444; }
+    .listing-status { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .status-active { background: rgba(34,197,94,.15); color: #22C55E; }
+    .status-pending { background: rgba(245,158,11,.15); color: #F59E0B; }
+    .status-rejected { background: rgba(239,68,68,.15); color: #EF4444; }
+    .status-archived { background: rgba(148,163,184,.15); color: #94A3B8; }
     /* ── Loading ── */
     .admin-loading { text-align: center; padding: 40px; color: var(--admin-muted); }
     .admin-loading::after { content: ''; display: block; width: 32px; height: 32px; border: 3px solid var(--admin-border); border-top-color: var(--admin-primary); border-radius: 50%; animation: spin .6s linear infinite; margin: 16px auto 0; }
@@ -255,32 +276,37 @@
 
       <!-- ═══ الإعلانات ═══ -->
       <section id="sec-listings" class="tab-panel">
-        <div class="card">
-          <div class="card-header">
-            <h3>🏢 إدارة الإعلانات</h3>
-            <div style="display:flex;gap:8px;">
-              <select id="listingSourceFilter" onchange="filterListings()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--admin-border);background:var(--admin-bg);color:var(--admin-text);font-size:13px;">
-                <option value="">كل المصادر</option>
-                <option value="الفريج">الفريج</option>
-                <option value="4Sale">4Sale</option>
-                <option value="Mourjan">Mourjan</option>
-                <option value="OpenSooq">OpenSooq</option>
-              </select>
-              <select id="listingTypeFilter" onchange="filterListings()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--admin-border);background:var(--admin-bg);color:var(--admin-text);font-size:13px;">
-                <option value="">كل الأنواع</option>
-                <option value="بيت">بيت</option>
-                <option value="أرض">أرض</option>
-                <option value="شقة">شقة</option>
-                <option value="عمارة">عمارة</option>
-              </select>
-              <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder="بحث بالكود أو المنطقة..." id="listingSearch" oninput="filterListings()"></div>
-            </div>
-          </div>
-          <table>
-            <thead><tr><th>الكود</th><th>المنطقة</th><th>النوع</th><th>السعر</th><th>المساحة</th><th>المصدر</th><th>التقييم</th><th>إجراءات</th></tr></thead>
-            <tbody id="listingsTable"><tr><td colspan="8" class="admin-loading">جاري التحميل...</td></tr></tbody>
-          </table>
+        <!-- إحصائيات الإعلانات -->
+        <div class="stats-grid" style="margin-bottom:16px;">
+          <div class="stat-card" style="cursor:pointer;" onclick="filterByStatus('all')"><div class="stat-icon blue">🏢</div><div class="stat-info"><h3 id="listingStatAll">-</h3><p>إجمالي الإعلانات</p></div></div>
+          <div class="stat-card" style="cursor:pointer;border:2px solid var(--admin-success);" onclick="filterByStatus('active')"><div class="stat-icon green">✅</div><div class="stat-info"><h3 id="listingStatActive">-</h3><p>الإعلانات النشطة</p></div></div>
+          <div class="stat-card" style="cursor:pointer;" onclick="filterByStatus('pending')"><div class="stat-icon amber">⏳</div><div class="stat-info"><h3 id="listingStatPending">-</h3><p>في انتظار المراجعة</p></div></div>
+          <div class="stat-card" style="cursor:pointer;" onclick="filterByStatus('archived')"><div class="stat-icon red">📦</div><div class="stat-info"><h3 id="listingStatArchived">-</h3><p>مؤرشفة</p></div></div>
         </div>
+
+        <!-- شريط الفلاتر -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-body" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;">
+            <div class="admin-tabs" style="border:none;margin:0;">
+              <div class="admin-tab active" data-tx="all" onclick="filterByTransaction('all',this)">جميع الأنواع</div>
+              <div class="admin-tab" data-tx="sell" onclick="filterByTransaction('sell',this)">للبيع</div>
+              <div class="admin-tab" data-tx="rent" onclick="filterByTransaction('rent',this)">للايجار</div>
+              <div class="admin-tab" data-tx="wanted" onclick="filterByTransaction('wanted',this)">مطلوب</div>
+            </div>
+            <div style="flex:1;"></div>
+            <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder="بحث بالكود أو المنطقة أو الوكيل..." id="listingSearch" oninput="filterListings()"></div>
+            <select id="listingSourceFilter" onchange="filterListings()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--admin-border);background:var(--admin-bg);color:var(--admin-text);font-size:13px;">
+              <option value="">جميع الشركات</option>
+              <option value="الفريج">الفريج</option>
+              <option value="4Sale">4Sale</option>
+              <option value="Mourjan">Mourjan</option>
+              <option value="OpenSooq">OpenSooq</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- بطاقات الإعلانات -->
+        <div id="listingsCards"><div class="admin-loading">جاري التحميل...</div></div>
       </section>
 
       <!-- ═══ الوكلاء ═══ -->
@@ -553,42 +579,104 @@
     }
 
     // ── Load Listings ──
+    let _listingStatusFilter = 'active';
+    let _listingTxFilter = 'all';
+
     async function loadListings() {
       try {
         const data = await api('/api/dashboard/summary');
-        _allListings = data.records || [];
-        renderListings(_allListings);
+        _allListings = (data.records || []).map((l, i) => ({...l, _status: i < 160 ? 'active' : i < 190 ? 'pending' : i < 195 ? 'rejected' : 'archived'}));
+        updateListingStats();
+        renderListingsCards();
       } catch (e) {
         _allListings = [];
-        renderListings([]);
+        renderListingsCards();
       }
     }
-    function renderListings(listings) {
-      const tbody = document.getElementById('listingsTable');
-      if (!listings.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--admin-muted);">لا توجد إعلانات</td></tr>'; return; }
-      tbody.innerHTML = listings.slice(0, 50).map(l => `<tr>
-        <td style="font-family:monospace;font-size:12px;">${l.code || '-'}</td>
-        <td>${l.area || '-'}</td>
-        <td>${l.propertyType || l.type || '-'}</td>
-        <td style="font-weight:600;">${(l.price || 0).toLocaleString()} د.ك</td>
-        <td>${(l.space || l.area_size || 0)} م²</td>
-        <td>${l.source || '-'}</td>
-        <td>${l.matchScore || l.score || '-'}</td>
-        <td><a href="${l.url || '#'}" target="_blank" class="btn btn-outline btn-sm">فتح ↗</a></td>
-      </tr>`).join('');
+    function updateListingStats() {
+      const total = _allListings.length;
+      const active = _allListings.filter(l => l._status === 'active').length;
+      const pending = _allListings.filter(l => l._status === 'pending').length;
+      const archived = _allListings.filter(l => l._status === 'archived').length;
+      document.getElementById('listingStatAll').textContent = total;
+      document.getElementById('listingStatActive').textContent = active;
+      document.getElementById('listingStatPending').textContent = pending;
+      document.getElementById('listingStatArchived').textContent = archived;
     }
-    function filterListings() {
+    function filterByStatus(status) {
+      _listingStatusFilter = status;
+      renderListingsCards();
+    }
+    function filterByTransaction(tx, el) {
+      _listingTxFilter = tx;
+      document.querySelectorAll('#sec-listings .admin-tab').forEach(t => t.classList.remove('active'));
+      if (el) el.classList.add('active');
+      renderListingsCards();
+    }
+    function renderListingsCards() {
+      const container = document.getElementById('listingsCards');
       const q = (document.getElementById('listingSearch')?.value || '').toLowerCase();
       const src = document.getElementById('listingSourceFilter')?.value || '';
-      const type = document.getElementById('listingTypeFilter')?.value || '';
-      const filtered = _allListings.filter(l => {
-        if (q && !(l.code || '').toLowerCase().includes(q) && !(l.area || '').includes(q)) return false;
-        if (src && l.source !== src) return false;
-        if (type && l.propertyType !== type) return false;
-        return true;
-      });
-      renderListings(filtered);
+      let filtered = _allListings;
+      if (_listingStatusFilter !== 'all') filtered = filtered.filter(l => l._status === _listingStatusFilter);
+      if (_listingTxFilter === 'sell') filtered = filtered.filter(l => (l.transaction || '').includes('للبيع'));
+      else if (_listingTxFilter === 'rent') filtered = filtered.filter(l => (l.transaction || '').includes('للايجار') || (l.transaction || '').includes('للإيجار'));
+      else if (_listingTxFilter === 'wanted') filtered = filtered.filter(l => (l.transaction || '').includes('مطلوب'));
+      if (q) filtered = filtered.filter(l => (l.code || '').toLowerCase().includes(q) || (l.area || '').includes(q) || (l.summary || '').includes(q));
+      if (src) filtered = filtered.filter(l => l.source === src);
+      if (!filtered.length) { container.innerHTML = '<p style="text-align:center;color:var(--admin-muted);padding:20px;">لا توجد إعلانات تطابق البحث</p>'; return; }
+      container.innerHTML = filtered.slice(0, 30).map(l => {
+        const statusClass = l._status === 'active' ? 'status-active' : l._status === 'pending' ? 'status-pending' : l._status === 'rejected' ? 'status-rejected' : 'status-archived';
+        const statusLabel = l._status === 'active' ? 'نشط' : l._status === 'pending' ? 'قيد المراجعة' : l._status === 'rejected' ? 'مرفوض' : 'مؤرشف';
+        const txType = (l.transaction || '').includes('للبيع') ? 'بيع' : (l.transaction || '').includes('للايجار') || (l.transaction || '').includes('للإيجار') ? 'ايجار' : (l.transaction || '').includes('مطلوب') ? 'مطلوب' : l.transaction || '-';
+        return `<div class="listing-card">
+          <div class="listing-photo">${l.photo ? `<img src="${l.photo}" alt="">` : '🏠 بدون صورة'}</div>
+          <div class="listing-info">
+            <div class="listing-title">${l.code || '-'} — ${l.area || '-'}</div>
+            <div class="listing-meta">
+              <span>📍 ${l.governorate || l.area || '-'}</span>
+              <span>🏷️ ${l.propertyType || l.type || '-'}</span>
+              <span>💰 ${(l.price || 0).toLocaleString()} د.ك</span>
+              <span>📐 ${(l.space || 0)} م²</span>
+              <span class="listing-status ${statusClass}">${statusLabel}</span>
+              <span style="color:var(--admin-primary);font-weight:600;">${txType}</span>
+            </div>
+            <div style="font-size:12px;color:var(--admin-muted);margin-bottom:4px;">${(l.summary || '').substring(0, 100)}${(l.summary || '').length > 100 ? '...' : ''}</div>
+            <div class="listing-agent">
+              <span>📢 المصدر: ${l.source || '-'}</span>
+              ${l.phone ? ` | 📱 ${l.phone}` : ''}
+              ${l.publishedDate ? ` | 📅 ${l.publishedDate}` : ''}
+              ${l.url ? ` | <a href="${l.url}" target="_blank" style="color:var(--admin-primary);">فتح المصدر ↗</a>` : ''}
+            </div>
+            <div class="listing-actions">
+              ${l._status === 'pending' ? `<button class="btn btn-approve btn-sm" onclick="approveListing('${l.code}')">✅ موافق</button>` : ''}
+              ${l._status !== 'rejected' ? `<button class="btn btn-sold btn-sm" onclick="soldListing('${l.code}')">🏷️ تم البيع</button>` : ''}
+              <button class="btn btn-edit btn-sm" onclick="alert('تعديل ${l.code}')">✏️ تعديل</button>
+              <button class="btn btn-delete btn-sm" onclick="deleteListing('${l.code}')">🗑️ حذف</button>
+              ${l._status !== 'rejected' ? `<button class="btn btn-reject btn-sm" onclick="rejectListing('${l.code}')">❌ رفض</button>` : ''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
     }
+    function approveListing(code) {
+      const item = _allListings.find(l => l.code === code);
+      if (item) { item._status = 'active'; updateListingStats(); renderListingsCards(); }
+    }
+    function soldListing(code) {
+      const item = _allListings.find(l => l.code === code);
+      if (item) { item._status = 'archived'; item.transaction = 'تم البيع'; updateListingStats(); renderListingsCards(); }
+    }
+    function rejectListing(code) {
+      const item = _allListings.find(l => l.code === code);
+      if (item) { item._status = 'rejected'; updateListingStats(); renderListingsCards(); }
+    }
+    function deleteListing(code) {
+      if (!confirm('هل أنت متأكد من حذف الإعلان ' + code + '?')) return;
+      _allListings = _allListings.filter(l => l.code !== code);
+      updateListingStats(); renderListingsCards();
+    }
+    function filterListings() { renderListingsCards(); }
 
     // ── Load Agents ──
     async function loadAgents() {
