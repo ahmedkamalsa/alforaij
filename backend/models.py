@@ -67,3 +67,8 @@ class RankedListing:
     reasons: list[str]
     warnings: list[str]
     comparables: list[dict[str, Any]]
+    # ── Confidence Interval: نطاق الثقة ──
+    valuation_low: float | None = None
+    valuation_high: float | None = None
+    confidence_interval_pct: float | None = None
+    explanation_factors: list[dict[str, Any]] | None = None

@@ -890,6 +890,10 @@ def enrich_rankings(request: PropertyRequest, ranked, all_listings: list[Listing
                 reasons=reasons,
                 warnings=warnings,
                 comparables=valuation.evidence,
+                valuation_low=valuation.valuation_low,
+                valuation_high=valuation.valuation_high,
+                confidence_interval_pct=valuation.confidence_interval_pct,
+                explanation_factors=valuation.explanation_factors,
             )
         )
         if sale_yield is not None:
