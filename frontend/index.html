@@ -19,8 +19,7 @@
   <script src="components/lucide-icons.js?v=20260819-modern"></script>
   <link rel="stylesheet" href="components/hover-card-v2.css?v=20260819-modern">
   <link rel="stylesheet" href="components/install-prompt.css?v=20260819-modern">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet + Chart.js loaded lazily on first search to improve FCP by ~3s -->
 </head>
 <body>
   <header class="topbar">
@@ -331,6 +330,30 @@
         <div id="savedSearchesBox" class="saved-searches-box" hidden></div>
         <div id="resultsSources" class="results-sources" hidden></div>
         <div id="demandIndicatorBox" class="results-demand" hidden></div>
+        <div id="areaPriceCompare" class="area-price-compare" hidden>
+          <h3>📊 مقارنة أسعار المناطق</h3>
+          <div id="areaPriceChart"></div>
+        </div>
+        <div id="priceTrendsBox" class="price-trends-box" hidden>
+          <h3>📈 اتجاهات الأسعار</h3>
+          <div id="priceTrendsChartWrap"><canvas id="priceTrendsChart"></canvas></div>
+        </div>
+        <div id="roiCalculatorBox" class="roi-calculator-box" hidden>
+          <h3>💰 حاسبة العائد الاستثماري</h3>
+          <div class="roi-form">
+            <label>سعر الشراء (د.ك)
+              <input id="roiBuyPrice" type="number" placeholder="200000">
+            </label>
+            <label>الإيجار الشهري (د.ك)
+              <input id="roiMonthlyRent" type="number" placeholder="800">
+            </label>
+            <label>تكاليف الترميم (د.ك)
+              <input id="roiRenovation" type="number" placeholder="10000" value="0">
+            </label>
+            <button type="button" onclick="calculateROI()">احسب العائد</button>
+          </div>
+          <div id="roiResult" class="roi-result" hidden></div>
+        </div>
         <div class="map-toggle-row">
           <button id="mapToggleBtn" class="save-search-btn" type="button" onclick="toggleMapView()" hidden>🗺️ الخريطة</button>
         </div>
