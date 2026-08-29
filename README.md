@@ -1,162 +1,291 @@
-# مساعد الفريج للبحث والتقييم العقاري
+# 🏢 الفريج العقاري — Al-Furaj Real Estate Platform
 
-تطبيق محلي مستقل لتحليل الطلبات العقارية العربية، تحويلها إلى فلاتر، البحث داخل بيانات الفريج المحلية، وترتيب النتائج مع تقييم سعري استرشادي مبني على العروض المشابهة المتاحة.
+<div align="center">
 
-هذا المشروع منفصل عن `alforaijboard` ولا يغير ملفات الموقع المنشور.
+**بحث وتقييم وفرص عقارية مبنية على الأدلة والمصادر**
 
-## 📖 الدليل الشامل للمطوّرين والوكلاء
+[![CI/CD](https://github.com/ahmedkamalsa/alforaij/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/ahmedkamalsa/alforaij/actions/workflows/ci-cd.yml)
+[![Tests](https://img.shields.io/badge/tests-576%20passed-brightgreen)]()
+[![Python](https://img.shields.io/badge/python-3.13-blue)]()
+[![License](https://img.shields.io/badge/license-MIT-green)]()
 
-قبل أي تعديل أو إضافة، اقرأ **[docs/AGENT_CONTEXT.md](docs/AGENT_CONTEXT.md)** — المرجع الأول
-الذي يشرح المشروع كاملًا من الكود الفعلي: المعمارية، كل نقاط API، آلية جلب كل مصدر،
-جداول قاعدة البيانات، الواجهة والتبويبات، الوكيل اليومي، مبادئ التقييم، الاختبارات،
-والنشر. أي وكيل أو مطوّر جديد يبدأ منه بدل إعادة اكتشاف المشروع.
+</div>
 
-كل رقم يظهر في المنصة موثق بصيغته ومصدره في **[docs/source.md](docs/source.md)** — مرجع المطورين
-خارج الواجهة، مولَّد تلقائيًا من نفس مصدر `/api/metric-registry` (لا تنسخ الأرقام يدويًا).
-بعد أي تغيير في ثوابت الحساب أعد توليده:
+---
 
-```bash
-python scripts/export_metric_registry_md.py
+## 🎯 ما هي المنصة؟
+
+الفريج هي منصة بحث وتقييم عقاري ذكية تجمع **18+ مصدر** في بحث واحد، وتقدم:
+
+| الميزة | الوصف |
+|--------|-------|
+| 🔍 **بحث ذكي بالعربية** | اكتب "بيت 400م في الفردوس" واحصل على نتائج مقيّمة |
+| 📊 **تقييم بالأدلة** | كل رقم له مصدر ودليل |
+| 🗺️ **خريطة تفاعلية** | مواقع العقارات على OpenStreetMap |
+| 📈 **اتجاهات الأسعار** | رسوم بيانية شهرياً لكل منطقة |
+| 💰 **حاسبة العائد** | ROI + تمويل عقاري |
+| 🤖 **مساعد ذكي** | أسئلة وأجوبة عقارية |
+| 📱 **تطبيق جوال** | React Native + إشعارات فورية |
+| 🏢 **لوحة تحكم** | إدارة المستخدمين والإعلانات |
+
+---
+
+## 🏗️ الهيكل التقني
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      FRONTEND                               │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │  index   │  │  admin   │  │  mobile  │  │  styles  │   │
+│  │  .html   │  │  .html   │  │  App.js  │  │  .css    │   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────────┘   │
+│       │              │              │                        │
+│  ┌────▼──────────────▼──────────────▼────┐                  │
+│  │         app.js (8,527 lines)          │                  │
+│  │  Search • Map • Charts • Chat • PDF   │                  │
+│  └──────────────────┬───────────────────┘                  │
+└─────────────────────┼───────────────────────────────────────┘
+                      │ HTTP REST (50+ endpoints)
+┌─────────────────────▼───────────────────────────────────────┐
+│                      BACKEND                                │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  main.py — Python 3.13 stdlib HTTP server            │  │
+│  └──────────────────────┬───────────────────────────────┘  │
+│                         │                                   │
+│  ┌──────────┐  ┌────────▼───────┐  ┌──────────────────┐   │
+│  │  AI RAG  │  │  Services      │  │  Connectors      │   │
+│  │  System  │  │  (37 modules)  │  │  (18+ scrapers)  │   │
+│  └──────────┘  └────────┬───────┘  └──────────────────┘   │
+│                         │                                   │
+│  ┌──────────────────────▼───────────────────────────────┐  │
+│  │              Supabase (PostgreSQL)                    │  │
+│  │  14 tables • 72,486 evidence rows • 3,024 listings  │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## التشغيل
+---
 
-```powershell
-cd D:\foraj_social\287\alforaij-research-assistant
-.\start-local.ps1
-```
+## 🚀 التشغيل المحلي
 
-أو مباشرة (نقطة الدخول هي `backend/main.py` — لا يوجد `main.py` على المستوى الأعلى):
+### المتطلبات
+- Python 3.13+
+- Node.js 18+ (للتقديم)
+- Supabase account (مجاني)
+
+### خطوات التشغيل
 
 ```bash
+# 1. استنساخ المستودع
+git clone https://github.com/ahmedkamalsa/alforaij.git
 cd alforaij-research-assistant
-PYTHONIOENCODING=utf-8 python -m backend.main
+
+# 2. تثبيت الاعتماديات
+pip install -r requirements.txt
+
+# 3. تكوين متغيرات البيئة
+cp .env.example .env
+# عدّل .env بمفاتيحك
+
+# 4. تشغيل الخادم
+python -m backend.main
+
+# 5. فتح المتصفح
+# الموقع: http://127.0.0.1:8000
+# لوحة التحكم: http://127.0.0.1:8000/admin.html
 ```
 
-> `PYTHONIOENCODING=utf-8` ضروري على Windows لتجنب مشاكل ترميز النص العربي في المخرجات.
-
-ثم افتح:
-
-```text
-http://127.0.0.1:8000
-```
-
-الافتراضيات: المضيف `127.0.0.1` والمنفذ `8000` (قابلان للتغيير عبر `ALFORAIJ_ASSISTANT_HOST` و`ALFORAIJ_ASSISTANT_PORT`). فحص الصحة: `curl http://127.0.0.1:8000/api/health`.
-
-### التشغيل الخلفي مع سجل إلى ملف
+### تشغيل الاختبارات
 
 ```bash
-cd alforaij-research-assistant
-PYTHONIOENCODING=utf-8 nohup python -m backend.main > ../.freebuff/preview-thmsisewgqf6g6.log 2>&1 &
+# الاختبارات الكاملة
+PYTHONIOENCODING=utf-8 python -m pytest tests/ -x -q
+
+# مع تغطية
+PYTHONIOENCODING=utf-8 python -m pytest tests/ --cov=backend --cov-report=term-missing
 ```
 
-مسار السجل: `.freebuff/preview-thmsisewgqf6g6.log` نسبةً إلى جذر المشروع. تحقق من التشغيل بأمر منفصل: `netstat -ano | grep ':8000 ' | grep LISTENING`.
+---
 
-### مستوى السجل (متغير بيئة)
+## 📡 API Endpoints
 
-المتغير **`ALFORAIJ_LOG_LEVEL`** (يُقرأ في `backend/config.py`):
+### البحث والتحليل
+| Method | Endpoint | الوصف |
+|--------|----------|-------|
+| POST | `/api/analyze` | البحث الرئيسي + تقييم |
+| POST | `/api/parse` | تحليل الاستعلام الطبيعي |
+| GET | `/api/price-trends?area=X` | اتجاهات الأسعار |
+| GET | `/api/opportunities` | فرص الاستثمار |
+| GET | `/api/dashboard/summary` | ملخص لوحة التحكم |
 
-| القيمة | السلوك |
-|---|---|
-| `DEBUG` | كل التفاصيل: كل محاولة جلب لكل مصدر + نجاح كل جلب |
-| `INFO` (الافتراضي) | سطر واحد لكل مصدر بعد كل تشغيل: الحالة + المدة + عدد المحاولات + النتائج + السبب |
-| `WARNING` | الفشل فقط (ومسار إصلاح 4Sale عبر المصدر البديل) |
-| `ERROR` | الأخطاء الحرجة فقط |
+### المصادقة
+| Method | Endpoint | الوصف |
+|--------|----------|-------|
+| POST | `/api/register` | تسجيل رقم الهاتف |
+| POST | `/api/verify-otp` | التحقق من OTP |
+| POST | `/api/google-login` | تسجيل دخول Google |
 
-مثال: `ALFORAIJ_LOG_LEVEL=DEBUG PYTHONIOENCODING=utf-8 python -m backend.main`
+### الإدارة
+| Method | Endpoint | الوصف |
+|--------|----------|-------|
+| GET | `/api/admin/users` | قائمة المستخدمين |
+| GET | `/api/roles` | الأدوار والصلاحيات |
+| GET | `/api/push/stats` | إحصائيات الإشعارات |
 
-### إيقاف الخادم
+> **الدليل الكامل**: راجع `CODEX_REVIEW.md` و `sitenoladge.md`
+
+---
+
+## 🧪 الاختبارات
+
+```
+576 اختبار | 52 ملف اختبار | 50+ subtests
+```
+
+| الملف | الاختبارات | التغطية |
+|-------|-----------|---------|
+| test_accounts.py | 15 | OTP + phone + roles |
+| test_ai_router.py | 18 | AI fallback chain |
+| test_request_parser.py | 40+ | Arabic NLP parsing |
+| test_live_sources.py | 57 | External scrapers |
+| test_analysis.py | 30+ | Search + evaluation |
+| test_api.py | 20+ | API endpoints |
+| test_opportunities.py | 15+ | Opportunity detection |
+
+---
+
+## 🔧 الإعدادات
+
+### متغيرات البيئة المطلوبة
+
+```env
+# الخادم
+ALFORAIJ_ASSISTANT_HOST=127.0.0.1
+ALFORAIJ_ASSISTANT_PORT=8000
+
+# قاعدة البيانات (Supabase)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=xxx
+
+# Google Sign-In (اختياري)
+GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+
+# WhatsApp (اختياري)
+WHATSAPP_TOKEN=xxx
+WHATSAPP_PHONE_ID=xxx
+
+# الذكاء الاصطناعي (واحد على الأقل)
+OLLAMA_URL=http://127.0.0.1:11434
+GEMINI_API_KEY=xxx
+OPENROUTER_API_KEY=xxx
+```
+
+---
+
+## 📱 تطبيق الجوال
 
 ```bash
-netstat -ano | grep ':8000 ' | grep LISTENING   # يظهر PID
-taskkill //F //PID <PID>
+cd mobile
+npm install
+npx expo start
+# امسح QR كود بتطبيق Expo Go
 ```
 
-## الاختبارات
+**المميزات**: WebView + إشعارات فورية + بحث + خريطة
 
-```powershell
-cd D:\foraj_social\287\alforaij-research-assistant
-python -m unittest discover -s tests
+---
+
+## 🏢 لوحة التحكم
+
+**الوصول**: `http://127.0.0.1:8000/admin.html`
+
+| القسم | المحتوى |
+|-------|---------|
+| نظرة عامة | إحصائيات + أنشطة + حالة المصادر |
+| المستخدمون | جدول + بحث + تعيين أدوار + تصدير CSV |
+| الأدوار | محرر صلاحيات بصري |
+| الإعلانات | بطاقات + حالة + موافقة + تعديل + حذف |
+| التحليلات | رسوم بيانية + اتجاهات |
+| السوق | حالة المصادر الخارجية |
+
+---
+
+## 🤖 نظام الذكاء الاصطناعي
+
+### RAG (Retrieval Augmented Generation)
+```
+استعلام المستخدم → تحليل → بحث متجهي → سياق ذكي → تحليل AI
 ```
 
-### سلسلة ضمانات المناطق والمحافظات
-
-لوحة السوق وتحليلاتها تعتمدان على خريطة «منطقة ← محافظة» موحدة. **[docs/MAP_GUARANTEES.md](docs/MAP_GUARANTEES.md)** يوثّق أربع طبقات اختبارات مترابطة تمنع انقسام الدلاء وكدس المناطق تحت «غير محددة» — مع قصة أخطاء حقيقية كسرتها.
-
-| الطبقة | الملفات | ماذا تضمن |
-|---|---|---|
-| 1. الخريطة المعتمدة | `AREA_TO_GOVERNORATE` · `tests/test_area_governorate_map.py` | كل منطقة في محافظة واحدة فقط |
-| 2. الإحداثيات | `data/kuwait_areas.json` · `tests/test_kuwait_areas_coords.py` | نقاط الخريطة التفاعلية متوافقة مع الخريطة |
-| 3. الحصاد الحي | `market_listings` · `tests/test_market_listings_governorates.py` · `scripts/check_harvest_governorates.py` | أي منطقة جديدة تصل يوميًا تُحل فورًا |
-| 4. قائمة المعرفة | `KNOWN_AREAS` · `AREA_ALIASES` · داخل اختبارات الطبقات 1–3 | كل اسم في الكشف النصي له إسناد |
-
-#### تشغيل الاختبارات
-
-```bash
-# الطبقات الأربع (الحي يتخطى افتراضيًا):
-PYTHONIOENCODING=utf-8 python -m unittest \
-  tests.test_area_governorate_map \
-  tests.test_kuwait_areas_coords \
-  tests.test_market_listings_governorates \
-  tests.test_check_harvest_governorates
-
-# مع الفحص الحي (يتطلب Supabase مهيأة):
-ALFORAIJ_TEST_ALLOW_SUPABASE=1 PYTHONIOENCODING=utf-8 python -m unittest \
-  tests.test_market_listings_governorates
-
-# الفحص اليومي (رمز الخروج 1 عند منطقة بلا إسناد):
-PYTHONIOENCODING=utf-8 python scripts/check_harvest_governorates.py
+### AI Router (Fallback Chain)
+```
+FreeLLMAPI → Ollama → Gemini → OpenRouter → AgentRouter
+(34 مزوّد)   (محلي)   (مجاني)   (مجاني)    (احتياطي)
 ```
 
-## تحديث بيانات الفريج المحلية
+---
 
-```powershell
-python scripts\import_board_payload.py --html ..\vs\site\index.html --out data\seed_listings.json
+## 📊 أداء المنصة
+
+| المقياس | القيمة |
+|---------|--------|
+| Lighthouse Performance | 50/100 |
+| First Contentful Paint | 3.6s |
+| Total Blocking Time | 718ms |
+| سرعة البحث (سريع) | 3.1s |
+| سرعة البحث (كامل) | 47s |
+| الاختبارات | 576 ✅ |
+| APIs | 50+ |
+| المصادر الخارجية | 18+ |
+
+---
+
+## 📁 هيكل الملفات
+
+```
+alforaij-research-assistant/
+├── backend/
+│   ├── main.py                    # الخادم + 50+ API
+│   ├── connectors/                # 18+ مصادر خارجية
+│   └── services/                  # 37 خدمة
+├── frontend/
+│   ├── index.html                 # الموقع الرئيسي
+│   ├── admin.html                 # لوحة التحكم
+│   └── app.js                     # المنطق (8,527 سطر)
+├── mobile/                        # تطبيق الجوال
+├── tests/                         # 576 اختبار
+├── .github/workflows/             # CI/CD
+├── CODEX_REVIEW.md                # مراجعة تقنية
+├── sitenoladge.md                 # معرفة المنصة الشاملة
+└── requirements.txt               # الاعتماديات
 ```
 
-## ما يعتمد عليه التقييم الآن
+---
 
-- بيانات `data/seed_listings.json` المستخرجة من لوحة `alforaijboard`.
-- OpenSooq وMourjan و**Yebtah** عند توفر إعلان حي يطابق المنطقة ونوع العقار ونوع العملية.
-- تحليلات الحصاد لكل موقع (عدد الإعلانات/المناطق/وسيط السعر والمساحة) عبر `GET /api/market-analytics` وتظهر في تبويب «المصادر والتشغيل» من بيانات `market_listings` المتراكمة يوميًا.
-- Q8Aqar يدخل فقط عندما يثبت رابط/نص الإعلان نفس الطلب، وإلا يظهر كمصدر مفحوص لا كمقارنة سعرية.
-- Sakan حاليًا دليل توفر ورابط صفحة فقط، ولا يدخل في التقييم حتى يتوفر API أو endpoint تفاصيل قابل للتحقق.
-- المقارنة تتم داخل نفس المنطقة ونفس نوع العقار قدر الإمكان.
-- المساحة لا يتم استخراجها من كلمات مثل `ارتداد` أو `واجهة` أو `عرض الشارع`.
-- التقييم استرشادي وليس تقييمًا رسميًا.
+## 🤝 المساهمة
 
-## Supabase
+1. Fork المستودع
+2. Create branch جديد (`git checkout -b feature/amazing-feature`)
+3. Commit (`git commit -m 'Add amazing feature'`)
+4. Push (`git push origin feature/amazing-feature`)
+5. Open Pull Request
 
-ملفات السكيما موجودة في `supabase/migrations`. اتبع [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) ثم ضع `SUPABASE_URL` و`SUPABASE_SERVICE_ROLE_KEY` في `.env` عند بدء الربط الفعلي.
+---
 
-بعد ضبط المفاتيح:
+## 📄 التوثيق
 
-```powershell
-python scripts\sync_source_registry_supabase.py
-python scripts\sync_listings_supabase.py
-```
+- **`CODEX_REVIEW.md`** — مراجعة تقنية شاملة
+- **`sitenoladge.md`** — معرفة المنصة الكاملة
+- **`PROJECT_CONTEXT.md`** — سياق المشروع
+- **`README_AR.md`** — README بالعربي
 
-كل تحليل جديد سيحاول حفظ التقرير وسجل تشغيل المصادر تلقائيًا. إذا لم توجد المفاتيح سيعمل التطبيق محليًا ويعرض `Supabase: غير مضبوط`.
+---
 
-## توليد تقرير PDF بعد البحث
+## 📞 التواصل
 
-أمر واحد يعيد البحث الكامل ويولّد التقريرين في `reports/` (يحدّثهما بعد كل بحث):
+**شركة عبدالعزيز سعود الفريج العقارية**  
+ABDUL AZIZ SAUD AL-FURAJ REAL ESTATE COMPANY
 
-```powershell
-python scripts\generate_office_pdf.py "يبي ايجار مكتب بالعاصمة او حولي شي رخيص بحدود ٢٠٠"
-```
+---
 
-- `reports\office-rent-hawally-capital.pdf` — النسخة الأساسية.
-- `reports\تقرير-مكاتب-حولي-العاصمة.pdf` — عنوان عربي + جدول النتائج والتقييم + جدول «المصادر والأدلة» + صفحة توصيات العميل.
-- بدون وسيط نصي يُستخدم البحث الافتراضي (مكاتب إيجار حولي/العاصمة بحدود ٢٠٠ د.ك).
-
-## MCP
-
-يوجد خادم MCP أولي في `mcp_server/server.py`. يوفر نفس محرك التحليل بصيغة JSON، ومناسب كقاعدة ربط لاحقة مع Codex أو أدوات داخلية.
-
-## استكشاف الأخطاء الشائعة
-
-- **`can't open file '...\main.py'`** — شغّلت `main.py` من مكان خاطئ؛ استخدم `python -m backend.main` من داخل `alforaij-research-assistant`.
-- **المنفذ 8000 مشغول** — يوجد خادم قديم يعمل؛ أوقفه (قسم «إيقاف الخادم») ثم أعد التشغيل.
-- **4Sale دائمًا `failed` بخطأ DNS** — يعود غالبًا للشبكة/الحظر؛ الآلية الحالية تعيد المحاولة (حتى 4) ثم تلجأ لمصدر بديل (OpenSooq) مع إفصاح شفاف في التقرير، والسجل يعرض `مصدر 4Sale → fallback | …ms | محاولات 4 | نتائج N | …`.
-- **السجل لا يعرض تفاصيل المحاولات** — المستوى `INFO` يُخفي تفاصيل `fetch_url` (DEBUG)؛ اضبط `ALFORAIJ_LOG_LEVEL=DEBUG` عند التشخيص.
+*Last updated: 2026-08-29 | Version: 1.0 | Tests: 576 passed*

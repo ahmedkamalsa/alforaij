@@ -1134,6 +1134,26 @@ class Handler(BaseHTTPRequestHandler):
             from backend.services.supabase_store import fetch_all_users
             json_response(self, {"users": fetch_all_users()})
             return
+        if path == "/api/rag/search":
+            # RAG-powered search: vector similarity + context generation
+            from backend.services.ai_rag import rag_query, index_properties, get_index_stats
+            query_text = payload.get("text", "")
+            top_k = min(int(payload.get("top_k", 10)), 50)
+            # Index current database listings for search
+            try:
+                from backend.services.supabase_store import _fetch_rows, SUPABASE_URL
+                listings = _fetch_rows(f"{SUPABASE_URL}/rest/v1/listings?select=*&limit=200") or []
+                market = _fetch_rows(f"{SUPABASE_URL}/rest/v1/market_listings?select=*&limit=500") or []
+                index_properties(listings + market)
+            except Exception:
+                pass
+            result = rag_query(query_text, top_k=top_k)
+            json_response(self, result)
+            return
+        if path == "/api/rag/stats":
+            from backend.services.ai_rag import get_index_stats
+            json_response(self, get_index_stats())
+            return
         if path == "/":
             path = "/index.html"
         file_path = (FRONTEND_DIR / path.lstrip("/")).resolve()
