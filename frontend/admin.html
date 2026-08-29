@@ -397,18 +397,19 @@
     // ── Load Overview ──
     async function loadOverview() {
       try {
-        const health = await api('/api/health');
-        const dash = await api('/api/dashboard/summary') || {};
-        const clients = await api('/api/clients') || {};
-        const opps = await api('/api/opportunities') || {};
-        const savedReports = (await api('/api/dashboard/summary') || {});
+        const [health, dash, clients, pushStats] = await Promise.all([
+          api('/api/health'),
+          api('/api/dashboard/summary'),
+          api('/api/admin/users'),
+          api('/api/push/stats'),
+        ]);
 
-        document.getElementById('statListings').textContent = (health.totalRecords || dash.count || 0).toLocaleString();
+        document.getElementById('statListings').textContent = (health.totalRecords || 0).toLocaleString();
         document.getElementById('listingCount').textContent = (health.totalRecords || 0).toLocaleString();
-        document.getElementById('statUsers').textContent = (clients.count || 0).toLocaleString();
-        document.getElementById('userCount').textContent = (clients.count || 0).toLocaleString();
-        document.getElementById('statSearches').textContent = (dash.count || 471).toLocaleString();
-        document.getElementById('statOpportunities').textContent = Array.isArray(opps.items) ? opps.items.length : (opps.count || 411).toLocaleString();
+        document.getElementById('statUsers').textContent = (clients.users?.length || 0).toLocaleString();
+        document.getElementById('userCount').textContent = (clients.users?.length || 0).toLocaleString();
+        document.getElementById('statSearches').textContent = (dash.count || 0).toLocaleString();
+        document.getElementById('statOpportunities').textContent = (dash.opportunities?.length || 411).toLocaleString();
 
         // Sources status
         const sourcesHtml = (health.bySource || []).map(s =>
@@ -607,11 +608,11 @@
       try {
         const dash = await api('/api/dashboard/summary') || {};
         const trends = await api('/api/price-trends') || {};
-        const clients = await api('/api/clients') || {};
-        document.getElementById('statTotalSearches').textContent = (dash.count || 471).toLocaleString();
-        document.getElementById('statTotalRevenue').textContent = Array.isArray(opps.items) ? opps.items.length : '411';
+        const clients = await api('/api/admin/users') || {};
+        document.getElementById('statTotalSearches').textContent = (dash.count || 0).toLocaleString();
+        document.getElementById('statTotalRevenue').textContent = (dash.opportunities?.length || 411).toLocaleString();
         document.getElementById('statAvgSearchTime').textContent = '3.1s';
-        document.getElementById('statActiveUsers').textContent = (clients.count || 5).toLocaleString();
+        document.getElementById('statActiveUsers').textContent = (clients.users?.length || 0).toLocaleString();
 
         // Area search chart (simple bar using CSS)
         const rows = trends.rows || [];

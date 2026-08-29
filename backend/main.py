@@ -1122,6 +1122,14 @@ class Handler(BaseHTTPRequestHandler):
             from backend.services.push_notifications import get_stats
             json_response(self, get_stats())
             return
+        if path == "/api/roles":
+            from backend.services.accounts import ROLES
+            json_response(self, {"roles": ROLES})
+            return
+        if path == "/api/ai/providers":
+            from backend.services.ai_router import get_available_providers
+            json_response(self, {"providers": get_available_providers()})
+            return
         if path == "/api/admin/users":
             from backend.services.supabase_store import fetch_all_users
             json_response(self, {"users": fetch_all_users()})
