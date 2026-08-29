@@ -352,6 +352,19 @@
         </div>
         <div id="resultsFilterChips" class="results-filter-chips" hidden aria-label="فلاتر سريعة بالنقر"></div>
         <div id="savedSearchesBox" class="saved-searches-box" hidden></div>
+        <div id="smartAlertsBox" class="smart-alerts-box">
+          <div class="smart-alerts-header">
+            <h3>🔔 تنبيهات ذكية</h3>
+            <button id="smartAlertsRefreshBtn" type="button" class="save-search-btn" onclick="refreshSmartAlerts()">تحديث</button>
+          </div>
+          <div id="smartAlertsList" class="smart-alerts-list">
+            <p class="smart-alerts-empty">سجّل دخولك لتفعيل التنبيهات الذكية</p>
+          </div>
+          <div id="smartAlertSubscribe" class="smart-alert-subscribe" hidden>
+            <span id="smartAlertSubscribeArea"></span>
+            <button id="smartAlertSubscribeBtn" type="button" class="save-search-btn" onclick="subscribeSmartAlert()">اشترك في تنبيهات هذه المنطقة</button>
+          </div>
+        </div>
         <div id="resultsSources" class="results-sources" hidden></div>
         <div id="demandIndicatorBox" class="results-demand" hidden></div>
         <div id="areaPriceCompare" class="area-price-compare" hidden>

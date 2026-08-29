@@ -5464,6 +5464,106 @@ function bindSavedSearchesEvents() {
   });
 }
 
+// ─── Smart Alerts: تنبيهات ذكية ───
+let _smartAlertsData = [];
+
+async function refreshSmartAlerts() {
+  const list = $("smartAlertsList");
+  if (!list) return;
+  if (!accountState.secret) {
+    list.innerHTML = '<p class="smart-alerts-empty">سجّل دخولك لتفعيل التنبيهات الذكية</p>';
+    return;
+  }
+  list.innerHTML = '<p class="smart-alerts-empty">جاري التحقق...</p>';
+  try {
+    const res = await fetch("/api/smart-alerts/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_secret: accountState.secret }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      list.innerHTML = '<p class="smart-alerts-empty">' + escapeHtml(data.detail || data.error) + '</p>';
+      return;
+    }
+    _smartAlertsData = (data.priceDrops || []).concat(data.newListings || []);
+    _renderSmartAlerts(list, _smartAlertsData);
+    // إظهار زر الاشتراك إذا كانت هناك منطقة في نتائج البحث الحالية
+    _updateSmartAlertSubscribe();
+  } catch (e) {
+    list.innerHTML = '<p class="smart-alerts-empty">خطأ في الاتصال</p>';
+  }
+}
+
+function _renderSmartAlerts(container, alerts) {
+  if (!alerts.length) {
+    container.innerHTML = '<p class="smart-alerts-empty">لا توجد تنبيهات جديدة — سنبّهك عند ظهور فرصة مطابقة</p>';
+    return;
+  }
+  container.innerHTML = alerts.slice(0, 10).map(a => {
+    const icon = a.type === "price_drop" ? "📉" : a.type === "new_listing" ? "🏢" : "💰";
+    const sevClass = a.severity || "info";
+    return '<div class="smart-alert-item">'
+      + '<span class="smart-alert-icon">' + icon + '</span>'
+      + '<div class="smart-alert-body">'
+      + '<span class="alert-msg">' + escapeHtml(a.message || "") + '</span>'
+      + '<span class="alert-meta">' + (a.area || "") + (a.price ? ' — ' + formatMoney(a.price) + ' د.ك' : '') + '</span>'
+      + '</div>'
+      + '<span class="smart-alert-severity ' + sevClass + '">' + (a.severity === 'high' ? 'مهم' : a.severity === 'medium' ? 'متوسط' : 'جديد') + '</span>'
+      + '</div>';
+  }).join("");
+}
+
+function _updateSmartAlertSubscribe() {
+  const wrap = $("smartAlertSubscribe");
+  const areaEl = $("smartAlertSubscribeArea");
+  if (!wrap || !areaEl) return;
+  //خذ المنطقة من أول نتيجة بحث
+  const firstResult = (window._lastSearchResults || [])[0];
+  if (firstResult && firstResult.area) {
+    areaEl.textContent = "المنطقة: " + firstResult.area;
+    wrap.hidden = false;
+  } else {
+    wrap.hidden = true;
+  }
+}
+
+async function subscribeSmartAlert() {
+  if (!accountState.secret) {
+    openAccountModal();
+    return;
+  }
+  const firstResult = (window._lastSearchResults || [])[0];
+  const area = firstResult && firstResult.area;
+  if (!area) {
+    alert("حدد منطقة في البحث أولاً");
+    return;
+  }
+  try {
+    const res = await fetch("/api/smart-alerts/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_secret: accountState.secret, area: area }),
+    });
+    const data = await res.json();
+    if (data.status === "ok") {
+      const msg = $("smartAlertSubscribeArea");
+      if (msg) msg.textContent = "✅ تم الاشتراك في تنبيهات " + area;
+      const btn = $("smartAlertSubscribeBtn");
+      if (btn) btn.hidden = true;
+    }
+  } catch (e) {
+    alert("خطأ في الاتصال");
+  }
+}
+
+// تحميل التنبيهات عند فتح التبويب
+function initSmartAlerts() {
+  if (accountState.secret) {
+    refreshSmartAlerts();
+  }
+}
+
 // ===== محفظة المستثمر المجانية: سجّل عقاراتك وتتبّع قيمتها التقديرية وعائدها =====
 const portfolioState = { items: [], loaded: false, trends: null, forecast: null };
 
@@ -8390,6 +8490,7 @@ async function boot() {
   initAreaChips();
   initDealSimulator();
   initMortgageCalculator();
+  initSmartAlerts();
   initMetricsRegistry();
   initMarketChat();
   // تفعيل أزرار تبديل الخريطة الحرارية وحالة الوضع المحفوظ عند الإقلاع
