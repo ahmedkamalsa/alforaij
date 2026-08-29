@@ -5082,8 +5082,30 @@ function openAccountModal() {
     if (stepOtp) stepOtp.hidden = true;
     if (phoneEl) phoneEl.value = accountState.phone || "";
     if (msg) msg.hidden = true;
+    // تنسيق تلقائي لرقم الهاتف أثناء الكتابة
+    _attachPhoneFormatter();
     setTimeout(() => phoneEl && phoneEl.focus(), 60);
   }
+}
+
+/** تنسيق رقم الهاتف تلقائياً: يحذف الأصفار الزائدة بعد رمز الدولة */
+function _attachPhoneFormatter() {
+  const phoneEl = $("accountPhone");
+  const codeEl = $("phoneCountryCode");
+  if (!phoneEl || phoneEl._formatterAttached) return;
+  phoneEl._formatterAttached = true;
+  phoneEl.addEventListener("input", function () {
+    let val = this.value.replace(/[^\d+]/g, "");
+    // إذا المستخدم كتب رمز الدولة مع الرقم، نحذف القيمة من حقل الدولة
+    const m = val.match(/^(\+\d{1,3})(.+)$/);
+    if (m && codeEl) {
+      codeEl.value = m[1];
+      val = m[2];
+    }
+    // حذف الأصفار الزائدة في البداية (البادئة المحلية)
+    val = val.replace(/^0+/, "");
+    this.value = val;
+  });
 }
 
 function closeAccountModal() {
@@ -5099,10 +5121,15 @@ async function accountRequestOtp() {
   // If user typed full international number, use normalizePhoneKw; otherwise combine with selector
   let phone;
   if (raw.startsWith("+")) {
+    // المستخدم أدخل الرقم كاملاً مع رمز الدولة
     phone = normalizePhoneKw(raw);
   } else {
-    // Strip leading 0 from local number before prepending country code
+    // حذف الأصفار الزائدة (بما فيها الصفر الأولي)
     const localNum = raw.replace(/^0+/, "");
+    if (!localNum) {
+      showAccountMsg("أدخل رقم الهاتف بدون رمز الدولة (مثال: 1064955051)", true);
+      return;
+    }
     phone = normalizePhoneKw(countryCode + localNum);
   }
   if (!phone) {
