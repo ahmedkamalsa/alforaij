@@ -523,6 +523,9 @@ def build_pdf(report: dict | None, *, title: str | None = None, client_recommend
     if results:
         top = results[0]
         _detail_top_result(story, top, styles)
+        # ---- مقارنة التمويل العقاري ----
+        if not top.get("rental"):
+            _mortgage_comparison_section(story, top, styles)
 
     # ---- مؤشر الطلب: من يبحث عن شراء/إيجار في نفس المنطقة (صفحة مخصصة بجانب ملخص التقييم) ----
     demand = report.get("demandIndicators") or {}
@@ -857,3 +860,60 @@ def _detail_top_result(story: list, item: dict, styles: dict[str, ParagraphStyle
     if warnings:
         story.append(Spacer(1, 4))
         _bullet_list(story, [f"تحذير: {w}" for w in warnings])
+
+
+def _mortgage_comparison_section(story: list, top_item: dict, styles: dict[str, ParagraphStyle]) -> None:
+    """قسم مقارنة التمويل العقاري بين بنوك الكويت."""
+    price = top_item.get("price")
+    if not price or price <= 0:
+        return
+    try:
+        from backend.services.mortgage_calculator import compare_banks, KUWAIT_BANKS
+        result = compare_banks(price, 30, 20)  # 30% down, 20 years
+        if not result or "banks" not in result:
+            return
+        story.append(PageBreak())
+        _heading(story, "مقارنة التمويل العقاري — بنوك الكويت")
+        story.append(Paragraph(
+            ar(f"مقارنة أقساط وأسعار فائدة 4 بنوك كويتية لتمويل العقار بقيمة {money(price)} د.ك (30% دفعة مقدمة، 20 سنة)"),
+            styles["body"]
+        ))
+        story.append(Spacer(1, 4))
+        # جدول المقارنة
+        header = [
+            Paragraph(ar("البنك"), styles["cell_head"]),
+            Paragraph(ar("الفائدة"), styles["cell_head"]),
+            Paragraph(ar("القسط الشهري"), styles["cell_head"]),
+            Paragraph(ar("إجمالي الفائدة"), styles["cell_head"]),
+            Paragraph(ar("الإجمالي المدفوع"), styles["cell_head"]),
+            Paragraph(ar("المدة"), styles["cell_head"]),
+        ]
+        rows = [header]
+        best_code = result.get("best_bank")
+        for bank in result.get("banks", []):
+            is_best = bank.get("code") == best_code
+            prefix = "🏆 " if is_best else ""
+            rows.append([
+                Paragraph(ar(f"{prefix}{bank.get('name', '')}"), styles["cell"]),
+                Paragraph(ar(f"{bank.get('rate', 0)}%"), styles["cell"]),
+                Paragraph(ar(money(bank.get("monthly_payment", 0))), styles["cell"]),
+                Paragraph(ar(money(bank.get("total_interest", 0))), styles["cell"]),
+                Paragraph(ar(money(bank.get("total_paid", 0))), styles["cell"]),
+                Paragraph(ar(f"{bank.get('years', 0)} سنة"), styles["cell"]),
+            ])
+        table = Table(rows, colWidths=[38 * mm, 20 * mm, 28 * mm, 32 * mm, 32 * mm, 22 * mm], repeatRows=1, hAlign="RIGHT")
+        table.setStyle(_data_table_style())
+        story.append(KeepTogether(table))
+        story.append(Spacer(1, 6))
+        # التوصية
+        rec = result.get("recommendation", {})
+        if rec.get("summary"):
+            story.append(Paragraph(ar(f"**التوصية:** {rec['summary']}"), styles["body"]))
+            story.append(Spacer(1, 4))
+        # ملاحظة
+        story.append(Paragraph(
+            ar("ملاحظة: الفوائد تقريبية وتتغير حسب العميل والتأمين. يُنصح بزيادة الدفعة المقدمة إذا تجاوز القسط 40% من الراتب."),
+            styles["small"]
+        ))
+    except Exception:
+        pass
