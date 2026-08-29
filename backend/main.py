@@ -1118,6 +1118,10 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 json_response(self, {"error": "Clients load failed", "detail": str(exc)}, status=500)
             return
+        if path == "/api/push/stats":
+            from backend.services.push_notifications import get_stats
+            json_response(self, get_stats())
+            return
         if path == "/":
             path = "/index.html"
         file_path = (FRONTEND_DIR / path.lstrip("/")).resolve()
@@ -1953,6 +1957,51 @@ class Handler(BaseHTTPRequestHandler):
                 json_response(self, result)
             else:
                 json_response(self, {"error": "missing_user_or_tier"}, status=400)
+            return
+
+        # ─── Push Notifications ───
+        if path == "/api/push/register":
+            from backend.services.push_notifications import register_token
+            token = payload.get("token", "")
+            platform = payload.get("platform", "unknown")
+            device_name = payload.get("deviceName", "unknown")
+            if not token:
+                json_response(self, {"error": "missing token"}, status=400)
+                return
+            result = register_token(token, platform, device_name)
+            json_response(self, result)
+            return
+        if path == "/api/push/unregister":
+            from backend.services.push_notifications import unregister_token
+            token = payload.get("token", "")
+            result = unregister_token(token)
+            json_response(self, result)
+            return
+        if path == "/api/push/subscribe":
+            from backend.services.push_notifications import subscribe
+            token = payload.get("token", "")
+            sub_type = payload.get("type", "all")
+            value = payload.get("value", "")
+            result = subscribe(token, sub_type, value)
+            json_response(self, result)
+            return
+        if path == "/api/push/unsubscribe":
+            from backend.services.push_notifications import unsubscribe
+            token = payload.get("token", "")
+            sub_type = payload.get("type", "all")
+            value = payload.get("value", "")
+            result = unsubscribe(token, sub_type, value)
+            json_response(self, result)
+            return
+        if path == "/api/push/send":
+            from backend.services.push_notifications import send_push_notification
+            title = payload.get("title", "")
+            body = payload.get("body", "")
+            data = payload.get("data", {})
+            target = payload.get("target_token")
+            filt = payload.get("filter")
+            result = send_push_notification(title, body, data, target, filt)
+            json_response(self, result)
             return
 
         json_response(self, {"error": "Unknown endpoint"}, status=404)
