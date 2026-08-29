@@ -3594,6 +3594,151 @@ function showMapIfResults(results) {
   }
 }
 
+// ── Feature 1: مقارنة أسعار المناطق ──
+function renderAreaPriceComparison(results) {
+  const box = $("areaPriceCompare");
+  if (!box || !results || !results.length) { if (box) box.hidden = true; return; }
+  // تجميع متوسط السعر/م² لكل منطقة
+  const areaMap = {};
+  for (const item of results) {
+    const area = (item.area || "").trim();
+    if (!area) continue;
+    const np = item.normalized_price || (item.price && item.space ? item.price / item.space : 0);
+    if (np <= 0) continue;
+    if (!areaMap[area]) areaMap[area] = { sum: 0, count: 0, total_price: 0 };
+    areaMap[area].sum += np;
+    areaMap[area].count += 1;
+    areaMap[area].total_price += item.price || 0;
+  }
+  const areas = Object.entries(areaMap)
+    .map(([name, d]) => ({ name, avg: Math.round(d.sum / d.count), count: d.count, total: d.total }))
+    .sort((a, b) => b.avg - a.avg);
+  if (areas.length < 2) { box.hidden = true; return; }
+  const maxAvg = areas[0].avg || 1;
+  let html = '<div class="area-bar-chart">';
+  for (const area of areas) {
+    const pct = Math.round((area.avg / maxAvg) * 100);
+    const color = area.avg > maxAvg * 0.8 ? "var(--red)" : area.avg > maxAvg * 0.5 ? "var(--amber)" : "var(--green)";
+    html += `<div class="area-bar-row">
+      <span class="area-bar-label">${escapeHtml(area.name)}</span>
+      <div class="area-bar-track"><div class="area-bar-fill" style="width:${pct}%;background:${color}">${area.count} إعلان</div></div>
+      <span class="area-bar-value">${area.avg.toLocaleString()} د.ك/م²</span>
+    </div>`;
+  }
+  html += '</div>';
+  box.hidden = false;
+  const chartEl = $("areaPriceChart");
+  if (chartEl) chartEl.innerHTML = html;
+}
+
+// ── Feature 2: اتجاهات الأسعار (رسم بياني) ──
+let _priceTrendsChart = null;
+async function loadPriceTrends(results) {
+  const box = $("priceTrendsBox");
+  if (!box) return;
+  // حدد المنطقة الأولى من النتائج
+  const area = results && results[0] ? (results[0].area || "") : "";
+  if (!area) { box.hidden = true; return; }
+  try {
+    const resp = await fetch(`/api/price-trends?area=${encodeURIComponent(area)}`);
+    const data = await resp.json();
+    const rows = data.rows || [];
+    if (!rows.length) { box.hidden = true; return; }
+    box.hidden = false;
+    // تجميع البيانات حسب الشهر
+    const byMonth = {};
+    for (const row of rows) {
+      const month = (row.month || "").slice(0, 7);
+      if (!month) continue;
+      if (!byMonth[month]) byMonth[month] = { prices: [], spaces: [] };
+      const ppm = row.median_price_per_m2 || row.median_price_per_sqm || 0;
+      if (ppm) { byMonth[month].prices.push(ppm); byMonth[month].hasPerM2 = true; }
+      else if (row.median_price) { byMonth[month].totalPrices = (byMonth[month].totalPrices || 0) + 1; byMonth[month].prices.push(row.median_price); }
+    }
+    const labels = Object.keys(byMonth).sort();
+    const values = labels.map(m => {
+      const p = byMonth[m].prices;
+      return p.length ? Math.round(p.reduce((a, b) => a + b, 0) / p.length) : 0;
+    });
+    if (!values.some(v => v > 0)) { box.hidden = true; return; }
+    const canvas = document.getElementById("priceTrendsChart");
+    if (!canvas) return;
+    if (_priceTrendsChart) _priceTrendsChart.destroy();
+    _priceTrendsChart = new Chart(canvas, {
+      type: "line",
+      data: {
+        labels: labels.map(l => l),
+        datasets: [{
+          label: Object.values(byMonth).some(m => m.hasPerM2) ? `سعر المتر — ${area}` : `متوسط السعر — ${area}`,
+          data: values,
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59,130,246,.15)",
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointBackgroundColor: "#3b82f6",
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: "rgba(255,255,255,.06)" }, ticks: { color: "#94a3b8", font: { size: 10 } } },
+          y: { grid: { color: "rgba(255,255,255,.06)" }, ticks: { color: "#94a3b8", font: { size: 10 }, callback: v => { const unit = Object.values(byMonth).some(m => m.hasPerM2) ? ' د.ك/م²' : ' د.ك'; return v.toLocaleString() + unit; } } },
+        },
+      },
+    });
+  } catch (e) {
+    box.hidden = true;
+  }
+}
+
+// ── Feature 3: حاسبة العائد الاستثماري ──
+function showROICalculator(results) {
+  const box = $("roiCalculatorBox");
+  if (!box) return;
+  if (!results || !results.length) { box.hidden = true; return; }
+  box.hidden = false;
+  // ملء تلقائي من أفضل نتيجة
+  const top = results[0];
+  if (top && top.price) {
+    const buyInput = $("roiBuyPrice");
+    if (buyInput && !buyInput.value) buyInput.value = top.price;
+  }
+}
+
+async function calculateROI() {
+  const buyPrice = parseFloat($("roiBuyPrice")?.value) || 0;
+  const monthlyRent = parseFloat($("roiMonthlyRent")?.value) || 0;
+  const renovation = parseFloat($("roiRenovation")?.value) || 0;
+  if (!buyPrice || !monthlyRent) {
+    const resultEl = $("roiResult");
+    if (resultEl) { resultEl.hidden = false; resultEl.innerHTML = '<div style="color:var(--red)">أدخل سعر الشراء والإيجار الشهري</div>'; }
+    return;
+  }
+  try {
+    const resp = await fetch("/api/invest/calculate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ buy_price: buyPrice, monthly_rent: monthlyRent, renovation }),
+    });
+    const data = await resp.json();
+    const resultEl = $("roiResult");
+    if (!resultEl) return;
+    resultEl.hidden = false;
+    resultEl.innerHTML = [
+      `<div class="roi-metric"><div class="roi-val">${(data.annual_roi_percent || 0).toFixed(1)}%</div><div class="roi-lbl">عائد سنوي</div></div>`,
+      `<div class="roi-metric"><div class="roi-val">${(data.monthly_roi_percent || 0).toFixed(1)}%</div><div class="roi-lbl">عائد شهري</div></div>`,
+      `<div class="roi-metric"><div class="roi-val">${(data.payback_years || 0).toFixed(1)}</div><div class="roi-lbl">سنوات استرداد</div></div>`,
+      `<div class="roi-metric"><div class="roi-val">${(data.annual_cashflow || 0).toLocaleString()}</div><div class="roi-lbl">تدفق نقدي سنوي (د.ك)</div></div>`,
+    ].join("");
+  } catch (e) {
+    const resultEl = $("roiResult");
+    if (resultEl) { resultEl.hidden = false; resultEl.innerHTML = '<div style="color:var(--red)">خطأ في الحساب</div>'; }
+  }
+}
+
 function countByNormalized(items, pick) {
   const counts = {};
   for (const item of items) {
@@ -4187,6 +4332,10 @@ function renderReport(report) {
   if (window.hoverCard) hoverCard.refresh();
   // تحديث الخريطة بالنتائج الجديدة
   showMapIfResults(results);
+  // ── ميزات التمييز: مقارنة الأسعار + اتجاهات + حاسبة العائد ──
+  renderAreaPriceComparison(results);
+  loadPriceTrends(results);
+  showROICalculator(results);
 }
 
 function downloadReport() {
