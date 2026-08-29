@@ -294,6 +294,30 @@
         <p class="sim-note" id="simNote">أدخل سعر الشراء وتكلفة الترميم والإيجار المتوقع شهريًا — يُحسب العائد السنوي وفترة الاسترداد فورًا.</p>
       </details>
 
+      <details class="mortgage-calc" id="mortgageCalc">
+        <summary><svg class="hero-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 17l10-10 4 4 6-6"/><path d="M14 5h8v8"/></svg> حاسبة الرهن العقاري — مقارنة البنوك</summary>
+        <div class="mortgage-fields">
+          <label>قيمة العقار (د.ك)
+            <input id="mortgagePrice" type="number" min="0" step="1000" inputmode="decimal" placeholder="مثال: 250000" autocomplete="off">
+          </label>
+          <label>الدفعة المقدمة (%)
+            <input id="mortgageDownPct" type="number" min="0" max="80" step="5" value="30" inputmode="decimal" autocomplete="off">
+          </label>
+          <label>المدة (سنوات)
+            <input id="mortgageYears" type="number" min="1" max="25" step="1" value="20" inputmode="decimal" autocomplete="off">
+          </label>
+          <label>الراتب الشهري (د.ك) — اختياري
+            <input id="mortgageSalary" type="number" min="0" step="100" inputmode="decimal" placeholder="لحساب نسبة القسط من الراتب" autocomplete="off">
+          </label>
+          <button id="mortgageCalcBtn" type="button" class="primary">قارن البنوك</button>
+        </div>
+        <div class="mortgage-results" id="mortgageResults" hidden>
+          <div class="mortgage-summary" id="mortgageSummary"></div>
+          <div class="mortgage-banks" id="mortgageBanks"></div>
+        </div>
+        <p class="sim-note">قارن أقساط وأسعار فائدة KFH، KBK، CBK، وبوبيان — يُنصح بزيادة الدفعة المقدمة إذا تجاوز القسط 40% من الراتب.</p>
+      </details>
+
       <details class="advanced-fields">
         <summary>خيارات متقدمة</summary>
         <div class="fields">

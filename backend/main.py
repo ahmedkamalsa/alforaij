@@ -1889,6 +1889,19 @@ class Handler(BaseHTTPRequestHandler):
             result = calculate_mortgage(price, down_pct, rate, years, rent)
             json_response(self, result)
             return
+        if path == "/api/invest/compare-banks":
+            # مقارنة التمويل العقاري بين بنوك الكويت الأربعة
+            from backend.services.mortgage_calculator import compare_banks
+            price = float(payload.get("price") or 0)
+            down_pct = float(payload.get("down_payment_pct") or 30)
+            years = int(payload.get("years") or 20)
+            salary = float(payload.get("salary") or 0) or None
+            if price <= 0:
+                json_response(self, {"error": "أدخل سعر العقار"}, status=400)
+                return
+            result = compare_banks(price, down_pct, years, salary)
+            json_response(self, result)
+            return
         if path == "/api/invest/compare":
             # مقارنة أحياء
             from backend.services.investment_calculator import compare_neighborhoods

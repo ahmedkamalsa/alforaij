@@ -7533,6 +7533,91 @@ function initDealSimulator() {
   if (prefill) prefill.addEventListener("click", prefillSimulator);
 }
 
+// ─── حاسبة الرهن العقاري — مقارنة بنوك الكويت ───
+function initMortgageCalculator() {
+  const btn = $("mortgageCalcBtn");
+  if (!btn) return;
+  btn.addEventListener("click", runMortgageComparison);
+}
+
+async function runMortgageComparison() {
+  const price = Number($("mortgagePrice")?.value || 0);
+  const downPct = Number($("mortgageDownPct")?.value || 30);
+  const years = Number($("mortgageYears")?.value || 20);
+  const salary = Number($("mortgageSalary")?.value || 0) || null;
+
+  if (price <= 0) {
+    alert("أدخل قيمة العقار أولاً");
+    return;
+  }
+
+  const btn = $("mortgageCalcBtn");
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch("/api/invest/compare-banks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        price: price,
+        down_payment_pct: downPct,
+        years: years,
+        salary: salary,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+    renderMortgageResults(data);
+  } catch (e) {
+    console.error("Mortgage comparison error:", e);
+    alert("خطأ في الاتصال — أعد المحاولة");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function renderMortgageResults(data) {
+  const container = $("mortgageResults");
+  const summaryEl = $("mortgageSummary");
+  const banksEl = $("mortgageBanks");
+  if (!container || !summaryEl || !banksEl) return;
+
+  container.hidden = false;
+
+  // ملخص
+  const rec = data.recommendation || {};
+  summaryEl.innerHTML = `
+    <div>💰 <strong>${formatMoney(data.property_value)}</strong> د.ك — الدفعة المقدمة: <strong>${formatMoney(data.down_payment_amount)}</strong> (${data.down_payment_pct}%)</div>
+    <div>🏦 مبلغ القرض: <strong>${formatMoney(data.loan_amount)}</strong> د.ك — المدة: <strong>${data.requested_years}</strong> سنة</div>
+    ${rec.summary ? `<div style="margin-top:6px;color:#16a34a">🎯 ${rec.summary}</div>` : ""}
+  `;
+
+  // بطاقات البنوك
+  banksEl.innerHTML = (data.banks || []).map(bank => {
+    const isBest = bank.code === data.best_bank;
+    const ratioClass = bank.salary_ratio == null ? "" : bank.salary_ratio <= 30 ? "ok" : bank.salary_ratio <= 40 ? "warn" : "danger";
+    const featuresHtml = (bank.features || []).map(f => '<li>' + f + '</li>').join("");
+    const urlHtml = bank.url ? '<a href="' + bank.url + '" target="_blank" rel="noreferrer" style="font-size:11px;color:var(--blue);margin-top:6px;display:inline-block">الرابط الرسمي ↗</a>' : "";
+    const ratioHtml = bank.salary_ratio != null ? '<div class="bank-salary-ratio ' + ratioClass + '">نسبة القسط من الراتب: ' + bank.salary_ratio + '%</div>' : "";
+    return '<div class="mortgage-bank-card' + (isBest ? ' best' : '') + '">' +
+      '<div class="bank-name">' + bank.name + ' <span class="bank-name-en">' + bank.name_en + '</span></div>' +
+      '<span class="bank-rate">' + bank.rate + '%</span>' +
+      '<div class="bank-monthly">' + formatMoney(bank.monthly_payment) + ' <small>د.ك/شهر</small></div>' +
+      '<div class="bank-details">' +
+        '<div>إجمالي الفائدة: <strong>' + formatMoney(bank.total_interest) + '</strong> د.ك</div>' +
+        '<div>الإجمالي المدفوع: <strong>' + formatMoney(bank.total_paid) + '</strong> د.ك</div>' +
+        '<div>المدة: <strong>' + bank.years + '</strong> سنة</div>' +
+        ratioHtml +
+      '</div>' +
+      '<ul class="bank-features">' + featuresHtml + '</ul>' +
+      urlHtml +
+    '</div>';
+  }).join("");
+}
+
 // ترتيب سجلات اللوحة (الأحدث / السعر الأعلى / الأقل / المنطقة أبجديا)
 function sortBoardRows(rows) {
   const sort = $("boardSortFilter")?.value || "newest";
@@ -8304,6 +8389,7 @@ async function boot() {
   populateAdvancedOptions();
   initAreaChips();
   initDealSimulator();
+  initMortgageCalculator();
   initMetricsRegistry();
   initMarketChat();
   // تفعيل أزرار تبديل الخريطة الحرارية وحالة الوضع المحفوظ عند الإقلاع

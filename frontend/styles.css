@@ -4854,6 +4854,160 @@ button.results-source-chip:hover {
   line-height: 1.6;
 }
 
+/* ── حاسبة الرهن العقاري ── */
+.mortgage-calc {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, .03);
+  padding: 12px 14px;
+}
+.mortgage-calc summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--blue);
+}
+.mortgage-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.mortgage-fields label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.mortgage-fields input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+}
+.mortgage-results {
+  margin-top: 14px;
+}
+.mortgage-summary {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--blue-soft);
+  border: 1px solid #b7cdf4;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.mortgage-banks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.mortgage-bank-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  padding: 14px;
+  position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.mortgage-bank-card:hover {
+  border-color: var(--blue);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.mortgage-bank-card.best {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.15);
+}
+.mortgage-bank-card.best::after {
+  content: "✅ الأفضل";
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  font-size: 11px;
+  font-weight: 800;
+}
+.mortgage-bank-card .bank-name {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.mortgage-bank-card .bank-name-en {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.mortgage-bank-card .bank-rate {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.mortgage-bank-card .bank-monthly {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+  margin: 8px 0;
+}
+.mortgage-bank-card .bank-monthly small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.mortgage-bank-card .bank-details {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.mortgage-bank-card .bank-details strong {
+  color: var(--text);
+}
+.mortgage-bank-card .bank-salary-ratio {
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+}
+.mortgage-bank-card .bank-salary-ratio.ok {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+.mortgage-bank-card .bank-salary-ratio.warn {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+.mortgage-bank-card .bank-salary-ratio.danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+.mortgage-bank-card .bank-features {
+  margin-top: 8px;
+  padding: 0;
+  list-style: none;
+}
+.mortgage-bank-card .bank-features li {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 2px 0;
+}
+.mortgage-bank-card .bank-features li::before {
+  content: "• ";
+  color: var(--blue);
+}
+
 /* شارة فجوة السعر: السعر المطلوب مقابل وسيط المنطقة */
 .price-gap-badge {
   display: inline-block;
