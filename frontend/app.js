@@ -5025,11 +5025,10 @@ function openAccountModal() {
   modal.hidden = false;
   renderAccountStatus();
   portfolioShowHide();
-  // إخفاء زر Google إذا لم يكن Client ID متاحاً
+  // إظهار زر Google دائماً (الافتراضي: متاح)
   const googleWrap = $("googleSignInWrap");
   if (googleWrap) {
-    const cid = window.GOOGLE_CLIENT_ID || localStorage.getItem("alforaij_google_client_id") || "";
-    googleWrap.style.display = cid ? "" : "none";
+    googleWrap.style.display = "";
   }
   const phoneEl = $("accountPhone");
   const stepPhone = $("accountStepPhone");
@@ -5063,7 +5062,9 @@ async function accountRequestOtp() {
   if (raw.startsWith("+")) {
     phone = normalizePhoneKw(raw);
   } else {
-    phone = normalizePhoneKw(countryCode + raw);
+    // Strip leading 0 from local number before prepending country code
+    const localNum = raw.replace(/^0+/, "");
+    phone = normalizePhoneKw(countryCode + localNum);
   }
   if (!phone) {
     showAccountMsg("أدخل رقم الهاتف من القائمة ثم الرقم (مثال: 55512345)", true);

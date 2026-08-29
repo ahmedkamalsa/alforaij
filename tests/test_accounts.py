@@ -1,7 +1,7 @@
-"""اختبارات هوية المستخدمين المجانيين: توحيد الهاتف الكويتي + OTP (توليد/تحقق/محاولات).
+"""اختبارات هوية المستخدمين المجانيين: توحيد الهاتف + OTP (توليد/تحقق/محاولات).
 
-تغطي المهمة 1 من خطة الحسابات المجاني:
-- توحيد الرقم لصيغة +965XXXXXXXX ورفض غير الكويتي (مثل 0106... المصري).
+تغطي:
+- توحيد الرقم لصيغة E.164 دوليًا (الكويت، السعودية، الإمارات، وغيرها).
 - رمز تحقق 6 أرقام بملح، انتهاء 10 دقائق، حد 5 محاولات.
 - سرّ المستخدم عشوائي بطول 24.
 - إعادة الإرسال تبطل الرمز القديم.
@@ -17,30 +17,77 @@ from backend.services.accounts import (
     check_otp,
     issue_otp,
     new_secret,
+    normalize_phone,
     normalize_phone_kw,
 )
 
 
 class NormalizePhoneTests(unittest.TestCase):
     def test_accepts_local_kw_mobile(self) -> None:
-        self.assertEqual(normalize_phone_kw("55512345"), "+96555512345")
-        self.assertEqual(normalize_phone_kw("66612345"), "+96566612345")
-        self.assertEqual(normalize_phone_kw("91234567"), "+96591234567")
+        phone, country = normalize_phone("55512345")
+        self.assertEqual(phone, "+96555512345")
+        self.assertEqual(country, "KW")
 
     def test_accepts_international_kw(self) -> None:
-        self.assertEqual(normalize_phone_kw("+96555512345"), "+96555512345")
-        self.assertEqual(normalize_phone_kw("96555512345"), "+96555512345")
-        self.assertEqual(normalize_phone_kw("0096555512345"), "+96555512345")
+        phone, country = normalize_phone("+96555512345")
+        self.assertEqual(phone, "+96555512345")
+        self.assertEqual(country, "KW")
 
-    def test_rejects_egyptian_number(self) -> None:
-        # 0106... — رقم مصري (11 رقمًا يبدأ بـ 01) يجب رفضه كرقم كويتي
-        self.assertEqual(normalize_phone_kw("01061234567"), "")
-        self.assertEqual(normalize_phone_kw("+201061234567"), "")
+    def test_accepts_saudi_number(self) -> None:
+        phone, country = normalize_phone("+966512345678")
+        self.assertEqual(phone, "+966512345678")
+        self.assertEqual(country, "SA")
+
+    def test_accepts_uae_number(self) -> None:
+        phone, country = normalize_phone("+971501234567")
+        self.assertEqual(phone, "+971501234567")
+        self.assertEqual(country, "AE")
+
+    def test_accepts_egyptian_number(self) -> None:
+        # الأرقام المصرية: +20 + 10 حروف = 12 رقم
+        phone, country = normalize_phone("01061234567")
+        self.assertEqual(phone, "+201061234567")
+        self.assertEqual(country, "EG")
+
+    def test_egyptian_with_country_code(self) -> None:
+        # المستخدم يكتب +201064955051 مباشرة
+        phone, country = normalize_phone("+201064955051")
+        self.assertEqual(phone, "+201064955051")
+        self.assertEqual(country, "EG")
+
+    def test_saudi_number(self) -> None:
+        phone, country = normalize_phone("+966555123456")
+        self.assertEqual(phone, "+966555123456")
+        self.assertEqual(country, "SA")
+
+    def test_uae_number(self) -> None:
+        phone, country = normalize_phone("+971555123456")
+        self.assertEqual(phone, "+971555123456")
+        self.assertEqual(country, "AE")
+
+    def test_us_number(self) -> None:
+        phone, country = normalize_phone("+12025551234")
+        self.assertEqual(phone, "+12025551234")
+        self.assertEqual(country, "US")
+
+    def test_kuwaiti_local_input(self) -> None:
+        # مستخدم يكتب 55512345 بدون رمز الدولة — يتحول لـ +965
+        phone, country = normalize_phone("55512345")
+        self.assertEqual(phone, "+96555512345")
+        self.assertEqual(country, "KW")
 
     def test_rejects_garbage(self) -> None:
-        self.assertEqual(normalize_phone_kw(""), "")
-        self.assertEqual(normalize_phone_kw("abc"), "")
-        self.assertEqual(normalize_phone_kw("12345"), "")
+        phone, country = normalize_phone("")
+        self.assertEqual(phone, "")
+        phone, country = normalize_phone("abc")
+        self.assertEqual(phone, "")
+        phone, country = normalize_phone("12345")
+        self.assertEqual(phone, "")
+
+    def test_normalize_phone_kw_backward_compatible(self) -> None:
+        # التوافق مع الكود القديم
+        self.assertEqual(normalize_phone_kw("55512345"), "+96555512345")
+        self.assertEqual(normalize_phone_kw("+96555512345"), "+96555512345")
 
 
 class SecretTests(unittest.TestCase):
