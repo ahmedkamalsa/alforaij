@@ -1761,6 +1761,24 @@ class Handler(BaseHTTPRequestHandler):
                 logger.exception("PDF generation failed")
                 json_response(self, {"error": "PDF generation failed", "detail": str(exc)}, status=500)
             return
+        if path == "/api/report-excel":
+            try:
+                from backend.services.excel_report import build_excel
+                excel_bytes = build_excel(payload.get("report") or {})
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition", 'attachment; filename="alforaij-report.xlsx"')
+                self.send_header("Content-Length", str(len(excel_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.end_headers()
+                self.wfile.write(excel_bytes)
+            except Exception as exc:
+                logger.exception("Excel generation failed")
+                json_response(self, {"error": "Excel generation failed", "detail": str(exc)}, status=500)
+            return
         if path == "/api/outreach-click":
             # تتبع نقرات التسويق (نسخ/إرسال فرصة أو عميل) → يُسجَّل في outreach_clicks
             from backend.services.supabase_store import save_outreach_click

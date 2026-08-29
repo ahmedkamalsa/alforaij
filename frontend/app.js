@@ -4585,6 +4585,41 @@ async function downloadPdfReport(btnId) {
   }
 }
 
+async function downloadExcelReport(btnId) {
+  if (!state.report) return;
+  const btn = btnId ? $(btnId) : null;
+  const original = btn ? btn.textContent : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "جاري توليد Excel...";
+  }
+  try {
+    const response = await fetch(apiUrl("/api/report-excel"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ report: state.report }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `alforaij-report-${Date.now()}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Excel generation failed:", err);
+    alert("تعذر توليد ملف Excel — تأكد من اتصال الخادم");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // أفضل الفرص والتوقعات
 // ---------------------------------------------------------------------------
@@ -6972,6 +7007,7 @@ function bind() {
   on("downloadReportBtnTop", downloadReport);
   on("downloadPdfBtn", () => downloadPdfReport("downloadPdfBtn"));
   on("downloadPdfBtnTop", () => downloadPdfReport("downloadPdfBtnTop"));
+  on("downloadExcelBtn", () => downloadExcelReport("downloadExcelBtn"));
   on("toggleCustomSearchBtn", () => {
     switchMainTab("search");
     const panel = $("customSearchPanel");
