@@ -1122,6 +1122,10 @@ class Handler(BaseHTTPRequestHandler):
             from backend.services.push_notifications import get_stats
             json_response(self, get_stats())
             return
+        if path == "/api/admin/users":
+            from backend.services.supabase_store import fetch_all_users
+            json_response(self, {"users": fetch_all_users()})
+            return
         if path == "/":
             path = "/index.html"
         file_path = (FRONTEND_DIR / path.lstrip("/")).resolve()

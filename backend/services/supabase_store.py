@@ -1158,6 +1158,12 @@ def fetch_user(phone: str) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
+def fetch_all_users() -> list[dict[str, Any]]:
+    """قراءة جميع المستخدمين من جدول users."""
+    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/users?select=phone,role,created_at&order=created_at.desc&limit=200")
+    return rows or []
+
+
 def upsert_user(row: dict[str, Any]) -> None:
     """إنشاء مستخدم جديد (أو إعادة إرسال الرمز) — upsert على رقم الهاتف."""
     _post("users", [row], upsert=True, conflict="phone")
@@ -1209,6 +1215,14 @@ def insert_user_alerts(rows: list[dict[str, Any]]) -> int:
         conflict="user_secret,opportunity_code",
     )
     return len(rows)
+
+
+def fetch_user_by_secret(secret: str) -> dict[str, Any] | None:
+    """قراءة مستخدم بالسرّ — يُستخدم للمصادقة البديلة (بدون JWT)."""
+    if not secret or not is_configured():
+        return None
+    rows = _fetch_rows(f"{SUPABASE_URL}/rest/v1/users?secret=eq.{urllib.parse.quote(secret)}&select=*")
+    return rows[0] if rows else None
 
 
 def fetch_user_phones() -> dict[str, str]:
