@@ -4036,6 +4036,94 @@ button.results-source-chip:hover {
   margin-top: 4px;
 }
 
+/* ── مقارنة أسعار المناطق ── */
+.area-price-compare, .price-trends-box, .roi-calculator-box {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+.area-price-compare h3, .price-trends-box h3, .roi-calculator-box h3 {
+  font-size: 15px;
+  margin: 0 0 12px 0;
+  color: var(--text);
+}
+.area-bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.area-bar-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 70px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.area-bar-label { color: var(--text-dim); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.area-bar-track { height: 22px; background: rgba(255,255,255,.06); border-radius: 6px; overflow: hidden; position: relative; }
+.area-bar-fill { height: 100%; border-radius: 6px; transition: width .5s ease; display: flex; align-items: center; padding: 0 8px; font-size: 11px; color: #fff; font-weight: 600; white-space: nowrap; }
+.area-bar-value { color: var(--text); font-weight: 600; text-align: left; font-size: 12px; }
+
+/* ── حاسبة العائد الاستثماري ── */
+.roi-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+.roi-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.roi-form input {
+  background: rgba(255,255,255,.08);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+.roi-form input:focus { border-color: var(--blue); outline: none; }
+.roi-form button {
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.roi-form button:hover { opacity: .9; }
+.roi-result {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(34,197,94,.08);
+  border: 1px solid rgba(34,197,94,.25);
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+.roi-metric { text-align: center; }
+.roi-metric .roi-val { font-size: 20px; font-weight: 700; color: var(--green); }
+.roi-metric .roi-lbl { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+#priceTrendsChartWrap { height: 220px; position: relative; }
+@media (max-width: 640px) {
+  .area-bar-row { grid-template-columns: 80px 1fr 60px; }
+  .roi-form { grid-template-columns: 1fr 1fr; }
+  #priceTrendsChartWrap { height: 180px; }
+}
+
 .result-card {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
@@ -7873,6 +7961,35 @@ body.drill-open {
 }
 .google-signin-btn svg {
   flex-shrink: 0;
+}
+
+/* ── زر تسجيل الدخول بـ Apple ── */
+.apple-signin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #000;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.apple-signin-btn:hover {
+  box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+  border-color: #333;
+}
+.apple-signin-btn:active {
+  transform: scale(0.98);
+}
+.apple-signin-btn svg {
+  flex-shrink: 0;
+  fill: #fff;
 }
 
 /* ── صورة الملف الشخصي + شارة المزوّد ── */

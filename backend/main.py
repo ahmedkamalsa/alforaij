@@ -1382,6 +1382,62 @@ class Handler(BaseHTTPRequestHandler):
             )
             json_response(self, {**resp, "secret": secret})
             return
+        if path == "/api/apple-login":
+            # تسجيل الدخول عبر Apple: استقبال authorization code + id_token
+            from backend.services.accounts import new_secret
+            from backend.services.supabase_store import fetch_user, upsert_user, patch_user
+            code = payload.get("code") or ""
+            id_token = payload.get("id_token") or ""
+            user_info = payload.get("user") or {}
+            if not code and not id_token:
+                json_response(self, {"error": "missing_credential", "detail": "لم يتم إرسال بيانات Apple"}, status=400)
+                return
+            # Decode Apple id_token JWT if provided
+            apple_sub = ""
+            apple_email = ""
+            apple_name = ""
+            try:
+                if id_token:
+                    parts = id_token.split(".")
+                    if len(parts) == 3:
+                        b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
+                        idinfo = json.loads(base64.urlsafe_b64decode(b64))
+                        apple_sub = idinfo.get("sub") or ""
+                        apple_email = idinfo.get("email") or ""
+                if not apple_sub and code:
+                    # Fallback: use code as identifier (Apple doesn't expose sub without id_token)
+                    apple_sub = f"apple_code:{code[:20]}"
+            except Exception as e:
+                logger.warning("Apple credential decode failed: %s", e)
+                json_response(self, {"error": "invalid_credential", "detail": "بيانات Apple غير صالحة"}, status=400)
+                return
+            if not apple_sub:
+                json_response(self, {"error": "no_sub", "detail": "لا يوجد معرّف Apple"}, status=400)
+                return
+            # Extract name from user info (only available on first sign-in)
+            if user_info:
+                name_obj = user_info.get("name") or {}
+                apple_name = f"{name_obj.get('firstName', '')} {name_obj.get('lastName', '')}".strip()
+            phone_key = f"apple:{apple_sub}"
+            resp = {"status": "ok", "phone": apple_email,
+                    "name": apple_name, "avatar": "",
+                    "provider": "apple"}
+            user = _run_with_timeout(lambda: fetch_user(phone_key), timeout_sec=8)
+            if user and user.get("secret"):
+                json_response(self, {**resp, "secret": user["secret"]})
+                return
+            secret = new_secret()
+            _run_with_timeout(
+                lambda: upsert_user({"phone": phone_key, "secret": secret, "verified": True}),
+                timeout_sec=8,
+            )
+            if apple_email or apple_name:
+                _run_with_timeout(
+                    lambda: patch_user(phone_key, {"google_email": apple_email, "google_name": apple_name}),
+                    timeout_sec=8,
+                )
+            json_response(self, {**resp, "secret": secret})
+            return
         if path == "/api/analytics":
             # استقبال بيانات التتبع من الواجهة
             try:

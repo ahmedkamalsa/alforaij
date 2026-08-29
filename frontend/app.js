@@ -5241,6 +5241,85 @@ async function _handleGoogleCredential(response) {
   }
 }
 
+/* ─── تسجيل الدخول بـ Apple ─── */
+function appleLogin() {
+  // Apple Sign-In via Apple JS SDK (يُحمّل من cdn-apple.com)
+  if (typeof AppleID === "undefined" || !AppleID.auth) {
+    // تحميل SDK إذا لم يكن محمّلاً
+    const script = document.createElement("script");
+    script.src = "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
+    script.async = true;
+    script.onload = () => _initAppleSignIn();
+    script.onerror = () => showAccountMsg("تعذر تحميل Apple SDK — أعد المحاولة", true);
+    document.head.appendChild(script);
+  } else {
+    _initAppleSignIn();
+  }
+}
+
+function _initAppleSignIn() {
+  const clientId = window.APPLE_CLIENT_ID || localStorage.getItem("alforaij_apple_client_id") || "";
+  if (!clientId) {
+    // بدون Client ID: نستخدم بديل — نطلب البريد الإلكتروني يدوياً
+    showAccountMsg("تسجيل الدخول بـ Apple يتطلب Client ID. استخدم رقم الهاتف مؤقتاً.", true);
+    return;
+  }
+  try {
+    AppleID.auth.init({
+      clientId: clientId,
+      scope: "name email",
+      redirectURI: window.location.origin,
+      usePopup: true,
+    });
+    AppleID.auth.signIn();
+  } catch (e) {
+    showAccountMsg("خطأ في بدء تسجيل الدخول بـ Apple", true);
+    console.error("Apple login init error:", e);
+  }
+}
+
+// استقبال callback من Apple Sign-In
+async function _handleAppleCredential(response) {
+  if (!response || !response.code) return;
+  showAccountMsg("جاري التحقق من حساب Apple...", false);
+  try {
+    const res = await fetch("/api/apple-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: response.code,
+        id_token: response.id_token || "",
+        user: response.user || null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.secret) {
+      showAccountMsg(data.detail || "تعذر تسجيل الدخول بـ Apple", true);
+      return;
+    }
+    accountState.secret = data.secret;
+    accountState.phone = data.phone || "";
+    accountSave();
+    try {
+      localStorage.setItem("alforaij_user_name", data.name || "");
+      localStorage.setItem("alforaij_user_avatar", "");
+      localStorage.setItem("alforaij_user_provider", data.provider || "apple");
+    } catch { /* ignore */ }
+    const stepPhone = $("accountStepPhone");
+    const stepOtp = $("accountStepOtp");
+    if (stepPhone) stepPhone.hidden = true;
+    if (stepOtp) stepOtp.hidden = true;
+    renderAccountStatus();
+    showAccountMsg(`تم تسجيل الدخول بنجاح ✓ — مرحباً ${escapeHtml(data.name || "")}`, false);
+    loadSavedSearches();
+    loadUserAlerts();
+    loadPortfolio();
+  } catch (e) {
+    showAccountMsg("خطأ في الاتصال — أعد المحاولة", true);
+    console.error("Apple login error:", e);
+  }
+}
+
 // حفظ البحث الحالي (من الفلاتر الحالية في صفحة البحث) مع تفعيل التنبيه
 async function handleSaveSearch() {
   if (!accountState.secret) {

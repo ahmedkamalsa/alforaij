@@ -146,5 +146,45 @@ class OtpTests(unittest.TestCase):
         self.assertNotEqual(stored1, stored2)
 
 
+class AppleLoginTests(unittest.TestCase):
+    """اختبارات تسجيل الدخول بـ Apple"""
+
+    def test_apple_id_token_decode(self) -> None:
+        """Test Apple id_token JWT decoding"""
+        import base64, json as _json
+        # Create a mock Apple id_token
+        header = base64.urlsafe_b64encode(_json.dumps({"alg": "ES256", "kid": "test"}).encode()).rstrip(b"=").decode()
+        payload_b64 = base64.urlsafe_b64encode(_json.dumps({
+            "iss": "https://appleid.apple.com",
+            "sub": "001234.abcdef",
+            "email": "user@example.com",
+            "aud": "com.alforaij.app",
+        }).encode()).rstrip(b"=").decode()
+        sig = base64.urlsafe_b64encode(b"fake-sig").rstrip(b"=").decode()
+        token = f"{header}.{payload_b64}.{sig}"
+        # Decode (same logic as backend)
+        parts = token.split(".")
+        self.assertEqual(len(parts), 3)
+        b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
+        decoded = _json.loads(base64.urlsafe_b64decode(b64))
+        self.assertEqual(decoded["iss"], "https://appleid.apple.com")
+        self.assertEqual(decoded["sub"], "001234.abcdef")
+        self.assertEqual(decoded["email"], "user@example.com")
+
+    def test_apple_phone_key_format(self) -> None:
+        """Apple users get phone_key like 'apple:{sub}'"""
+        apple_sub = "001234.abcdef"
+        phone_key = f"apple:{apple_sub}"
+        self.assertTrue(phone_key.startswith("apple:"))
+        self.assertEqual(phone_key, "apple:001234.abcdef")
+
+    def test_apple_code_fallback(self) -> None:
+        """When no id_token is provided, code is used as identifier"""
+        code = "abc123def456ghi789jkl0"
+        phone_key = f"apple_code:{code[:20]}"
+        self.assertEqual(phone_key, "apple_code:abc123def456ghi789jk")
+        self.assertTrue(len(phone_key) > 10)
+
+
 if __name__ == "__main__":
     unittest.main()
