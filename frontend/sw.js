@@ -11,7 +11,7 @@
 const CACHE_VERSION = 'v3';
 const CACHE_NAME = `alforaij-${CACHE_VERSION}`;
 const STATIC_CACHE = `alforaij-static-${CACHE_VERSION}`;
-const API_CACHE = `alforaij-api-${VERSION}`;
+const API_CACHE = `alforaij-api-${CACHE_VERSION}`;
 const OFFLINE_PAGE = '/offline.html';
 
 // ─── الملفات الأساسية (App Shell) ───
@@ -62,6 +62,7 @@ const API_NETWORK_FIRST = [
   '/api/developments',
   '/api/market-analytics',
   '/api/platform-dates',
+  '/api/platform-intelligence',
   '/api/metric-registry',
   '/api/update-notifications',
   '/api/market-matching',

@@ -94,7 +94,7 @@ def _dashboard_cache_key(selected: set[str], include_local: bool) -> str | None:
 
 def _build_health_payload() -> dict:
     listings = load_listings()
-    data_summary = supabase_data_summary(len(listings))
+    data_summary = _run_with_timeout(lambda: supabase_data_summary(len(listings)), timeout_sec=3) or {}
     tables = (data_summary or {}).get("tables") or {}
     market_harvested = int((tables.get("market_listings") or {}).get("count") or 0)
     market_live = int((tables.get("market_ads") or {}).get("count") or 0)
@@ -102,7 +102,7 @@ def _build_health_payload() -> dict:
     by_source: list[dict] = []
     try:
         from backend.services.supabase_store import fetch_market_listing_source_counts
-        by_source = fetch_market_listing_source_counts() or []
+        by_source = _run_with_timeout(fetch_market_listing_source_counts, timeout_sec=3) or []
     except Exception as exc:
         logger.warning("Health bySource failed: %s", exc)
     return {
@@ -611,17 +611,20 @@ def _dashboard_summary(listings, selected_platforms: set[str] | None = None, inc
 
 def json_response(handler: BaseHTTPRequestHandler, payload: dict, status: int = 200) -> None:
     body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
-    handler.send_response(status)
-    handler.send_header("Content-Type", "application/json; charset=utf-8")
-    handler.send_header("Content-Length", str(len(body)))
-    handler.send_header("Access-Control-Allow-Origin", "*")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-    handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    # رؤوس الأمان (CSP + XSS protection)
-    for header, value in _security.get_headers().items():
-        handler.send_header(header, value)
-    handler.end_headers()
-    handler.wfile.write(body)
+    try:
+        handler.send_response(status)
+        handler.send_header("Content-Type", "application/json; charset=utf-8")
+        handler.send_header("Content-Length", str(len(body)))
+        handler.send_header("Access-Control-Allow-Origin", "*")
+        handler.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        # رؤوس الأمان (CSP + XSS protection)
+        for header, value in _security.get_headers().items():
+            handler.send_header(header, value)
+        handler.end_headers()
+        handler.wfile.write(body)
+    except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+        logger.debug("Client disconnected before JSON response was delivered")
 
 
 def _iso_utc(epoch: float) -> str:
@@ -829,6 +832,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/sources":
             json_response(self, {"sources": source_registry()})
+            return
+        if path == "/api/platform-intelligence":
+            from backend.services.platform_intelligence import build_platform_intelligence
+            json_response(self, _ttl_cached("platform-intelligence", 300, build_platform_intelligence))
             return
         if path == "/api/search-options":
             # قوائم الاختيار الرسمية لحقول «اكتب أو اختر» في الخيارات المتقدمة
@@ -1146,8 +1153,15 @@ class Handler(BaseHTTPRequestHandler):
             json_response(self, {"providers": get_available_providers()})
             return
         if path == "/api/admin/users":
+            from backend.services.server_tier import extract_user_from_token
+            token = self.headers.get("Authorization", "").replace("Bearer ", "")
+            user = extract_user_from_token(token)
+            if not user or user.get("tier") not in ("pro", "enterprise"):
+                json_response(self, {"error": "Unauthorized"}, status=403)
+                return
             from backend.services.supabase_store import fetch_all_users
-            json_response(self, {"users": fetch_all_users()})
+            users = _run_with_timeout(fetch_all_users, timeout_sec=5) or []
+            json_response(self, {"users": users})
             return
         if path == "/api/rag/search":
             # RAG-powered search: vector similarity + context generation
@@ -1691,9 +1705,23 @@ class Handler(BaseHTTPRequestHandler):
                         logger.warning("Clients attach failed: %s", clients_error)
                         report["profitOpportunities"] = _profit_opportunities(report)
 
+                try:
+                    from backend.services.analysis_agents import build_analysis_agent_trace
+                    report["agentTrace"] = build_analysis_agent_trace(
+                        request, report, report.get("sourceStatus") or external_statuses, report.get("aiInsights") or {},
+                    )
+                except Exception as agent_trace_error:
+                    logger.warning("Analysis agent trace failed: %s", agent_trace_error)
+
                 if not _fast:
                     try:
-                        report["persistence"] = persist_analysis(request, report, report["sourceStatus"])
+                        report["persistence"] = _run_with_timeout(
+                            lambda: persist_analysis(request, report, report["sourceStatus"]),
+                            timeout_sec=8,
+                        ) or {
+                            "enabled": supabase_is_configured(),
+                            "status": "deferred",
+                        }
                     except Exception as persist_error:
                         report["persistence"] = {
                             "enabled": supabase_is_configured(),
@@ -1706,14 +1734,17 @@ class Handler(BaseHTTPRequestHandler):
                         if supabase_is_configured() and request.areas:
                             fair_value = report.get("valuation", {}).get("fairValue") or report.get("fairValue")
                             valuation_result = report.get("valuation") or {}
-                            save_valuation_request(
-                                region=request.areas[0],
-                                property_type=request.property_type or "",
-                                land_area_m2=request.min_area or request.max_area,
-                                offered_price=request.budget,
-                                fair_value_estimated=fair_value or valuation_result.get("marketValue"),
-                                score=round((getattr(deduped[0], "confidence", 0) or 0) * 100) if deduped else None,
-                                lang="ar",
+                            _run_with_timeout(
+                                lambda: save_valuation_request(
+                                    region=request.areas[0],
+                                    property_type=request.property_type or "",
+                                    land_area_m2=request.min_area or request.max_area,
+                                    offered_price=request.budget,
+                                    fair_value_estimated=fair_value or valuation_result.get("marketValue"),
+                                    score=round((getattr(deduped[0], "confidence", 0) or 0) * 100) if deduped else None,
+                                    lang="ar",
+                                ),
+                                timeout_sec=3,
                             )
                     except Exception as ve:
                         logger.warning("Could not save valuation request: %s", ve)
@@ -1725,7 +1756,8 @@ class Handler(BaseHTTPRequestHandler):
                         demand_source = list(local_demand_source)
                         if supabase_is_configured():
                             from backend.services.supabase_store import fetch_external_demand_rows
-                            demand_source.extend(fetch_external_demand_rows())
+                            external_demand_rows = _run_with_timeout(fetch_external_demand_rows, timeout_sec=4) or []
+                            demand_source.extend(external_demand_rows)
                         report["demandIndicators"] = _demand_indicator_payload(demand_source, request, top_area)
                     except Exception as demand_error:
                         logger.warning("Demand indicators failed: %s", demand_error)
@@ -1741,6 +1773,7 @@ class Handler(BaseHTTPRequestHandler):
                 json_response(self, report)
             except Exception as exc:
                 logger.exception("Analysis failed")
+                _progress_push(job_id, "error", "Analysis failed", results=0)
                 json_response(self, {"error": "Analysis failed", "detail": str(exc)}, status=500)
             return
         if path == "/api/report-pdf":

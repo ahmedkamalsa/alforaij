@@ -178,6 +178,9 @@
     regions.forEach(({ id, label }) => {
       const el = document.getElementById(id);
       if (el) {
+        if (!el.getAttribute('role')) {
+          el.setAttribute('role', 'region');
+        }
         el.setAttribute('aria-label', label);
         el.setAttribute('aria-live', 'polite');
         el.setAttribute('aria-atomic', 'false');

@@ -40,7 +40,14 @@ def _headers(prefer: str = "return=minimal") -> dict[str, str]:
     }
 
 
-def _post(table: str, rows: list[dict[str, Any]], *, upsert: bool = False, conflict: str = "") -> None:
+def _post(
+    table: str,
+    rows: list[dict[str, Any]],
+    *,
+    upsert: bool = False,
+    conflict: str = "",
+    optional_missing: bool = False,
+) -> None:
     if not rows or not is_configured():
         return
     query = f"?on_conflict={urllib.parse.quote(conflict)}" if upsert and conflict else ""
@@ -62,6 +69,8 @@ def _post(table: str, rows: list[dict[str, Any]], *, upsert: bool = False, confl
             return
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
+            if optional_missing and exc.code == 404:
+                raise RuntimeError(f"Supabase optional table {table} is missing") from exc
             logger.exception("Supabase %s write failed: HTTP %s %s", table, exc.code, detail)
             raise RuntimeError(f"Supabase {table} write failed: HTTP {exc.code} {detail}") from exc
         except (TimeoutError, urllib.error.URLError, ConnectionError, OSError) as exc:
@@ -175,7 +184,7 @@ def save_search_history(request: PropertyRequest, report: dict[str, Any], status
                     "top_area": top.get("area"),
                     "top_price": top.get("price"),
                     "top_recommendation": top.get("recommendationScore"),
-                    "top_data_quality": top.get("dataQuality"),
+                    "top_data_quality": top.get("dataQuality") or "لا توجد نتيجة عليا",
                     "source_summary": source_summary,
                     "report_summary": report.get("summary"),
                 }
@@ -228,6 +237,100 @@ def save_listing_evidence(report: dict[str, Any]) -> None:
             )
     for index in range(0, len(rows), 250):
         _post("listing_evidence", rows[index:index + 250])
+
+
+def save_ai_provider_runs(request: PropertyRequest, attempts: list[dict[str, Any]]) -> None:
+    """حفظ محاولات مزودي AI للمراقبة. فشلها لا يكسر تقرير المستخدم."""
+    if not attempts:
+        return
+    rows = [
+        {
+            "request_text": request.raw_text,
+            "provider": str(attempt.get("provider") or "unknown"),
+            "model": str(attempt.get("model") or ""),
+            "status": str(attempt.get("status") or "unknown"),
+            "response_ms": attempt.get("responseMs"),
+            "error": attempt.get("error") or None,
+            "metadata": attempt,
+        }
+        for attempt in attempts
+    ]
+    try:
+        _post("ai_provider_runs", rows, optional_missing=True)
+    except RuntimeError as exc:
+        logger.warning("ai_provider_runs save skipped: %s", exc)
+
+
+def save_analysis_agent_trace(request: PropertyRequest, trace: dict[str, Any]) -> None:
+    """حفظ سجل وكلاء التحليل وخطواتهم. فشله لا يمنع نتيجة البحث."""
+    agents = trace.get("agents") or []
+    if not agents:
+        return
+    run_rows: list[dict[str, Any]] = []
+    step_rows: list[dict[str, Any]] = []
+    for agent in agents:
+        agent_id = str(agent.get("id") or "unknown_agent")
+        outputs = agent.get("outputs") or {}
+        run_rows.append(
+            {
+                "request_text": request.raw_text,
+                "agent_id": agent_id,
+                "agent_name": str(agent.get("name") or agent_id),
+                "status": str(agent.get("status") or "unknown"),
+                "summary": str(agent.get("summary") or ""),
+                "outputs": outputs,
+            }
+        )
+        for key, value in outputs.items():
+            step_rows.append(
+                {
+                    "request_text": request.raw_text,
+                    "agent_id": agent_id,
+                    "step_key": str(key),
+                    "step_value": value if isinstance(value, (dict, list)) else {"value": value},
+                }
+            )
+    try:
+        _post("analysis_agent_runs", run_rows, optional_missing=True)
+        _post("analysis_agent_steps", step_rows, optional_missing=True)
+    except RuntimeError as exc:
+        logger.warning("analysis_agent trace save skipped: %s", exc)
+
+
+def save_data_quality_events(request: PropertyRequest, report: dict[str, Any]) -> None:
+    """حفظ تحذيرات ونواقص الجودة حتى تتحول لاحقًا إلى مهام تنظيف بيانات."""
+    rows: list[dict[str, Any]] = []
+    for item in report.get("results") or []:
+        for warning in item.get("warnings") or []:
+            rows.append(
+                {
+                    "request_text": request.raw_text,
+                    "source_id": resolve_source_id(str(item.get("source") or "")),
+                    "listing_code": item.get("code"),
+                    "event_type": "listing_warning",
+                    "severity": "warning",
+                    "reason": str(warning),
+                    "metadata": {"area": item.get("area"), "price": item.get("price")},
+                }
+            )
+    for limitation in report.get("limitations") or []:
+        rows.append(
+            {
+                "request_text": request.raw_text,
+                "source_id": None,
+                "listing_code": None,
+                "event_type": "report_limitation",
+                "severity": "info",
+                "reason": str(limitation),
+                "metadata": {},
+            }
+        )
+    if not rows:
+        return
+    try:
+        _post("data_quality_events", rows[:200], optional_missing=True)
+    except RuntimeError as exc:
+        logger.warning("data_quality_events save skipped: %s", exc)
 
 
 def _parse_price(value: Any) -> float | None:
@@ -325,6 +428,11 @@ def supabase_data_summary(local_records: int = 0) -> dict[str, Any]:
         "client_property_requests": "طلبات عملاء من لوحة العرض",
         "opportunities": "لقطات فرص محفوظة",
         "search_history": "سجل بحث مختصر",
+        "ai_provider_runs": "سجل محاولات مزودي الذكاء الاصطناعي",
+        "analysis_agent_runs": "سجل الوكلاء الرئيسيين لكل تحليل",
+        "analysis_agent_steps": "خطوات ومخرجات الوكلاء الفرعية",
+        "partner_feeds": "مصادر الشراكات والاشتراكات المرخصة",
+        "data_quality_events": "أحداث جودة البيانات وأسباب الاستبعاد",
     }
     details = {
         table: {"label": label, **_table_count(table)}
@@ -1146,6 +1254,9 @@ def persist_analysis(request: PropertyRequest, report: dict[str, Any], statuses:
     save_search_history(request, report, statuses)
     save_source_runs(request, statuses)
     save_listing_evidence(report)
+    save_ai_provider_runs(request, (report.get("aiInsights") or {}).get("_ai_attempts") or [])
+    save_analysis_agent_trace(request, report.get("agentTrace") or {})
+    save_data_quality_events(request, report)
     return {"enabled": True, "status": "saved"}
 
 

@@ -78,6 +78,16 @@ class TestProviderFallback(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["provider"], "ollama")
 
+    def test_nvidia_nim_can_be_first_provider(self):
+        self._setup_providers(
+            ["nvidia_nim", "freellmapi"],
+            {"nvidia_nim": {"content": "from minimax", "provider": "nvidia_nim", "model": "minimaxai/minimax-m3"}},
+        )
+        result = _mod.ai_chat("system", "user", use_cache=False)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["provider"], "nvidia_nim")
+        self.assertEqual(result["attempts"][0]["provider"], "nvidia_nim")
+
     def test_fallback_to_second_provider(self):
         self._setup_providers(
             ["ollama", "gemini"],
@@ -111,6 +121,14 @@ class TestProviderFallback(unittest.TestCase):
         self._setup_providers(["ollama", "gemini", "openrouter", "agentrouter"], {})
         result = _mod.ai_chat("system", "user", use_cache=False)
         self.assertIsNone(result)
+
+    def test_failed_attempts_are_exposed(self):
+        self._setup_providers(["nvidia_nim", "freellmapi"], {})
+        result = _mod.ai_chat("system", "user", use_cache=False)
+        self.assertIsNone(result)
+        attempts = _mod.get_last_ai_attempts()
+        self.assertEqual([a["provider"] for a in attempts], ["nvidia_nim", "freellmapi"])
+        self.assertTrue(all(a["status"] == "unavailable" for a in attempts))
 
     def test_caching_works(self):
         self._setup_providers(["ollama"], {"ollama": {"content": "cached", "provider": "ollama", "model": "test"}})
@@ -195,7 +213,7 @@ class TestProviderStatus(unittest.TestCase):
         for p in providers:
             self.assertIn("name", p)
             self.assertIn("status", p)
-            self.assertIn(p["name"], ["freellmapi", "ollama", "gemini", "openrouter", "agentrouter"])
+            self.assertIn(p["name"], ["nvidia_nim", "freellmapi", "ollama", "gemini", "openrouter", "agentrouter"])
 
 
 if __name__ == "__main__":

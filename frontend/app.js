@@ -194,6 +194,7 @@ const STATIC_DATA_MAP = {
   "/api/market-insights": "market-insights.json",
   "/api/developments": "developments.json",
   "/api/platform-dates": "platform-dates.json",
+  "/api/platform-intelligence": "platform-intelligence.json",
 };
 
 function apiUrl(path) {
@@ -3073,6 +3074,48 @@ function renderResultsSources(report) {
   });
 }
 
+function renderAgentTrace(report) {
+  const root = $("agentTraceBox");
+  if (!root) return;
+  const trace = report.agentTrace || {};
+  const agents = Array.isArray(trace.agents) ? trace.agents : [];
+  if (!agents.length) {
+    root.hidden = true;
+    root.innerHTML = "";
+    return;
+  }
+  const ai = trace.ai || {};
+  const aiLabel = ai.provider
+    ? `${ai.provider}${ai.model ? ` · ${ai.model}` : ""}`
+    : "تحليل محلي";
+  const cards = agents.map((agent) => `
+    <article class="agent-trace-card">
+      <div>
+        <h4>${escapeHtml(agent.name || agent.id || "وكيل")}</h4>
+        <p>${escapeHtml(agent.summary || "")}</p>
+      </div>
+      <span class="agent-trace-state">${escapeHtml(agent.status || "done")}</span>
+    </article>
+  `).join("");
+  const attempts = (ai.attempts || []).slice(0, 4).map((attempt) => `
+    <span class="agent-attempt ${attempt.status === "success" ? "ok" : "muted"}">
+      ${escapeHtml(attempt.provider || "")}${attempt.responseMs != null ? ` · ${Math.round(Number(attempt.responseMs))}ms` : ""}
+    </span>
+  `).join("");
+  root.innerHTML = `
+    <div class="agent-trace-head">
+      <div>
+        <strong>مسار التحليل</strong>
+        <span>الأرقام من قاعدة البيانات والمنطق الحسابي، والذكاء الاصطناعي للتفسير فقط.</span>
+      </div>
+      <b>${escapeHtml(aiLabel)}</b>
+    </div>
+    ${attempts ? `<div class="agent-attempts">${attempts}</div>` : ""}
+    <div class="agent-trace-grid">${cards}</div>
+  `;
+  root.hidden = false;
+}
+
 function renderDemandIndicator(report) {
   // مؤشر الطلب بجانب النتائج: من يبحث عن شراء/إيجار في نفس منطقة التقييم
   const root = $("demandIndicatorBox");
@@ -4009,6 +4052,7 @@ function renderReport(report) {
   }
   renderSources(report);
   renderResultsSources(report);
+  renderAgentTrace(report);
   renderDemandIndicator(report);
   renderProfitOpportunities(report);
   renderSimilarExternal(report);
@@ -5852,6 +5896,67 @@ async function renderPlatformDates() {
   }
 }
 
+const PLATFORM_BUCKET_LABELS = {
+  connected: "متصل ويدخل التقييم",
+  conditional: "مشروط بجودة البيانات",
+  official: "رسمي/تحقق",
+  partner_required: "يحتاج شراكة أو اشتراك مرخص",
+  reference: "مرجع مساعد",
+  inactive: "غير نشط حاليًا",
+};
+
+async function loadPlatformIntelligence() {
+  const root = $("platformIntelRoot");
+  const meta = $("platformIntelMeta");
+  if (!root) return;
+  try {
+    const data = await getJson("/api/platform-intelligence");
+    const summary = data.summary || {};
+    const sources = Array.isArray(data.sources) ? data.sources : [];
+    const strategy = data.databaseStrategy || {};
+    const highlight = sources
+      .filter((s) => ["partner_required", "official", "conditional"].includes(s.bucket))
+      .slice(0, 8);
+    if (meta) {
+      meta.textContent = `${Number(summary.connected || 0)} متصل · ${Number(summary.official || 0)} رسمي · ${Number(summary.partnerRequired || 0)} شراكة`;
+    }
+    const stats = [
+      ["متصل", summary.connected],
+      ["مشروط", summary.conditional],
+      ["رسمي", summary.official],
+      ["شراكة", summary.partnerRequired],
+    ].map(([label, count]) => `<span><b>${Number(count || 0).toLocaleString("en-US")}</b>${escapeHtml(label)}</span>`).join("");
+    const rules = (strategy.qualityRules || []).slice(0, 4)
+      .map((rule) => `<li>${escapeHtml(rule)}</li>`)
+      .join("");
+    const rows = highlight.map((s) => `
+      <article class="platform-intel-card">
+        <div class="platform-intel-card-head">
+          <h5>${escapeHtml(s.name)}</h5>
+          <span class="platform-bucket bucket-${escapeHtml(s.bucket)}">${escapeHtml(PLATFORM_BUCKET_LABELS[s.bucket] || s.status || "مصدر")}</span>
+        </div>
+        <p>${escapeHtml(s.professionalUse || "")}</p>
+        <dl>
+          <div><dt>الربط</dt><dd>${escapeHtml(s.integrationMode || "")}</dd></div>
+          <div><dt>الجداول</dt><dd>${escapeHtml((s.databaseTables || []).join("، "))}</dd></div>
+        </dl>
+        <small>${escapeHtml(s.nextAction || "")}</small>
+      </article>
+    `).join("");
+    root.innerHTML = `
+      <div class="platform-intel-stats">${stats}</div>
+      <div class="platform-intel-rules">
+        <strong>${escapeHtml(strategy.principle || "سياسة البيانات")}</strong>
+        <ul>${rules}</ul>
+      </div>
+      <div class="platform-intel-cards">${rows || '<div class="empty">لا توجد مصادر تحتاج عرضًا خاصًا الآن.</div>'}</div>
+    `;
+  } catch {
+    if (meta) meta.textContent = "";
+    root.innerHTML = '<div class="saved-empty">خريطة الربط غير متاحة حاليًا، وباقي المنصة يعمل من سجل المصادر الأساسي.</div>';
+  }
+}
+
 // ===== جرس التنبيهات (المهمة 4): عدّاد غير المقروء + قائمة منسدلة + «تم» =====
 const alertState = { alerts: [], loaded: false };
 
@@ -7351,7 +7456,10 @@ function switchMainTab(name) {
   }
   const visiblePanels = name === "market" ? new Set(["board", "insights"]) : new Set([name]);
   document.querySelectorAll(".main-tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.mainTab === name);
+    const isActive = btn.dataset.mainTab === name;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+    btn.setAttribute("tabindex", isActive ? "0" : "-1");
   });
   document.querySelectorAll("[data-main-panel]").forEach((panel) => {
     panel.classList.toggle("active", visiblePanels.has(panel.dataset.mainPanel));
@@ -7360,6 +7468,7 @@ function switchMainTab(name) {
   if (name === "market" || name === "board") loadDashboardBoard();
   if (name === "market" || name === "insights") loadInsights();
   if (name === "developments") loadDevelopments();
+  if (name === "why-free") loadPlatformIntelligence();
 }
 
 // زر «اسأل المساعد» العائم: يفتح صندوق المحادثة العائم

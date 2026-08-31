@@ -36,7 +36,7 @@
           <div class="status" id="healthStatus">جاري فحص البيانات...</div>
         </div>
       </div>
-      <div class="logo-showcase" aria-label="الفريج العقاري">
+      <div class="logo-showcase">
         <img class="brand-logo" src="assets/alforaij_logo.png" alt="الفريج العقاري">
       </div>
     </div>
@@ -45,6 +45,7 @@
   <div class="geo-divider" aria-hidden="true"></div>
 
   <main class="workspace">
+    <div class="main-tabs-shell">
     <nav class="main-tabs" id="mainTabs" aria-label="الأقسام الرئيسية">
       <button class="main-tab active" data-main-tab="search" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> بحث <b class="main-tab-count" id="tabCountSearch"></b></button>
       <button class="main-tab" data-main-tab="opportunities" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg> فرص <b class="main-tab-count" id="tabCountOpp"></b></button>
@@ -52,15 +53,16 @@
       <button class="main-tab" data-main-tab="developments" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg> تحديثات <b class="main-tab-count" id="tabCountDevelopments"></b></button>
       <button class="main-tab" data-main-tab="analytics" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m16 8-4 4-4-4-4 4"/></svg> تحليلات</button>
       <button class="main-tab" data-main-tab="account" type="button"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg> حساب</button>
-      <details class="main-more">
-        <summary aria-label="روابط إضافية">•••</summary>
-        <div class="main-more-menu">
-          <button data-more-tab="why-free" type="button">مجاني وأدق</button>
-          <button data-more-tab="metrics" type="button">المقاييس <b class="main-tab-count" id="tabCountMetrics"></b></button>
-          <a href="activity.html">التصنيفات</a>
-        </div>
-      </details>
     </nav>
+    <details class="main-more">
+      <summary aria-label="روابط إضافية">•••</summary>
+      <div class="main-more-menu">
+        <button data-more-tab="why-free" type="button">مجاني وأدق</button>
+        <button data-more-tab="metrics" type="button">المقاييس <b class="main-tab-count" id="tabCountMetrics"></b></button>
+        <a href="activity.html">التصنيفات</a>
+      </div>
+    </details>
+    </div>
 
     <section class="action-toolbar" data-main-panel="search">
       <div>
@@ -391,6 +393,7 @@
           </div>
         </div>
         <div id="resultsSources" class="results-sources" hidden></div>
+        <div id="agentTraceBox" class="agent-trace-box" hidden></div>
         <div id="demandIndicatorBox" class="results-demand" hidden></div>
         <div id="areaPriceCompare" class="area-price-compare" hidden>
           <h3>📊 مقارنة أسعار المناطق</h3>
@@ -422,7 +425,7 @@
         <div id="mapContainer" class="map-container" hidden>
           <div id="propertyMap" class="property-map"></div>
         </div>
-        <div id="results" class="results"></div>
+        <div id="results" class="results" role="region" aria-label="نتائج البحث" aria-live="polite" aria-atomic="false"></div>
       </section>
 
     <section class="main-panel" data-main-panel="search">
@@ -691,6 +694,19 @@
           <h4>من أين نجمع؟ بداية التغطية لكل منصة</h4>
           <p class="whyfree-coverage-note">عدد الإعلانات الحالي وأول يوم بدأنا فيه الجلب من كل منصة — المواقع الخارجية لا تنشر تاريخ الإعلان عادة، لذلك «أول جلب» هو المرجع الصادق لبداية التغطية، وتاريخ النشر المعروف يُذكر حيث توفره المنصة.</p>
           <div id="platformDatesWrap" class="coverage-table" role="table" aria-label="بداية الحصاد لكل منصة"></div>
+        </div>
+
+        <div class="platform-intel" aria-labelledby="platformIntelTitle">
+          <div class="platform-intel-head">
+            <div>
+              <h4 id="platformIntelTitle">خريطة الربط والاشتراكات وقاعدة البيانات</h4>
+              <p>تصنيف عملي لكل مصدر: المتصل الآن، المشروط، الرسمي، وما يحتاج شراكة أو اشتراك مصرح به قبل أن يدخل في التقييم.</p>
+            </div>
+            <span id="platformIntelMeta" class="filter-summary"></span>
+          </div>
+          <div id="platformIntelRoot" class="platform-intel-grid" aria-live="polite">
+            <div class="empty">جار تحميل خريطة المصادر...</div>
+          </div>
         </div>
 
         <details class="collapsible">

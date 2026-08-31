@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 # ── مهل الاتصال لكل مزوّد ──
 _FREELLMAPI_TIMEOUT = 5
+_NVIDIA_TIMEOUT = 8
 _OLLAMA_TIMEOUT = 5
 _GEMINI_TIMEOUT = 5
 _OPENROUTER_TIMEOUT = 5
@@ -35,23 +36,18 @@ _AGENTROUTER_TIMEOUT = 5
 # ══════════════════════════════════════════════════════════════════
 # 1. FreeLLMAPI — 34 providers, 635 models, 7.4B tokens/month
 # ══════════════════════════════════════════════════════════════════
-def _try_freellmapi(
+def _openai_compatible_chat(
+    api_url: str,
+    api_key: str,
+    model: str,
     system: str,
     user: str,
-    model: str = "",
-    temperature: float = 0.4,
+    temperature: float,
+    timeout: float,
+    provider: str,
 ) -> dict | None:
-    """Try FreeLLMAPI — unified gateway for 34 free providers.
-
-    Requires:
-      - FREELLMAPI_URL (default: http://127.0.0.1:5050/v1)
-      - FREELLMAPI_KEY (from FreeLLMAPI dashboard tray popover)
-    """
-    api_url = os.getenv("FREELLMAPI_URL", "http://127.0.0.1:5050/v1") + "/chat/completions"
-    api_key = os.getenv("FREELLMAPI_KEY", "")
     if not api_key:
         return None
-    model = model or os.getenv("FREELLMAPI_MODEL", "google/gemini-2.0-flash")
     payload = {
         "model": model,
         "messages": [
@@ -67,20 +63,70 @@ def _try_freellmapi(
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
         },
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=_FREELLMAPI_TIMEOUT) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             result = json.loads(resp.read().decode("utf-8"))
             choices = result.get("choices", [])
             if choices:
                 content = choices[0].get("message", {}).get("content", "")
                 if content:
-                    return {"content": content, "provider": "freellmapi", "model": model}
+                    return {"content": content, "provider": provider, "model": model}
     except Exception as e:
-        logger.debug("FreeLLMAPI unavailable: %s", e)
+        logger.debug("%s unavailable: %s", provider, e)
     return None
+
+
+def _try_nvidia_nim(
+    system: str,
+    user: str,
+    model: str = "",
+    temperature: float = 0.4,
+) -> dict | None:
+    """Try NVIDIA NIM OpenAI-compatible endpoint for MiniMax M3."""
+    api_key = os.getenv("NVIDIA_API_KEY", "")
+    api_base = os.getenv("NVIDIA_API_URL", "https://integrate.api.nvidia.com/v1").rstrip("/")
+    model = model or os.getenv("NVIDIA_MODEL", "minimaxai/minimax-m3")
+    return _openai_compatible_chat(
+        f"{api_base}/chat/completions",
+        api_key,
+        model,
+        system,
+        user,
+        temperature,
+        _NVIDIA_TIMEOUT,
+        "nvidia_nim",
+    )
+
+
+def _try_freellmapi(
+    system: str,
+    user: str,
+    model: str = "",
+    temperature: float = 0.4,
+) -> dict | None:
+    """Try FreeLLMAPI — unified gateway for 34 free providers.
+
+    Requires:
+      - FREELLMAPI_URL (default: http://127.0.0.1:5050/v1)
+      - FREELLMAPI_KEY (from FreeLLMAPI dashboard tray popover)
+    """
+    api_url = os.getenv("FREELLMAPI_URL", "http://127.0.0.1:5050/v1").rstrip("/") + "/chat/completions"
+    api_key = os.getenv("FREELLMAPI_KEY", "")
+    model = model or os.getenv("FREELLMAPI_MODEL", "minimaxai/minimax-m3")
+    return _openai_compatible_chat(
+        api_url,
+        api_key,
+        model,
+        system,
+        user,
+        temperature,
+        _FREELLMAPI_TIMEOUT,
+        "freellmapi",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -295,15 +341,22 @@ def _set_cache(system: str, user: str, result: dict) -> None:
 # AI Chat — الواجهة الرئيسية
 # ══════════════════════════════════════════════════════════════════
 # ترتيب المزوّدين (يمكن تعديله عبر متغير البيئة AI_PROVIDER_ORDER)
-_DEFAULT_PROVIDERS = ["freellmapi", "ollama", "gemini", "openrouter", "agentrouter"]
+_DEFAULT_PROVIDERS = ["nvidia_nim", "freellmapi", "gemini", "openrouter", "ollama", "agentrouter"]
 
 _PROVIDER_MAP = {
+    "nvidia_nim": _try_nvidia_nim,
     "freellmapi": _try_freellmapi,
     "ollama": _try_ollama,
     "gemini": _try_gemini,
     "openrouter": _try_openrouter,
     "agentrouter": _try_agentrouter,
 }
+
+_last_attempts: list[dict[str, Any]] = []
+
+
+def get_last_ai_attempts() -> list[dict[str, Any]]:
+    return [dict(item) for item in _last_attempts]
 
 
 def ai_chat(
@@ -335,6 +388,8 @@ def ai_chat(
         providers = list(_DEFAULT_PROVIDERS)
 
     import time as _time
+    attempts: list[dict[str, Any]] = []
+    global _last_attempts
     _total_start = _time.time()
     _TOTAL_TIMEOUT = 10  # حد أقصى 10 ثوانٍ لكل المزوّدين مجتمعين
     for provider_name in providers:
@@ -344,12 +399,23 @@ def ai_chat(
         fn = _PROVIDER_MAP.get(provider_name)
         if not fn:
             continue
+        started = _time.time()
         result = fn(system, user, model=model, temperature=temperature)
+        elapsed_ms = round((_time.time() - started) * 1000, 1)
+        attempts.append({
+            "provider": provider_name,
+            "status": "success" if result else "unavailable",
+            "model": (result or {}).get("model") or model or "",
+            "responseMs": elapsed_ms,
+        })
         if result:
+            result["attempts"] = [dict(item) for item in attempts]
+            _last_attempts = [dict(item) for item in attempts]
             if use_cache:
                 _set_cache(system, user, result)
             return result
 
+    _last_attempts = [dict(item) for item in attempts]
     logger.warning("All AI providers failed — no response available")
     return None
 
@@ -407,6 +473,8 @@ def get_available_providers() -> list[dict[str, Any]]:
                     status = "available" if models else "running_no_models"
             except Exception:
                 status = "offline"
+        elif name == "nvidia_nim":
+            status = "configured" if os.getenv("NVIDIA_API_KEY") else "no_key"
         elif name == "gemini":
             status = "configured" if (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_AI_STUDIO_KEY")) else "no_key"
         elif name == "openrouter":

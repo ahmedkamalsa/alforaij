@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from backend.models import Listing, PropertyRequest
+from backend.services.request_parser import detect_area_in_text
 from backend.services.supabase_store import fetch_market_ads
 
 logger = logging.getLogger(__name__)

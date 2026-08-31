@@ -16,10 +16,29 @@ AI-Powered Listing Classification System
 """
 
 import json
+import re
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
 from datetime import datetime
+
+
+_ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+
+
+def _number(value: Any, default: float = 0.0) -> float:
+    if value is None or isinstance(value, bool):
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).translate(_ARABIC_DIGITS)
+    cleaned = re.sub(r"[^\d.\-]", "", text.replace(",", ""))
+    if cleaned in {"", "-", ".", "-."}:
+        return default
+    try:
+        return float(cleaned)
+    except ValueError:
+        return default
 
 
 class ClassificationCategory(Enum):
@@ -251,9 +270,9 @@ class ListingClassifier:
     
     def _classify_investment_level(self, listing: Dict) -> str:
         """تصنيف مستوى الاستثمار"""
-        score = listing.get("opportunityScore", 0)
-        price = listing.get("price", 0)
-        space = listing.get("space", 0)
+        score = _number(listing.get("opportunityScore", 0))
+        price = _number(listing.get("price", 0))
+        space = _number(listing.get("space", 0))
         
         if score > 80:
             return "ممتاز"
@@ -268,8 +287,8 @@ class ListingClassifier:
     
     def _classify_priority(self, listing: Dict) -> str:
         """تصنيف الأولوية"""
-        score = listing.get("opportunityScore", 0)
-        movement = listing.get("movement", 0)
+        score = _number(listing.get("opportunityScore", 0))
+        movement = _number(listing.get("movement", 0))
         
         if score > 70 or movement > 5:
             return "عالية"
@@ -320,9 +339,9 @@ class ListingClassifier:
     
     def _classify_trust_level(self, listing: Dict) -> str:
         """تصنيف مستوى الثقة"""
-        has_price = listing.get("price", 0) > 0
-        has_space = listing.get("space", 0) > 0
-        has_evidence = listing.get("evidenceCount", 0) > 0
+        has_price = _number(listing.get("price", 0)) > 0
+        has_space = _number(listing.get("space", 0)) > 0
+        has_evidence = _number(listing.get("evidenceCount", 0)) > 0
         source = listing.get("source", "")
         
         trust_score = 0
@@ -341,7 +360,7 @@ class ListingClassifier:
     def _classify_target_audience(self, listing: Dict) -> str:
         """تصنيف الفئة المستهدفة"""
         tx = listing.get("transaction", "").lower()
-        score = listing.get("opportunityScore", 0)
+        score = _number(listing.get("opportunityScore", 0))
         
         if "إيجار" in tx:
             return "مستثمر"

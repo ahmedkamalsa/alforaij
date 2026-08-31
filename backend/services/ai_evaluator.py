@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 from backend.config import AGENT_ROUTER_API_KEY, AGENT_ROUTER_API_URL
 from backend.models import PropertyRequest, RankedListing
-from backend.services.ai_router import ai_chat, ai_chat_json
+from backend.services.ai_router import ai_chat, ai_chat_json, get_last_ai_attempts
 
 
 AI_TIMEOUT_SECONDS = 12  # مهلة قصيرة حتى لا يعلق التحليل عند تعذر الاتصال
@@ -72,6 +72,7 @@ def _call_ai_analysis(
             if isinstance(parsed, dict) and parsed.get("executive_summary"):
                 parsed["_ai_provider"] = result.get("provider", "unknown")
                 parsed["_ai_model"] = result.get("model", "unknown")
+                parsed["_ai_attempts"] = result.get("attempts") or []
                 return parsed
     except Exception as e:
         logger.warning("AI evaluator call via router failed: %s", e)
@@ -166,4 +167,7 @@ def generate_professional_analysis(
         return ai
     fallback = fallback_professional_analysis(request, top_listings, external_statuses)
     fallback["analysisMethod"] = "local"
+    fallback["_ai_provider"] = "local"
+    fallback["_ai_model"] = "deterministic-fallback"
+    fallback["_ai_attempts"] = get_last_ai_attempts()
     return fallback

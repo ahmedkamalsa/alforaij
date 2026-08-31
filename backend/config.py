@@ -70,7 +70,10 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
 AI_PROVIDER_ORDER = os.getenv("AI_PROVIDER_ORDER", "freellmapi,ollama,gemini,openrouter,agentrouter")
 FREELLMAPI_URL = os.getenv("FREELLMAPI_URL", "http://127.0.0.1:5050/v1")
 FREELLMAPI_KEY = os.getenv("FREELLMAPI_KEY", "")
-FREELLMAPI_MODEL = os.getenv("FREELLMAPI_MODEL", "google/gemini-2.0-flash")
+FREELLMAPI_MODEL = os.getenv("FREELLMAPI_MODEL", "minimaxai/minimax-m3")
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
+NVIDIA_API_URL = os.getenv("NVIDIA_API_URL", "https://integrate.api.nvidia.com/v1")
+NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "minimaxai/minimax-m3")
 SEED_LISTINGS_PATH = Path(os.getenv("ALFORAIJ_SEED_LISTINGS", DATA_DIR / "seed_listings.json"))
 BOARD_HTML_PATH = Path(
     os.getenv(
