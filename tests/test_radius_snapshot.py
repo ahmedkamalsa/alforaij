@@ -6,11 +6,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_snapshot_script_exists_and_produces_entries() -> None:
     """الأداة تكتب JSON بعدد إدخالات > 0 عند تشغيلها على خادم حي."""
+    pytest.importorskip("playwright")
     out = ROOT / ".freebuff" / "radius_snapshot_test.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     base = os.getenv("ALFORAIJ_MOBILE_BASE", "http://127.0.0.1:8000/")
