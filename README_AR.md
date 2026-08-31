@@ -87,18 +87,19 @@ NVIDIA NIM (MiniMax M3) ➔ FreeLLMAPI ➔ Google Gemini ➔ OpenRouter ➔ Olla
 
 ---
 
-## 🌐 النشر إلى GitHub Pages
+## 🌐 النشر المباشر و GitHub Pages
 
-تم إعداد workflow آلي يسمى `Deploy to GitHub Pages` في الملف:
-`.github/workflows/deploy-github-pages.yml`
+- **الرابط المنشور المباشر للموقع/اللوحة:** [https://ahmedkamalsa.github.io/alforaijboard/](https://ahmedkamalsa.github.io/alforaijboard/)
 
-### كيف يعمل النشر؟
-1. عند الرفع (`git push`) إلى الفرع الرئيسي `main`، يتم رفع المجلد `frontend/` تلقائيًا كـ artifact لـ GitHub Pages.
-2. تقوم منصة GitHub ينشر الواجهة الاسترشادية مباشرة على الرابط الخارجي.
-3. يمكن ضبط رابط الـ Backend في متغيرات GitHub Actions:
-   ```env
-   ALFORAIJ_API_BASE=https://your-backend-api.example.com
-   ```
+### مسار النشر الآلي:
+تم إعداد وتفعيل workflows النشر في `.github/workflows/`:
+1. **`deploy-alforaijboard.yml`**: يقوم بنشر الواجهة الاسترشادية مباشرة إلى فرع `gh-pages` لـ `alforaijboard`.
+2. **`deploy-github-pages.yml`**: ينشر أحدث نسخة من `frontend/` تلقائيًا على GitHub Pages عند كل الرفع (`push`) إلى الفرع الرئيسي `main`.
+
+يمكن ضبط رابط الـ Backend الحي في متغيرات GitHub Actions:
+```env
+ALFORAIJ_API_BASE=https://your-backend-api.example.com
+```
 
 ---
 

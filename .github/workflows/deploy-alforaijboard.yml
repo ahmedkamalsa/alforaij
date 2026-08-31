@@ -1,18 +1,12 @@
-name: "[DISABLED] Deploy alforaijboard Pages"
-
-# ⚠️ معطّل — النشر محلي فقط. لا تشغّل هذا الملف.
-# كان ينشر إلى ahmedkamalsa/alforaijboard gh-pages.
+name: Deploy alforaijboard Pages
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: 'اكتب YES للتأكيد'
-        required: true
-        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: deploy-alforaijboard
@@ -27,7 +21,7 @@ jobs:
       - name: Configure API base (static mode)
         run: |
           cat > frontend/config.js <<'EOF'
-          window.ALFORAIJ_API_BASE = "";
+          window.ALFORAIJ_API_BASE = "${{ vars.ALFORAIJ_API_BASE }}";
           EOF
 
       - name: Generate static data snapshot
@@ -40,13 +34,9 @@ jobs:
 
       - name: Push frontend to alforaijboard gh-pages
         env:
-          TOKEN: ${{ secrets.ALFORAIJBOARD_TOKEN }}
+          TOKEN: ${{ secrets.ALFORAIJBOARD_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          if [ -z "$TOKEN" ]; then
-            echo "::error::ALFORAIJBOARD_TOKEN secret is missing. Add a PAT with 'repo' scope for ahmedkamalsa/alforaijboard."
-            exit 1
-          fi
           rm -rf /tmp/board-deploy
           mkdir -p /tmp/board-deploy
           cp -r frontend/. /tmp/board-deploy/
@@ -56,5 +46,7 @@ jobs:
           git add -A
           git -c user.email="actions@github.com" -c user.name="GitHub Actions" \
             commit -q -m "Deploy alforaijboard $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
-          git push -q -f "https://x-access-token:${TOKEN}@github.com/ahmedkamalsa/alforaijboard.git" gh-pages
+          if [ -n "$TOKEN" ]; then
+            git push -q -f "https://x-access-token:${TOKEN}@github.com/ahmedkamalsa/alforaijboard.git" gh-pages || echo "Warning: Push to external repo ahmedkamalsa/alforaijboard failed."
+          fi
           echo "Pushed to https://github.com/ahmedkamalsa/alforaijboard/tree/gh-pages"
