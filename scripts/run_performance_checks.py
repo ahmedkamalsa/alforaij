@@ -45,6 +45,9 @@ def _healthy(timeout: float = 15.0) -> bool:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
     os.chdir(ROOT)
 
     try:

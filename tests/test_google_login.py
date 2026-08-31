@@ -22,34 +22,42 @@ PASS = 0
 FAIL = 0
 
 
-def post(path, body, timeout=90):
+def post(path, body, timeout=90, retries=5):
     data = json.dumps(body).encode()
-    req = urllib.request.Request(
-        f"{BASE}{path}",
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status, json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        body = e.read()
-        return e.code, json.loads(body) if body else {}
-    except Exception as e:
-        return 0, {"error": str(e)}
+    for attempt in range(retries):
+        req = urllib.request.Request(
+            f"{BASE}{path}",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            body_res = e.read()
+            return e.code, json.loads(body_res) if body_res else {}
+        except Exception as e:
+            if attempt < retries - 1:
+                time.sleep(1)
+                continue
+            return 0, {"error": str(e)}
 
 
-def get(path, timeout=15):
-    req = urllib.request.Request(f"{BASE}{path}")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status, json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        body = e.read()
-        return e.code, json.loads(body) if body else {}
-    except Exception as e:
-        return 0, {"error": str(e)}
+def get(path, timeout=15, retries=5):
+    for attempt in range(retries):
+        req = urllib.request.Request(f"{BASE}{path}")
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            body_res = e.read()
+            return e.code, json.loads(body_res) if body_res else {}
+        except Exception as e:
+            if attempt < retries - 1:
+                time.sleep(1)
+                continue
+            return 0, {"error": str(e)}
 
 
 def assert_test(name, condition, detail=""):

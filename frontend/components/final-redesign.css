@@ -1,0 +1,1227 @@
+/* ===== إعادة التصميم الشاملة — مساحات واسعة وريسبونسيف احترافي ===== */
+
+:root {
+  /* ألوان أساسية */
+  --primary: #3b82f6;
+  --primary-light: #60a5fa;
+  --primary-dark: #2563eb;
+  --secondary: #8b5cf6;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #06b6d4;
+
+  /* ألوان الخلفية */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-card: #1e293b;
+  --bg-hover: #334155;
+
+  /* ألوان النص */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* حدود وظلال */
+  --border-color: #334155;
+  --border-radius: 16px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.5);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,0.6);
+
+  /* تباعد */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+}
+
+/* ===== إعادة تعيين عامة ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Noto Kufi Arabic', 'Tajawal', system-ui, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ===== الحاوية الرئيسية ===== */
+.workspace {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-2xl);
+  min-height: calc(100vh - 80px);
+}
+
+/* ===== التنقل الرئيسي ===== */
+.main-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--space-xl);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.main-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.main-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.main-tab.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: var(--shadow-md);
+}
+
+.main-tab-count {
+  background: rgba(255,255,255,0.2);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* ===== شريط الأدوات ===== */
+.action-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--space-xl);
+  gap: var(--space-lg);
+}
+
+.action-toolbar div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.action-toolbar strong {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.action-toolbar span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.action-buttons button {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-buttons button:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.action-buttons button.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+/* ===== لوحة السوق ===== */
+.board-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-lg);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+}
+
+.board-header-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.board-header-title h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.board-summary-badge {
+  background: var(--primary);
+  color: white;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ===== الفلاتر ===== */
+.board-quick-filters {
+  padding: var(--space-lg);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+}
+
+.board-filter-row {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.board-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 180px;
+  flex: 1;
+}
+
+.board-filter-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.board-select, .board-input {
+  padding: var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.board-select:focus, .board-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.3);
+}
+
+.board-apply-btn {
+  padding: var(--space-md) var(--space-xl);
+  background: var(--primary);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 48px;
+}
+
+.board-apply-btn:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.board-clear-btn {
+  padding: var(--space-md) var(--space-lg);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.board-clear-btn:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+
+/* ===== بطاقات المقاييس ===== */
+.board-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  border-left: 4px solid var(--primary);
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.metric-card-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.metric-card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.metric-card-change {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.metric-card-change.positive {
+  color: var(--success);
+}
+
+.metric-card-change.negative {
+  color: var(--danger);
+}
+
+/* ===== تخطيط اللوحة ===== */
+.board-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+}
+
+.board-overview {
+  padding: var(--space-xl);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+}
+
+.board-overview-header {
+  margin-bottom: var(--space-lg);
+}
+
+.board-overview-header h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.board-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+/* ===== قسم المحافظات ===== */
+.governorate-section {
+  padding: var(--space-xl);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+}
+
+.gov-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-xl);
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.gov-section-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.gov-section-title h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.gov-icon {
+  font-size: 1.5rem;
+}
+
+.gov-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.gov-section-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.gov-view-switch {
+  display: flex;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  padding: var(--space-xs);
+}
+
+.gov-view-btn {
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gov-view-btn.active {
+  background: var(--primary);
+  color: white;
+}
+
+.gov-axis-pill {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 20px;
+  font-size: 0.85rem;
+}
+
+.gov-action-btn {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gov-action-btn:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+/* ===== شريط الملخص ===== */
+.gov-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  margin-bottom: var(--space-xl);
+}
+
+.gov-summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.gov-summary-item:hover {
+  transform: scale(1.05);
+}
+
+.gov-summary-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.gov-summary-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ===== شبكة المحافظات ===== */
+.gov-grid-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--space-lg);
+}
+
+.gov-card {
+  background: var(--bg-tertiary);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  border: 1px solid var(--border-color);
+}
+
+.gov-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary);
+}
+
+.gov-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-lg);
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+  cursor: pointer;
+}
+
+.gov-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.gov-card-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: white;
+  border-radius: 12px;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.gov-card-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gov-card-name h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gov-card-name span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.gov-card-count {
+  background: var(--primary);
+  color: white;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.gov-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+}
+
+.gov-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.gov-stat:hover {
+  background: var(--bg-hover);
+}
+
+.gov-stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gov-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.gov-stat-change {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.gov-stat-change.positive {
+  color: var(--success);
+}
+
+.gov-stat-change.negative {
+  color: var(--danger);
+}
+
+/* ===== المناطق ===== */
+.gov-areas {
+  padding: var(--space-lg);
+  border-top: 1px solid var(--border-color);
+  display: none;
+}
+
+.gov-card.expanded .gov-areas {
+  display: block;
+}
+
+.gov-areas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-md);
+}
+
+.gov-area {
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.gov-area:hover {
+  border-color: var(--primary);
+  background: var(--bg-hover);
+}
+
+.gov-area-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.gov-area-count {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.gov-area-stats {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.gov-area-stat {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ===== الإعلانات المرتبطة ===== */
+.gov-linked-ads {
+  margin-top: var(--space-xl);
+  padding: var(--space-xl);
+  background: var(--bg-tertiary);
+  border-radius: var(--border-radius);
+}
+
+.gov-linked-ads-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.gov-linked-ads-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gov-linked-ads-count {
+  background: var(--primary);
+  color: white;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.gov-linked-ads-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-md);
+}
+
+.gov-ad-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.gov-ad-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.gov-ad-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.gov-ad-price {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.gov-ad-meta {
+  display: flex;
+  gap: var(--space-md);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.gov-ad-source {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.gov-ad-score {
+  background: var(--primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ===== الريسبونسيف ===== */
+@media (max-width: 1200px) {
+  .workspace {
+    padding: var(--space-lg) var(--space-xl);
+  }
+
+  .gov-grid-view {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .workspace {
+    padding: var(--space-md);
+  }
+
+  .main-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: var(--space-sm);
+  }
+
+  .main-tab {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.85rem;
+  }
+
+  .action-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .action-buttons {
+    justify-content: center;
+  }
+
+  .board-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .board-filter-group {
+    min-width: 100%;
+  }
+
+  .gov-section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gov-section-actions {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .gov-grid-view {
+    grid-template-columns: 1fr;
+  }
+
+  .gov-card-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gov-areas-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gov-linked-ads-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .workspace {
+    padding: var(--space-sm);
+  }
+
+  .main-tab {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.8rem;
+  }
+
+  .tab-full {
+    display: none;
+  }
+
+  .tab-short {
+    display: inline;
+  }
+
+  .board-apply-btn {
+    width: 100%;
+  }
+
+  .gov-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-md);
+  }
+
+  .gov-card-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .gov-areas-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== الوضع الفاتح ===== */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-hover: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+    --shadow-xl: 0 20px 25px rgba(0,0,0,0.15);
+  }
+}
+
+/* ===== تحسينات إضافية ===== */
+.governorate-section {
+  border: 1px solid var(--border-color);
+}
+
+.gov-card {
+  border: 1px solid var(--border-color);
+}
+
+.gov-card:hover {
+  border-color: var(--primary);
+}
+
+.gov-area {
+  border: 1px solid var(--border-color);
+}
+
+.gov-area:hover {
+  border-color: var(--primary);
+}
+
+.gov-ad-card {
+  border: 1px solid var(--border-color);
+}
+
+.gov-ad-card:hover {
+  border-color: var(--primary);
+}
+
+/* ===== تأثيرات حركية ===== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.gov-card {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+.gov-card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.gov-card:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.gov-card:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.gov-card:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+.gov-card:nth-child(6) {
+  animation-delay: 0.5s;
+}
+
+/* ===== تحسينات التمرير ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* ===== تحسينات النماذج ===== */
+input, select, textarea {
+  font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.3);
+}
+
+/* ===== تحسينات الأزرار ===== */
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== تحسينات الروابط ===== */
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--primary-light);
+}
+
+/* ===== تحسينات الجداول ===== */
+@media (max-width: 768px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* ===== تحسينات الصور ===== */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ===== تحسينات النصوص ===== */
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.3;
+}
+
+p {
+  line-height: 1.6;
+}
+
+/* ===== تحسينات الأيقونات ===== */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== تحسينات البطاقات ===== */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* ===== تحسينات النماذج المزرية ===== */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-md);
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--space-xl);
+}
+
+/* ===== تحسينات التنبيهات ===== */
+.alert {
+  padding: var(--space-md);
+  border-radius: 10px;
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.alert-success {
+  background: rgba(16,185,129,0.1);
+  border: 1px solid var(--success);
+  color: var(--success);
+}
+
+.alert-warning {
+  background: rgba(245,158,11,0.1);
+  border: 1px solid var(--warning);
+  color: var(--warning);
+}
+
+.alert-danger {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
+.alert-info {
+  background: rgba(6,182,212,0.1);
+  border: 1px solid var(--info);
+  color: var(--info);
+}
+
+/* ===== تحسينات التحميل ===== */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-3xl);
+  color: var(--text-secondary);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--bg-tertiary);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== تحسينات الفارغ ===== */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-3xl);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ===== تحسينات التلميحات ===== */
+.tooltip {
+  position: relative;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  z-index: 1000;
+}
+
+.tooltip:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ===== تحسينات الأجهزة المحمولة ===== */
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block !important;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none !important;
+  }
+
+  .desktop-only {
+    display: block !important;
+  }
+}

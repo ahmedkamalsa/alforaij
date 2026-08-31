@@ -36,5 +36,17 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pypdf  # pypdf: تقرير PDF يُختبر بقراءة ملف (اختبار فقط)
+      - name: Start local API server
+        run: |
+          PYTHONIOENCODING=utf-8 PYTHONPATH=. python -m backend.main > server.log 2>&1 &
+          echo $! > server.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat server.log
+          exit 1
       - name: Run pytest suite
         run: python -m pytest tests/ -q
