@@ -85,4 +85,4 @@
 - Create/Modify: `README_AR.md`
 
 - [x] Explain project, tabs, APIs, Supabase, AI providers, and deployment.
-- [ ] Run compile, pytest, JS checks, API smoke, and Playwright smoke.
+- [x] Run compile, pytest, JS checks, API smoke, and Playwright smoke.
