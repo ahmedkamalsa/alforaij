@@ -1,0 +1,58 @@
+---
+name: Sync Supabase Daily
+
+# yamllint disable-line rule:truthy
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "alforaij-research-assistant/**"
+      - "alforaijboard/**"
+      - "supabase/**"
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Sync listings to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "::error::SUPABASE_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && \
+             [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::SUPABASE key missing"
+            exit 1
+          fi
+          # توافق: بعض البيئات تستخدم SUPABASE_KEY بدل SERVICE_ROLE
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && \
+             [ -n "$SUPABASE_KEY" ]; then
+            export SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_KEY"
+          fi
+          echo "Running sync_listings_supabase.py ..."
+          python scripts/sync_listings_supabase.py
+          echo "Running persist_to_supabase.py ..."
+          python scripts/persist_to_supabase.py
