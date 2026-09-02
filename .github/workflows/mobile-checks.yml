@@ -5,14 +5,14 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "frontend/**"
+      - "alforaijboard/**"
       - "tests/playwright/**"
       - "scripts/run_mobile_checks.py"
       - ".github/workflows/mobile-checks.yml"
   push:
     branches: [main]
     paths:
-      - "frontend/**"
+      - "alforaijboard/**"
       - "tests/playwright/**"
       - "scripts/run_mobile_checks.py"
       - ".github/workflows/mobile-checks.yml"

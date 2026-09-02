@@ -1,9 +1,18 @@
 {
-  "generatedAt": "2026-08-31T06:02:12",
+  "generatedAt": "2026-09-02T06:02:55",
   "count": 8,
   "status": "success",
   "note": "جمع 8 تطورًا، 5/11 مصادر عقارية",
   "developments": [
+    {
+      "url": "https://timeskuwait.com/kuwait-tightens-anti-money-laundering-controls-for-gold-and-real-estate-sectors/",
+      "title": "Kuwait tightens anti-money laundering controls for gold and real estate sectors",
+      "source": "timeskuwait",
+      "source_name": "TimesKuwait",
+      "category": "أخبار السوق",
+      "published": "Tue, 01 Se",
+      "summary": "Minister of Commerce and Industry Osama Boodai has updated anti-money laundering and counter-terrorist financing controls for businesses dealing in gold, precious stones and precious metals, as well as real estate brokers and intermediaries. The updated rules require companies and institutions in th"
+    },
     {
       "url": "https://alanba.com.kw/BBCNews/19202/",
       "title": "ترامب: الولايات المتحدة أبرمت صفقة \"تاريخية\" للسيطرة على 65 مليار برميل من النفط الفنزويلي",
@@ -14,17 +23,8 @@
       "summary": ""
     },
     {
-      "url": "https://www.aljarida.com/article/142840",
-      "title": "«السكنية»: 22 تحالفاً تقود باكورة مشاريع «المطور العقاري» 31-08-2026",
-      "source": "aljarida",
-      "source_name": "الجريدة",
-      "category": "أخبار السوق",
-      "published": "",
-      "summary": ""
-    },
-    {
-      "url": "https://www.alraimedia.com/article/1777770/محليات/أخبار-محلية/سكة-المشاريع-السكنية-سالكة",
-      "title": "دفعت المؤسسة العامة للرعاية السكنية مشروع «المُطوّر العقاري» خُطوة جديدة إلى الأمام، بإعلان تأهيل 22 تحالفاً تضم 41 شركة كويتية وعالمية، للمشاركة في المرحلة الت",
+      "url": "https://www.alraimedia.com/article/1777912/اقتصاد/حظر-بيع-وشراء-الذهب-والوساطة-عقاريا-لمن-يتعذر-معه-التحقق-من-المستفيد-الفعلي",
+      "title": "حظر بيع وشراء الذهب والوساطة عقارياً لِمَنْ يتعذّر معه التحقّق من «المستفيد الفعلي»",
       "source": "alrai",
       "source_name": "الراي",
       "category": "أخبار السوق",
@@ -34,6 +34,15 @@
     {
       "url": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports/Real-estate-reports.html",
       "title": "Real estate Reports",
+      "source": "kfh_reports",
+      "source_name": "بيت التمويل الكويتي - تقارير عقارية",
+      "category": "تمويل عقاري",
+      "published": "",
+      "summary": ""
+    },
+    {
+      "url": "https://www.kfh.com/en/reports/kuwait/RE-Reports/KFH-Local-Real-Estate-Report---Q2-2026/document_en/KFH-Real-Estate-Report-2026-Q2.pdf.pdf",
+      "title": "KFH-Local Real Estate Report - Q2 2026",
       "source": "kfh_reports",
       "source_name": "بيت التمويل الكويتي - تقارير عقارية",
       "category": "تمويل عقاري",
@@ -52,15 +61,6 @@
     {
       "url": "https://www.kfh.com/en/reports/kuwait/RE-Reports/KFH-Local-Real-Estate-Report-Q3-2025/document_en/KFH%20Real%20Estate%20Report%202025%20Q3-En.pdf.pdf",
       "title": "KFH Local Real Estate Report-Q3-2025",
-      "source": "kfh_reports",
-      "source_name": "بيت التمويل الكويتي - تقارير عقارية",
-      "category": "تمويل عقاري",
-      "published": "",
-      "summary": ""
-    },
-    {
-      "url": "https://www.kfh.com/en/reports/kuwait/RE-Reports/KFH-Local-Real-Estate-Report---Q2-2025/document_en_en/KFH%20Real%20Estate%20Report%202025%20Q2-En.pdf.pdf",
-      "title": "KFH-Local Real Estate Report - Q2 2025",
       "source": "kfh_reports",
       "source_name": "بيت التمويل الكويتي - تقارير عقارية",
       "category": "تمويل عقاري",
@@ -90,15 +90,15 @@
       "name": "Kuwait Times",
       "status": "no_matches",
       "records": 0,
-      "note": "لا عناوين",
+      "note": "1 عنوانًا إجمالًا، 0 عقاريًا",
       "fetchMethod": "HTML",
       "endpoint": "https://kuwaittimes.com/"
     },
     {
       "name": "TimesKuwait",
-      "status": "no_matches",
-      "records": 0,
-      "note": "10 عنوانًا إجمالًا، 0 عقاريًا",
+      "status": "success",
+      "records": 1,
+      "note": "10 عنوانًا إجمالًا، 1 عقاريًا",
       "fetchMethod": "RSS",
       "endpoint": "https://timeskuwait.com/feed"
     },
@@ -128,9 +128,9 @@
     },
     {
       "name": "الجريدة",
-      "status": "success",
-      "records": 1,
-      "note": "1 عنوانًا إجمالًا، 1 عقاريًا",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
       "fetchMethod": "HTML",
       "endpoint": "https://www.aljarida.com/"
     },
@@ -138,7 +138,7 @@
       "name": "الراي",
       "status": "success",
       "records": 1,
-      "note": "1 عنوانًا إجمالًا، 1 عقاريًا",
+      "note": "2 عنوانًا إجمالًا، 1 عقاريًا",
       "fetchMethod": "HTML",
       "endpoint": "https://www.alraimedia.com/"
     },

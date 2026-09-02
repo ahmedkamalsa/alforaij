@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "frontend/**"
+      - "alforaijboard/**"
       - "backend/main.py"
       - "tests/playwright/performance_audit.py"
       - "scripts/run_performance_checks.py"
@@ -13,7 +13,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "frontend/**"
+      - "alforaijboard/**"
       - "backend/main.py"
       - "tests/playwright/performance_audit.py"
       - "scripts/run_performance_checks.py"

@@ -1,19 +1,19 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-08-31T06:00:03",
-  "finishedAt": "2026-08-31T06:03:01",
+  "startedAt": "2026-09-02T06:00:02",
+  "finishedAt": "2026-09-02T06:03:51",
   "steps": [
     {
       "name": "sync_source_registry",
       "status": "ok",
       "result": {
         "status": "synced",
-        "count": 25,
+        "count": 26,
         "drift": {
           "available": true,
-          "localCount": 25,
-          "remoteCount": 25,
+          "localCount": 26,
+          "remoteCount": 26,
           "unregisteredLocal": [],
           "remoteOnly": [],
           "synced": true
@@ -57,7 +57,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 438,
+        "totalScored": 443,
         "includeExternal": true
       }
     },
@@ -66,7 +66,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 492,
+        "count": 511,
         "error": ""
       }
     },
@@ -75,7 +75,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 517,
+        "count": 523,
         "error": ""
       }
     },
@@ -85,7 +85,7 @@
       "result": {
         "status": "swept",
         "days": 14,
-        "cutoff": "2026-08-17T03:02:08.230477+00:00",
+        "cutoff": "2026-08-19T03:02:49.046680+00:00",
         "error": "",
         "count": null
       }
@@ -95,8 +95,8 @@
       "status": "ok",
       "result": {
         "status": "deduped",
-        "groups": 0,
-        "marked": 0,
+        "groups": 1,
+        "marked": 1,
         "error": ""
       }
     },
@@ -105,7 +105,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 316,
+        "count": 322,
         "error": ""
       }
     },
@@ -124,8 +124,8 @@
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 13,
-        "removed": 14,
+        "added": 19,
+        "removed": 18,
         "priceDrops": 0
       }
     },
@@ -144,11 +144,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "marketListingsHarvested": 492,
-    "opportunitiesScored": 438,
+    "marketListingsHarvested": 511,
+    "opportunitiesScored": 443,
     "notificationCounts": {
-      "added": 13,
-      "removed": 14,
+      "added": 19,
+      "removed": 18,
       "priceDrops": 0
     },
     "whatsappAlerts": {
@@ -285,13 +285,13 @@
         "market_listings": {
           "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
           "available": true,
-          "count": 3130,
+          "count": 3376,
           "status": "ok"
         },
         "price_trends": {
           "label": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
           "available": true,
-          "count": 618,
+          "count": 864,
           "status": "ok"
         },
         "market_ads": {
@@ -315,19 +315,19 @@
         "saved_reports": {
           "label": "تقارير بحث وتقييم محفوظة",
           "available": true,
-          "count": 766,
+          "count": 773,
           "status": "ok"
         },
         "source_runs": {
           "label": "سجل تشغيل المصادر",
           "available": true,
-          "count": 5950,
+          "count": 5976,
           "status": "ok"
         },
         "listing_evidence": {
           "label": "دليل كل رقم داخل النتائج",
           "available": true,
-          "count": 80706,
+          "count": 81839,
           "status": "ok"
         },
         "client_leads": {
@@ -345,14 +345,49 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 410,
+          "count": 412,
           "status": "ok"
         },
         "search_history": {
           "label": "سجل بحث مختصر",
           "available": true,
-          "count": 499,
+          "count": 505,
           "status": "ok"
+        },
+        "ai_provider_runs": {
+          "label": "سجل محاولات مزودي الذكاء الاصطناعي",
+          "available": false,
+          "count": null,
+          "status": "http_404",
+          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.source_runs'\",\"message\":\"Could not find the table 'public.ai_provider_runs' in the schema cache\"}"
+        },
+        "analysis_agent_runs": {
+          "label": "سجل الوكلاء الرئيسيين لكل تحليل",
+          "available": false,
+          "count": null,
+          "status": "http_404",
+          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.source_runs'\",\"message\":\"Could not find the table 'public.analysis_agent_runs' in the schema cache\"}"
+        },
+        "analysis_agent_steps": {
+          "label": "خطوات ومخرجات الوكلاء الفرعية",
+          "available": false,
+          "count": null,
+          "status": "http_404",
+          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.client_leads'\",\"message\":\"Could not find the table 'public.analysis_agent_steps' in the schema cache\"}"
+        },
+        "partner_feeds": {
+          "label": "مصادر الشراكات والاشتراكات المرخصة",
+          "available": false,
+          "count": null,
+          "status": "http_404",
+          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.market_ads'\",\"message\":\"Could not find the table 'public.partner_feeds' in the schema cache\"}"
+        },
+        "data_quality_events": {
+          "label": "أحداث جودة البيانات وأسباب الاستبعاد",
+          "available": false,
+          "count": null,
+          "status": "http_404",
+          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.listing_quality_events'\",\"message\":\"Could not find the table 'public.data_quality_events' in the schema cache\"}"
         }
       },
       "note": "قاعدة البيانات هدفها تجميع كل المصادر. رقم الفريج المحلي هو خط أساس فقط؛ المصادر الخارجية والرسمية تدخل عندما توجد صفوف منظمة في جداولها أو في أدلة التقرير."

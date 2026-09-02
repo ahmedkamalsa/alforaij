@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-31T06:03:01",
+  "generatedAt": "2026-09-02T06:03:51",
   "hasPrevious": true,
   "counts": {
-    "added": 13,
-    "removed": 14,
+    "added": 19,
+    "removed": 18,
     "priceDrops": 0
   },
   "officialTransactions": {
@@ -64,6 +64,19 @@
     "priceDrops": [],
     "added": [
       {
+        "code": "AF-223",
+        "area": "خيطان",
+        "propertyType": "بيت",
+        "price": 350000.0,
+        "priceText": "350 ألف د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة (أقل من السوق بوضوح)",
+        "source": "الفريج",
+        "url": "https://front.alforaij.com/Listing/Detail/223",
+        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
+      },
+      {
         "code": "AF-168",
         "area": "حولي",
         "propertyType": "عمارة",
@@ -77,57 +90,31 @@
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       },
       {
-        "code": "BU3-7437",
+        "code": "AF-142",
         "area": "المطلاع",
-        "propertyType": "بيت",
-        "price": 230000.0,
-        "priceText": "230,000 د.ك",
+        "propertyType": "عقارات",
+        "price": 260000.0,
+        "priceText": "260 ألف د.ك",
         "oldPrice": null,
         "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "بوعقار / بوشملان (Bu3qar)",
-        "url": "https://www.bu3qar.com/product-details/7437/%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D8%A8%D9%8A%D8%AA-%D9%81%D9%89-%D8%A7%D9%84%D9%85%D8%B7%D9%84%D8%A7%D8%B9-%D9%82%D8%B7%D8%B9%D8%A9-1",
-        "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
-      },
-      {
-        "code": "AF-206",
-        "area": "المنقف",
-        "propertyType": "عمارة",
-        "price": 1350000.0,
-        "priceText": "1,350 ألف د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
+        "valuationLabel": "لقطة ممتازة (أقل من السوق بوضوح)",
         "source": "الفريج",
-        "url": "https://front.alforaij.com/Listing/Detail/206",
+        "url": "https://front.alforaij.com/Listing/Detail/142",
         "guidance": "فرصة جديدة في السوق — راسل العملاء المطابقين فورًا قبل المنافسين."
       }
     ],
     "removed": [
       {
-        "code": "BU3-7632",
-        "area": "الجابرية",
-        "propertyType": "بيت",
-        "price": 420000.0,
-        "priceText": "420,000 د.ك",
-        "oldPrice": null,
-        "oldPriceText": null,
-        "valuationLabel": "لقطة ممتازة",
-        "source": "بوعقار / بوشملان (Bu3qar)",
-        "url": "https://www.bu3qar.com/product-details/7632/%D8%A8%D9%8A%D8%AA-%D9%87%D8%AF%D8%A7%D9%85-%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D9%81%D9%89-%D8%A7%D9%84%D8%AC%D8%A7%D8%A8%D8%B1%D9%8A%D8%A9-%D9%82%D8%B7%D8%B9%D8%A9-9",
-        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
-      },
-      {
-        "code": "BU3-7663",
+        "code": "BU3-7657",
         "area": "صباح الأحمد",
         "propertyType": "أرض",
-        "price": 290000.0,
-        "priceText": "290,000 د.ك",
+        "price": 160000.0,
+        "priceText": "160,000 د.ك",
         "oldPrice": null,
         "oldPriceText": null,
         "valuationLabel": "لقطة ممتازة",
         "source": "بوعقار / بوشملان (Bu3qar)",
-        "url": "https://www.bu3qar.com/product-details/7663/%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D8%A3%D8%B1%D8%B6-%D9%81%D9%8A-%D9%85%D8%AF%D9%8A%D9%86%D8%A9-%D8%B5%D8%A8%D8%A7%D8%AD-%D8%A7%D9%84%D8%A3%D8%AD%D9%85%D8%AF-%D8%A7%D9%84%D8%A8%D8%AD%D8%B1%D9%8A%D8%A9-%D8%A7%D9%84%D8%B1%D8%A7%D8%A8%D8%B9%D8%A9",
+        "url": "https://www.bu3qar.com/product-details/7657/%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D8%A7%D8%B1%D8%B6-%D8%B5%D9%81-%D8%AB%D8%A7%D9%86%D9%8A-%D9%81%D9%8A-%D8%A7%D9%84%D8%A8%D8%AD%D8%B1%D9%8A%D8%A9-%D8%A7%D9%84%D9%85%D8%B1%D8%AD%D9%84%D8%A9-%D8%A7%D9%84%D8%A7%D9%88%D9%84%D9%8A",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       },
       {
@@ -141,6 +128,19 @@
         "valuationLabel": "لقطة ممتازة",
         "source": "بوعقار / بوشملان (Bu3qar)",
         "url": "https://www.bu3qar.com/product-details/7603/%D9%84%D9%84%D8%A8%D9%8A%D8%B9-%D8%A8%D9%8A%D8%AA-%D9%81%D9%89-%D8%A7%D9%84%D8%AF%D9%88%D8%AD%D9%87-%D9%82%D8%B7%D8%B9%D9%87-2",
+        "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
+      },
+      {
+        "code": "MJ-28525343",
+        "area": "خيطان",
+        "propertyType": "بيت",
+        "price": 300000.0,
+        "priceText": "300,000 د.ك",
+        "oldPrice": null,
+        "oldPriceText": null,
+        "valuationLabel": "لقطة ممتازة",
+        "source": "Mourjan",
+        "url": "https://www.mourjan.com/kw/kuwait/villas-and-houses/for-sale/28525343/",
         "guidance": "اختفى الإعلان من السوق — أزله من العروض المرسلة وأبلغ العملاء المهتمين (قد يكون حُجز أو سُحب)."
       }
     ]

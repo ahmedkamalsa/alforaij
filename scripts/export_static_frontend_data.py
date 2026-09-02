@@ -214,6 +214,10 @@ def main() -> None:
     write_json("outreach-stats.json", outreach)
     write_json("health.json", health)
 
+    # لوحة التحليلات المتقدمة: تصدير لقطة ثابتة من build_dashboard
+    from backend.services.analytics_dashboard import build_dashboard
+    write_json("analytics-dashboard.json", guarded("analytics-dashboard", lambda: build_dashboard()))
+
     # إحداثيات مناطق الكويت للخريطة التفاعلية — بيانات مرجعية ثابتة في data/
     # (مُلتَزمة في المستودع) تُنسَخ كما هي إلى اللقطة؛ غيابها لا يكسر التصدير.
     _coords_path = ROOT / "data" / "kuwait_areas.json"

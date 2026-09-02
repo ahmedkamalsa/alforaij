@@ -10155,3 +10155,10 @@ button.primary:hover,
     line-height: 1.5;
   }
 }
+
+/* تثبيت حلقة التركيز في نهاية الشلال — أي قاعدة موحّدة قبل هذا السطر مهما كان موضعها ستُهزم هنا (آخر مصدر يفوز). */
+:focus-visible {
+  outline: var(--ring-width) solid var(--ring-color);
+  outline-offset: var(--ring-offset);
+  border-radius: var(--radius-sm);
+}

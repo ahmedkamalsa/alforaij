@@ -1,4 +1,4 @@
-﻿
+
 -- supabase\migrations\001_initial_schema.sql
 
 create table if not exists listings (
@@ -178,45 +178,80 @@ on conflict (id) do update set
   scoring_policy = excluded.scoring_policy,
   evidence_policy = excluded.evidence_policy,
   status = excluded.status,
-  updated_at = now();
-
--- supabase\migrations\007_outreach_clicks.sql
-
--- تتبع نقرات التسويق: كل نقرة «نسخ ملخص» أو «إرسال واتساب» على فرصة/عميل تُسجَّل هنا،
--- وتُجمَّع عدادات التفاعل لكل عميل في تبويب الأداء.
--- سياسات RLS: القراءة والكتابة لدور service_role فقط (أرقام العملاء بيانات خاصة).
-
-create table if not exists outreach_clicks (
-  id bigint generated always as identity primary key,
-  client_phone text not null default '',
-  client_area text not null default '',
-  client_type text not null default '',
-  opportunity_code text not null default '',
-  action text not null default 'copy',
-  channel text not null default '',
-  created_at timestamptz not null default now()
-);
-
-create index if not exists outreach_clicks_phone_idx on outreach_clicks (client_phone);
-create index if not exists outreach_clicks_created_idx on outreach_clicks (created_at desc);
-create index if not exists outreach_clicks_code_idx on outreach_clicks (opportunity_code);
-
-alter table outreach_clicks enable row level security;
-
-create policy "service read outreach_clicks"
-  on outreach_clicks for select to service_role
-  using (true);
-
-create policy "service write outreach_clicks"
-  on outreach_clicks for insert to service_role
-  with check (true);
-
-create policy "service update outreach_clicks"
-  on outreach_clicks for update to service_role
-  using (true);
-
-create policy "service delete outreach_clicks"
-  on outreach_clicks for delete to service_role
+  updated_at = now();
+
+
+
+-- supabase\migrations\007_outreach_clicks.sql
+
+
+
+-- تتبع نقرات التسويق: كل نقرة «نسخ ملخص» أو «إرسال واتساب» على فرصة/عميل تُسجَّل هنا،
+
+-- وتُجمَّع عدادات التفاعل لكل عميل في تبويب الأداء.
+
+-- سياسات RLS: القراءة والكتابة لدور service_role فقط (أرقام العملاء بيانات خاصة).
+
+
+
+create table if not exists outreach_clicks (
+
+  id bigint generated always as identity primary key,
+
+  client_phone text not null default '',
+
+  client_area text not null default '',
+
+  client_type text not null default '',
+
+  opportunity_code text not null default '',
+
+  action text not null default 'copy',
+
+  channel text not null default '',
+
+  created_at timestamptz not null default now()
+
+);
+
+
+
+create index if not exists outreach_clicks_phone_idx on outreach_clicks (client_phone);
+
+create index if not exists outreach_clicks_created_idx on outreach_clicks (created_at desc);
+
+create index if not exists outreach_clicks_code_idx on outreach_clicks (opportunity_code);
+
+
+
+alter table outreach_clicks enable row level security;
+
+
+
+drop policy if exists "service read outreach_clicks" on outreach_clicks;
+create policy "service read outreach_clicks" on outreach_clicks for select to service_role
+
+  using (true);
+
+
+
+drop policy if exists "service write outreach_clicks" on outreach_clicks;
+create policy "service write outreach_clicks" on outreach_clicks for insert to service_role
+
+  with check (true);
+
+
+
+drop policy if exists "service update outreach_clicks" on outreach_clicks;
+create policy "service update outreach_clicks" on outreach_clicks for update to service_role
+
+  using (true);
+
+
+
+drop policy if exists "service delete outreach_clicks" on outreach_clicks;
+create policy "service delete outreach_clicks" on outreach_clicks for delete to service_role
+
   using (true);
 
 -- supabase\migrations\008_search_history.sql
@@ -248,12 +283,12 @@ create index if not exists search_history_area_idx
 
 alter table search_history enable row level security;
 
-create policy "service write search history"
-  on search_history for insert to service_role
+drop policy if exists "service write search history" on search_history;
+create policy "service write search history" on search_history for insert to service_role
   with check (true);
 
-create policy "service read search history"
-  on search_history for select to service_role
+drop policy if exists "service read search history" on search_history;
+create policy "service read search history" on search_history for select to service_role
   using (true);
 
 -- =====================================================================
@@ -291,12 +326,14 @@ create index if not exists market_listings_fetched_idx on public.market_listings
 -- RLS: القراءة/الكتابة لخدمة التطبيق فقط (service_role) — إعلانات السوق جزء من قاعدة المعرفة الداخلية
 alter table public.market_listings enable row level security;
 
+drop policy if exists "market_listings_service_all" on public.market_listings;
 create policy "market_listings_service_all" on public.market_listings
   for all
   to service_role
   using (true)
   with check (true);
 
+drop policy if exists "market_listings_anon_read" on public.market_listings;
 create policy "market_listings_anon_read" on public.market_listings
   for select
   to anon
@@ -328,10 +365,12 @@ create index if not exists market_developments_category_idx on public.market_dev
 -- RLS: قراءة عامة (للعرض في المنصة/الموقع المرفوع) + كتابة للخدمة فقط.
 alter table public.market_developments enable row level security;
 
+drop policy if exists "market_developments_anon_read" on public.market_developments;
 create policy "market_developments_anon_read" on public.market_developments
   for select to anon
   using (true);
 
+drop policy if exists "market_developments_service_all" on public.market_developments;
 create policy "market_developments_service_all" on public.market_developments
   for all to service_role
   using (true)
@@ -414,26 +453,31 @@ alter table public.analysis_agent_steps enable row level security;
 alter table public.partner_feeds enable row level security;
 alter table public.data_quality_events enable row level security;
 
+drop policy if exists "ai_provider_runs_service_all" on public.ai_provider_runs;
 create policy "ai_provider_runs_service_all" on public.ai_provider_runs
   for all to service_role
   using (true)
   with check (true);
 
+drop policy if exists "analysis_agent_runs_service_all" on public.analysis_agent_runs;
 create policy "analysis_agent_runs_service_all" on public.analysis_agent_runs
   for all to service_role
   using (true)
   with check (true);
 
+drop policy if exists "analysis_agent_steps_service_all" on public.analysis_agent_steps;
 create policy "analysis_agent_steps_service_all" on public.analysis_agent_steps
   for all to service_role
   using (true)
   with check (true);
 
+drop policy if exists "partner_feeds_service_all" on public.partner_feeds;
 create policy "partner_feeds_service_all" on public.partner_feeds
   for all to service_role
   using (true)
   with check (true);
 
+drop policy if exists "data_quality_events_service_all" on public.data_quality_events;
 create policy "data_quality_events_service_all" on public.data_quality_events
   for all to service_role
   using (true)
