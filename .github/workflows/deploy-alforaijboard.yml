@@ -3,6 +3,10 @@ name: Deploy alforaijboard Pages
 on:
   push:
     branches: [main]
+    paths:
+      - "alforaijboard/**"
+      - "frontend/**"
+      - ".github/workflows/deploy-alforaijboard.yml"
   workflow_dispatch:
 
 permissions:
