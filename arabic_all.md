@@ -640,3 +640,112 @@ D:\ahmed\1\قواعد بيانات.txt
 - لم أفتح مسار paid تلقائي.
 
 الخلاصة: الملفان يدعمان الاتجاه الحالي، ولا يكشفان حاجة لتعديل عاجل إضافي بعد الرفع. أفضل إجراء الآن هو اعتبار محتواهما جزءًا من خارطة الطريق، وليس تنفيذه دفعة واحدة.
+## 24. تجربة مباشرة شاملة للبرامج والربط - 2026-09-16
+
+### ما تم اختباره فعليًا
+
+تم تنفيذ تجربة مباشرة بدون طباعة أي مفاتيح أو توكنات:
+
+- Hermes Gateway يعمل على profile `alforaij-pro` وحالته سليمة.
+- LM Studio يعمل محليًا، والموديلات المحملة تشمل `qwen3.5-4b` لاستخدامه كمسار محلي بسيط.
+- `hermes-smart.py` يختار:
+  - `LOCAL_SIMPLE` -> `lmstudio/qwen3.5-4b`.
+  - `CODING` و`RESEARCH` -> مسار verified-free عبر OpenRouter عند توفره وصحته.
+- `hermes-run.ps1` نفذ طلبًا مباشرًا بنجاح عبر Hermes:
+  - provider: `openrouter`
+  - model: `dots-studio/dots-3-note-preview:free`
+  - session id: `20260916_022944_1a0ba8`
+  - النتيجة: `DIRECT_HERMES_OK`
+- مشروع `alforaij-research-assistant` يعمل محليًا:
+  - `/api/health` رجع `status=ok`
+  - عدد سجلات Supabase المقروءة محليًا: `182`
+  - الواجهة الرئيسية `/` رجعت HTML بنجاح.
+- Supabase تمت تجربته قراءة فقط:
+  - قراءة service role لجدول `listings`: OK
+  - قراءة anon لجدول `market_listings`: OK
+- روابط GitHub Pages التي تم التحقق منها:
+  - `https://ahmedkamalsa.github.io/alforaij/`
+  - `https://ahmedkamalsa.github.io/alforaijboard/`
+
+### الاستفادة العملية الآن
+
+الاستخدام اليومي المقترح:
+
+```powershell
+cd D:\foraj_social\287
+.\hermes-ops\scripts\hermes-run.ps1 -Task "اكتب المطلوب هنا" -WorkingDirectory "D:\foraj_social\287\alforaij-research-assistant" -TaskClass CODING
+```
+
+للمهام البسيطة:
+
+```powershell
+.\hermes-ops\scripts\hermes-run.ps1 -Task "لخص هذه الفكرة" -WorkingDirectory "D:\foraj_social\287" -TaskClass LOCAL_SIMPLE
+```
+
+للموقع والباك اند:
+
+```powershell
+cd D:\foraj_social\287\alforaij-research-assistant
+.\start-local.ps1
+```
+
+ثم افتح:
+
+```text
+http://127.0.0.1:8000
+```
+
+### المفاتيح الموجودة والمفاتيح الناقصة
+
+لم يتم حذف أو تغيير أي مفتاح موجود. الاختبارات استخدمت المتاح حاليًا فقط.
+
+المطلوب لاحقًا لتحسين التكامل:
+
+- `GOOGLE_CLIENT_ID`: غير مضبوط/فارغ محليًا. يتم إنشاؤه من Google Cloud Console ثم وضعه في `.env` وفي إعدادات النشر عند الحاجة.
+- `OPENROUTER_API_KEY`: غير موجود كـ OS environment variable، لكن مسار Hermes/OpenRouter يعمل عبر إعدادات Hermes الحالية.
+- `GEMINI_API_KEY` أو `GOOGLE_API_KEY`: مطلوب فقط إذا أردت إضافة Gemini كمسار مجاني/منخفض التكلفة.
+- `GROQ_API_KEY`: مطلوب فقط إذا أردت إضافة Groq كمسار سريع إضافي.
+- `HUGGINGFACE_API_KEY` أو `HF_TOKEN`: مطلوب فقط إذا أردت تشغيل مسارات Hugging Face.
+- `UPSTASH_REDIS_REST_URL` و`UPSTASH_REDIS_REST_TOKEN`: مطلوبان لاحقًا إذا أضفنا rate limiting/cache عام.
+- `CLOUDFLARE_API_TOKEN` و`CLOUDFLARE_ACCOUNT_ID`: مطلوبان فقط إذا قررنا النشر أو تشغيل Worker على Cloudflare.
+- `VERCEL_TOKEN`: مطلوب فقط إذا اعتمدنا Vercel CLI أو CI للنشر.
+
+مصادر الحصول على المفاتيح:
+
+- Google OAuth / Client ID: https://developers.google.com/identity/protocols/oauth2
+- Gemini API key: https://aistudio.google.com/api-keys
+- OpenRouter API key: https://openrouter.ai/
+- Groq console/API keys: https://console.groq.com/
+- Hugging Face tokens: https://huggingface.co/settings/tokens
+- Upstash Redis REST: https://upstash.com/docs/redis/features/restapi
+- Cloudflare API Tokens: https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
+- Vercel account tokens: https://vercel.com/account/tokens
+
+### رأيي الاحترافي بعد التجربة
+
+أفضل مسار حاليًا هو عدم إضافة خدمات جديدة فقط لأنها متاحة. النظام أصبح يعمل بمنطق عملي:
+
+1. المحلي أولًا للمهام البسيطة عبر Qwen داخل LM Studio.
+2. verified-free cloud للبرمجة والبحث والاستدلال عند الحاجة.
+3. Codex أو أي paid route لا يعمل تلقائيًا إلا بموافقة أو طلب صريح.
+4. Supabase يبقى قاعدة البيانات الأساسية ومصدر الحقيقة.
+5. أي AI عام للمستخدمين يجب أن يمر من backend/edge function مع rate limit وتسجيل استخدام.
+
+الأولوية التالية المقترحة:
+
+1. ضبط `GOOGLE_CLIENT_ID` حتى يكتمل تسجيل الدخول من الواجهة.
+2. إضافة rate limit قبل أي endpoint عام يستخدم AI.
+3. تحويل وظائف التحليل العقاري المهمة إلى endpoints واضحة فوق Supabase.
+4. إضافة dashboard صغير لحالة Hermes routes والصحة والتكلفة بدون عرض أسرار.
+5. إبقاء GitHub Pages كنشر مستقر الآن، وعدم نقل النشر إلى Vercel إلا بعد توفر `VERCEL_TOKEN` وتحديد سبب واضح.
+
+### ما لم يتم عمله عمدًا
+
+- لم أطبع أي secret أو token.
+- لم أغير أي credential.
+- لم أضف خدمة مدفوعة.
+- لم أستبدل Supabase بقاعدة أخرى.
+- لم أعدل قاعدة البيانات مباشرة.
+- لم أغير routing الأساسي في Hermes بعد نجاح الاختبار.
+
+الخلاصة: الربط الحالي صالح للعمل اليومي كوكيل محلي/مجاني أولًا، والمشاريع مرفوعة ومنشورة. التحسينات التالية يجب أن تكون صغيرة وموجهة: Google login، rate limit، ثم endpoints ذكاء عقاري مرتبطة بـ Supabase.
