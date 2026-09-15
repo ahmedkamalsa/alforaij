@@ -879,3 +879,179 @@ cd D:\foraj_social\287
 قد تحتاج فتح Terminal جديد حتى ترى كل البرامج المتغيرات الجديدة تلقائيًا.
 الجلسة الحالية تم تحديثها أثناء تشغيل السكربت، لكن البرامج المفتوحة سابقًا قد لا ترث القيم الجديدة.
 ```
+
+## 27. الفائدة الحقيقية بعد التطبيق الشامل وطريقة تشغيل Hermes عمليًا - 2026-09-16
+
+### ماذا أصبح عندك فعليًا؟
+
+بعد التنفيذ والرفع، أصبح عندك نظام عملي مكون من 3 طبقات:
+
+1. **المشاريع المنشورة**
+   - موقع/برنامج `alforaij` منشور على GitHub Pages.
+   - لوحة `alforaijboard` منشورة على GitHub Pages.
+   - التوثيق العربي `arabic_all.md` موجود داخل المشروعين ومرفوع.
+
+2. **Hermes كوكيل تشغيل محلي**
+   - يستخدم profile واحد: `alforaij-pro`.
+   - عنده credentials جاهزة داخل Hermes credential store.
+   - عنده OS environment variables محلية مفيدة تم ضبطها من ملفات Hermes.
+   - يستخدم free/local first بدل paid first.
+
+3. **تشغيل عملي سهل**
+   - تم إنشاء اختصار سطح مكتب:
+     - `C:\Users\hello\Desktop\Hermes Pro.lnk`
+   - الاختصار يشغل:
+     - `D:\foraj_social\287\hermes-ops\scripts\Start-HermesPro.cmd`
+   - هذا يفتح Hermes Pro Smart Entry ويطلب منك المهمة الأولى، ثم يختار route مناسب.
+
+### الفائدة الحقيقية لك
+
+بدل أن تفتح كل مشروع وتفكر في المفاتيح والموديلات والأوامر، أصبح المطلوب منك عمليًا:
+
+```text
+دبل كليك على Hermes Pro
+اكتب المهمة بالعربي أو الإنجليزي
+Hermes يختار المسار المناسب وينفذ داخل ملفات المشروع
+```
+
+أمثلة مفيدة:
+
+```text
+راجع مشروع alforaij وابحث عن سبب فشل test معين وأصلحه ثم شغل الاختبار.
+```
+
+```text
+أضف endpoint بسيط لتحليل عقار من Supabase، ولا تعرض أي secrets، ثم اكتب test.
+```
+
+```text
+راجع alforaijboard وشغل validator ثم أصلح أصغر مشكلة تمنع النشر.
+```
+
+```text
+اقرأ arabic_all.md ولخص لي آخر حالة للمشروع وما الخطوة القادمة.
+```
+
+### كيف يقرر Hermes الموديل؟
+
+السياسة الحالية:
+
+```text
+LOCAL_SIMPLE
+-> lmstudio/qwen3.5-4b
+
+CODING / RESEARCH / REASONING
+-> أفضل verified-free cloud healthy
+-> بديل free
+-> Qwen المحلي
+
+CODEX_HEAVY
+-> فقط عند طلب صريح أو بعد فشل المسارات المجانية والمحلية
+```
+
+هذا يفيدك في نقطتين:
+
+1. لا يستهلك paid route تلقائيًا.
+2. لا يرمي المهمة على موديل ضعيف إذا كانت تحتاج أدوات وملفات.
+
+### طريقة التشغيل الأسرع
+
+من سطح المكتب:
+
+```text
+Hermes Pro
+```
+
+من PowerShell:
+
+```powershell
+cd D:\foraj_social\287
+.\hermes-ops\scripts\Start-HermesPro.cmd
+```
+
+تشغيل مباشر بمهمة محددة:
+
+```powershell
+cd D:\foraj_social\287
+.\hermes-ops\scripts\hermes-run.ps1 -Task "راجع الكود وشغل الاختبارات" -WorkingDirectory "D:\foraj_social\287\alforaij-research-assistant" -TaskClass CODING
+```
+
+تشغيل مهمة بسيطة محليًا:
+
+```powershell
+.\hermes-ops\scripts\hermes-run.ps1 -Task "لخص حالة المشروع" -WorkingDirectory "D:\foraj_social\287" -TaskClass LOCAL_SIMPLE
+```
+
+### ماذا تقول له كي يعمل مثل الشات معي؟
+
+اكتب له طلبًا واضحًا، مثل:
+
+```text
+أنت داخل D:\foraj_social\287\alforaij-research-assistant.
+افحص git status، لا تمسح أي تغييرات غير تخص المهمة.
+أصلح المشكلة التالية: ...
+شغل الاختبارات المناسبة.
+اكتب ملخصًا بالعربي لما غيرته.
+```
+
+أو:
+
+```text
+أنت داخل D:\foraj_social\287\alforaijboard.
+شغل validator فقط، وإذا فشل أصلح أصغر سبب داخل المشروع.
+لا تعيد تنظيم الملفات.
+لا تطبع secrets.
+```
+
+### حدود الوصول والسلامة
+
+Hermes يستطيع تنفيذ أوامر وقراءة/تعديل ملفات داخل الجهاز حسب الصلاحيات، لذلك الأفضل دائمًا أن تكتب له حدودًا واضحة:
+
+```text
+لا تستخدم paid models.
+لا تطبع secrets.
+لا تعمل git reset --hard.
+لا تحذف ملفات إلا بعد توضيح السبب.
+ارفع فقط بعد نجاح الاختبار.
+```
+
+### حالة النشر بعد التنفيذ
+
+تم التحقق من روابط GitHub Pages:
+
+```text
+https://ahmedkamalsa.github.io/alforaij/
+https://ahmedkamalsa.github.io/alforaijboard/
+```
+
+كلاهما رجع HTTP 200 في آخر تحقق.
+
+### المقترحات التنفيذية التالية
+
+أفضل خطوات فعلية تالية، بالترتيب:
+
+1. **اختبار Gemini/HuggingFace health داخل Hermes**
+   - الهدف: إضافة بدائل مجانية أكثر بجانب OpenRouter.
+   - لا يتم جعلها default إلا بعد نجاح tiny health check.
+
+2. **إضافة صفحة صغيرة لحالة Hermes داخل التقرير أو dashboard**
+   - تعرض provider/model/status بدون secrets.
+   - تفيدك تعرف هل free route يعمل قبل أي مهمة كبيرة.
+
+3. **إضافة backend AI endpoint محمي**
+   - الموقع لا يستدعي مفاتيح AI مباشرة.
+   - أي ذكاء عقاري عام يمر من backend مع rate limit.
+
+4. **إضافة rate limit قبل AI العام**
+   - باستخدام Upstash أو حل داخلي بسيط.
+   - الهدف حماية التكلفة والمفاتيح.
+
+5. **إضافة سجل استخدام في Supabase**
+   - provider
+   - model
+   - task_class
+   - success/failure
+   - cost estimate
+   - بدون أسرار.
+
+الخلاصة: ما تم ليس مجرد توثيق؛ أصبح لديك مدخل عملي باسم `Hermes Pro`، ومفاتيح متاحة للبرامج كـ User env، وتوجيه free/local-first، ومشاريع منشورة. الاستخدام اليومي الآن هو أن تكلم Hermes Pro بالمهمة، وتحدد له حدود السلامة، وهو ينفذ داخل المشروع مثل agent محلي.
