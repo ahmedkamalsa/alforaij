@@ -435,3 +435,102 @@ SUPABASE_ANON_KEY
 ```
 
 - Vercel CLI غير مثبت محليًا، لذلك النشر عبر Vercel CLI يحتاج تثبيت `vercel` أو الاعتماد على GitHub/Vercel integration.
+
+## 20. الرفع النهائي ونتائج GitHub Actions
+
+تم الرفع إلى GitHub:
+
+### alforaij-research-assistant
+
+remote:
+
+```text
+https://github.com/ahmedkamalsa/alforaij.git
+```
+
+commits:
+
+```text
+d95075e fix: stabilize live sync and agent routing docs
+84092b1 fix: unblock ci and optional supabase persist
+```
+
+نتائج GitHub Actions بعد commit الثاني:
+
+```text
+CI/CD Pipeline: success
+Sync Supabase Daily: success
+Deploy to GitHub Pages: success
+Backend pytest suite: success
+```
+
+كما أن أول push شغّل:
+
+```text
+Deploy alforaijboard Pages: success
+```
+
+وهذا هو workflow الذي يدفع `frontend/` إلى `ahmedkamalsa/alforaijboard` branch `gh-pages`.
+
+### alforaijboard
+
+remote:
+
+```text
+https://github.com/ahmedkamalsa/alforaijboard.git
+```
+
+branch:
+
+```text
+safety/pre-reorg-20260914-163154
+```
+
+commits:
+
+```text
+4882a24 fix: refine dashboard price metrics
+1855ed1 docs: update arabic execution report
+```
+
+تم رفع الفرع إلى:
+
+```text
+origin/safety/pre-reorg-20260914-163154
+```
+
+رابط إنشاء Pull Request:
+
+```text
+https://github.com/ahmedkamalsa/alforaijboard/pull/new/safety/pre-reorg-20260914-163154
+```
+
+## 21. حالة Git النهائية
+
+`alforaij-research-assistant`:
+
+```text
+clean
+main...origin/main
+```
+
+`alforaijboard`:
+
+```text
+clean
+safety/pre-reorg-20260914-163154...origin/safety/pre-reorg-20260914-163154
+```
+
+## 22. خلاصة نهائية
+
+تم تنفيذ تنظيف وإكمال محدود وآمن:
+
+- إصلاح Hermes wrappers.
+- تثبيت تشغيل free-first.
+- إصلاح اختبارات مستودع البحث.
+- إصلاح CI بعد الرفع.
+- رفع `alforaij-research-assistant/main`.
+- تشغيل GitHub Actions بنجاح.
+- نشر GitHub Pages ونجاح workflow نشر `alforaijboard Pages`.
+- رفع فرع safety في `alforaijboard`.
+- إنشاء وتحديث `arabic_all.md` كتقرير عربي شامل.
