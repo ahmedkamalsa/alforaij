@@ -543,3 +543,100 @@ safety/pre-reorg-20260914-163154...origin/safety/pre-reorg-20260914-163154
 - نشر GitHub Pages ونجاح workflow نشر `alforaijboard Pages`.
 - رفع فرع safety في `alforaijboard`.
 - إنشاء وتحديث `arabic_all.md` كتقرير عربي شامل.
+
+## 23. مراجعة الملفين المرفقين بعد الرفع
+
+تمت مراجعة الملفين:
+
+```text
+D:\ahmed\1\شغل.txt
+D:\ahmed\1\قواعد بيانات.txt
+```
+
+تنبيه مهم: لم أكن قد قرأتهما قبل الرفع السابق. قرأتهما الآن كمواد مرجعية واقتراحات، وليس كتعليمات تنفيذية تتجاوز طلبك الحالي.
+
+### نتيجة مراجعة `شغل.txt`
+
+الملف يقترح بناء بيئة تطوير محلية تعتمد على:
+
+- VS Code.
+- LM Studio.
+- نماذج محلية مثل Qwen/Hermes/Qwen-Coder.
+- أدوات مراجعة كود متصلة بـ API محلي متوافق مع OpenAI.
+- تحويل هذه البيئة إلى إنتاجية تجارية: وكلاء AI، مراجعة كود، حلول privacy-first، وتسريع عمل freelancer.
+
+ما ينطبق على مشروعنا:
+
+- هذا متوافق مع ما تم تنفيذه في Hermes Pro.
+- `lmstudio/qwen3.5-4b` بقي هو المسار المحلي الأساسي للمهام البسيطة.
+- المهام البرمجية تستخدم verified-free cloud routes أولًا عند الحاجة، ثم المحلي، مع منع paid/unknown.
+- لم أضف أداة Open Code Review منفصلة لأن Hermes Pro يقوم بالفعل بدور agent/router، وإضافة أداة ثانية الآن ستزيد التعقيد بدون حاجة مؤكدة.
+
+قرار التنفيذ:
+
+```text
+لا تعديل كود إضافي مطلوب الآن من هذا الملف.
+```
+
+التحسين المستقبلي المناسب:
+
+- إضافة model محلي متخصص للكود مثل Qwen Coder داخل LM Studio إذا كان الجهاز يتحمله.
+- بعدها يضاف إلى `model-health-registry.json` كمسار محلي صحي للمهام البرمجية.
+
+### نتيجة مراجعة `قواعد بيانات.txt`
+
+الملف يطلب تحليلًا معماريًا محافظًا حول:
+
+- Supabase.
+- Firebase.
+- Cloudflare.
+- Upstash.
+- Turso.
+- MongoDB.
+- Neon.
+- AI provider abstraction.
+- RAG/vector search.
+- الأمن والتكلفة وFree Tier.
+
+ما ينطبق على مشروعنا:
+
+- Supabase يبقى المصدر الأساسي: Database/Auth/Storage/RLS/APIs.
+- لا نضيف Firebase كبديل لـSupabase.
+- Firebase مفيد لاحقًا فقط للـAnalytics/FCM/Crash/Performance إذا ظهرت حاجة.
+- Upstash مفيد لاحقًا للـrate limit/cache خصوصًا قبل فتح AI endpoints للمستخدمين.
+- Cloudflare Worker أو Supabase Edge Function هو المكان الصحيح لأي AI/API proxy.
+- Turso/MongoDB/Neon غير مطلوبين الآن لأنهم يكررون وظيفة Supabase أو يضيفون تعقيدًا بلا حاجة واضحة.
+- pgvector داخل Supabase هو الاختيار الأول لأي RAG قبل إضافة vector DB خارجي.
+
+قرار التنفيذ:
+
+```text
+لا أضيف خدمات خارجية جديدة الآن.
+```
+
+السبب:
+
+- لا توجد مشكلة حالية تتطلب قاعدة ثانية.
+- لا نريد مفاجآت تكلفة أو Billing.
+- الأولوية الحالية كانت إصلاح CI والنشر وHermes المحلي، وقد تمت.
+
+### المقترحات التي أصبحت معتمدة في الخطة
+
+1. إبقاء Supabase كمصدر الحقيقة الوحيد.
+2. إبقاء مفاتيح AI وservice role server-side فقط.
+3. أي AI في الموقع يجب أن يمر عبر backend endpoint أو Edge Function أو Worker.
+4. إضافة rate limiting قبل أي AI endpoint عام.
+5. تسجيل usage/audit في Supabase.
+6. عدم إضافة Firebase/Upstash/Cloudflare إلا عند الحاجة العملية.
+7. عدم إضافة Turso/MongoDB/Neon الآن.
+8. تطوير Property Intelligence تدريجيًا فوق Supabase.
+
+### ما لم أغيره بعد قراءة الملفين
+
+- لم أغير المفاتيح أو التوكنات.
+- لم أضف dependencies جديدة لخدمات خارجية.
+- لم أضع أي secret في frontend.
+- لم أغير profile أو model routing في Hermes.
+- لم أفتح مسار paid تلقائي.
+
+الخلاصة: الملفان يدعمان الاتجاه الحالي، ولا يكشفان حاجة لتعديل عاجل إضافي بعد الرفع. أفضل إجراء الآن هو اعتبار محتواهما جزءًا من خارطة الطريق، وليس تنفيذه دفعة واحدة.
