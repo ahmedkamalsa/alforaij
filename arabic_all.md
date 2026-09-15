@@ -749,3 +749,60 @@ http://127.0.0.1:8000
 - لم أغير routing الأساسي في Hermes بعد نجاح الاختبار.
 
 الخلاصة: الربط الحالي صالح للعمل اليومي كوكيل محلي/مجاني أولًا، والمشاريع مرفوعة ومنشورة. التحسينات التالية يجب أن تكون صغيرة وموجهة: Google login، rate limit، ثم endpoints ذكاء عقاري مرتبطة بـ Supabase.
+
+## 25. تصحيح مهم حول مكان المفاتيح - 2026-09-16
+
+بعد ملاحظتك أن المفاتيح موجودة داخل ملفات/بروفايل Hermes Agent على الجهاز، تم التحقق من ذلك بدون عرض أي قيمة سرية.
+
+النتيجة:
+
+- Hermes مثبت من:
+  - `C:\Users\hello\AppData\Local\hermes\bin\hermes.exe`
+- ملفات/مخزن Hermes المحلي موجود في:
+  - `C:\Users\hello\AppData\Local\Hermes\.env`
+  - `C:\Users\hello\AppData\Local\Hermes\auth.json`
+  - `C:\Users\hello\AppData\Local\Hermes\supabase.env`
+  - `C:\Users\hello\AppData\Roaming\Hermes\secure-token-storage.json`
+- الأمر الرسمي `hermes -p alforaij-pro auth list` أظهر أن profile `alforaij-pro` لديه credentials مسجلة لعدة providers، منها:
+  - `openrouter`
+  - `gemini`
+  - `huggingface`
+  - `lmstudio`
+  - `openai-codex`
+  - `novita`
+  - `xai`
+  - `upstage`
+  - providers أخرى داخل Hermes
+
+التصحيح:
+
+```text
+المفاتيح ليست مفقودة من Hermes.
+الذي كان غير موجود في الفحص السابق هو بعض OS environment variables العامة فقط.
+Hermes نفسه لديه credential store وملفات env محلية يستخدمها بنجاح.
+```
+
+لذلك عند تشغيل Hermes يجب الاعتماد أولًا على:
+
+```powershell
+hermes -p alforaij-pro auth list
+```
+
+وعلى:
+
+```powershell
+.\hermes-ops\scripts\hermes-run.ps1 -Task "..." -WorkingDirectory "..." -TaskClass CODING
+```
+
+بدل الحكم من متغيرات Windows العامة فقط.
+
+قرار التشغيل الصحيح بعد هذا التصحيح:
+
+1. لا نطلب مفاتيح جديدة إلا إذا فشل provider داخل Hermes أو ظهر `AUTH_REQUIRED`.
+2. لا ننسخ أو نطبع محتوى `.env` أو `auth.json`.
+3. لا نغير credential store الحالي.
+4. `openrouter` يعمل بالفعل كمسار verified-free في Hermes.
+5. `gemini` و`huggingface` موجودان كاعتمادات داخل Hermes، لكن يجب اختبارهما صحيًا قبل جعلهما route أساسي.
+6. Codex موجود داخل Hermes، لكنه يبقى escalation اختياريًا فقط وليس افتراضيًا.
+
+الخلاصة المصححة: Hermes Agent عندك ليس ناقص مفاتيح بشكل عام؛ عنده مفاتيح وبروفايل جاهز. المطلوب الآن هو إدارة الصحة والتوجيه والتكلفة فوق هذه المفاتيح الموجودة، وليس إعادة طلبها منك.
