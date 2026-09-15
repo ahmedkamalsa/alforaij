@@ -86,8 +86,12 @@ jobs:
           python scripts/sync_listings_supabase.py
           echo "✅ Step 1 done"
           echo "📋 Step 2/2: persist_to_supabase.py ..."
-          python scripts/persist_to_supabase.py
-          echo "✅ Step 2 done"
+          if [ -f data/refined_abdullah_analyze.json ]; then
+            python scripts/persist_to_supabase.py
+            echo "✅ Step 2 done"
+          else
+            echo "::warning::data/refined_abdullah_analyze.json is not generated in this workflow; skipped optional analysis persist."
+          fi
 
       - name: Verify Supabase counts
         env:

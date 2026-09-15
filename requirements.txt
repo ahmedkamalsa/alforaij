@@ -9,3 +9,4 @@
 reportlab>=4.0
 arabic_reshaper>=3.0
 python-bidi>=0.4
+pypdf>=5.0

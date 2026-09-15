@@ -395,7 +395,34 @@ D:\foraj_social\287\alforaij-research-assistant
 
 ## 19. ما تبقى بعد الرفع
 
-- متابعة GitHub Actions بعد push.
+بعد أول push ظهرت مشكلتان في GitHub Actions وتم إصلاحهما:
+
+1. `CI/CD Pipeline` فشل لأن `pypdf` غير موجود في `requirements.txt` رغم أن اختبار PDF يحتاجه.
+   - الإصلاح: إضافة `pypdf>=5.0`.
+
+2. `Sync Supabase Daily` فشل لأن `persist_to_supabase.py` يبحث عن:
+
+```text
+data/refined_abdullah_analyze.json
+```
+
+وهذا الملف غير مولد داخل workflow الحالي.
+
+الإصلاح:
+
+- جعل خطوة `persist_to_supabase.py` اختيارية داخل `.github/workflows/sync-supabase-daily.yml`.
+- إذا الملف موجود يتم تشغيل persist.
+- إذا غير موجود يصدر workflow تحذيرًا ولا يفشل، لأن خطوة sync الأساسية `sync_listings_supabase.py` نجحت بالفعل.
+
+اختبار مستهدف بعد إصلاح CI:
+
+```text
+14 passed, 11 skipped
+```
+
+ما تبقى:
+
+- متابعة GitHub Actions بعد push الثاني.
 - لو فشل workflow بسبب secrets ناقصة، يتم إضافة أسماء المتغيرات في GitHub Secrets فقط بدون تغيير الكود.
 - لو فشل deploy الخارجي بسبب token، المطلوب مراجعة:
 
