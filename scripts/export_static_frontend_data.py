@@ -214,6 +214,14 @@ def main() -> None:
     write_json("outreach-stats.json", outreach)
     write_json("health.json", health)
 
+    # حالة hermes gateway — تُصدَّر كملف ثابت لتظهر صح في اللوحات (لا not installed وهو شغال PID 11340)
+    try:
+        from backend.services.hermes_gateway import get_hermes_gateway_status
+        write_json("hermes-gateway.json", get_hermes_gateway_status())
+    except Exception as _e:
+        print(f"warning: hermes gateway status failed: {_e}", file=sys.stderr)
+        write_json("hermes-gateway.json", {"installed": True, "running": False, "note": str(_e)})
+
     # لوحة التحليلات المتقدمة: تصدير لقطة ثابتة من build_dashboard
     from backend.services.analytics_dashboard import build_dashboard
     write_json("analytics-dashboard.json", guarded("analytics-dashboard", lambda: build_dashboard()))

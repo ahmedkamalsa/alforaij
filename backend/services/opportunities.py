@@ -491,6 +491,22 @@ def _score_listings(listings, clients: list[dict[str, Any]]) -> tuple[list[dict[
     return scored, skipped_demand, skipped_unreal
 
 
+def _limited_items_with_source_visibility(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """Return top items while preserving at least one valid item per external source."""
+    if len(items) <= limit:
+        return items
+    selected = list(items[:limit])
+    present_sources = {item.get("source") for item in selected if item.get("source")}
+    for item in items[limit:]:
+        source = item.get("source")
+        if not source or source == "الفريج" or source in present_sources:
+            continue
+        selected[-1] = item
+        selected.sort(key=lambda row: row.get("score") or 0, reverse=True)
+        present_sources.add(source)
+    return selected
+
+
 def _market_supply() -> list[dict[str, Any]]:
     """كل عروض السوق المتاحة المقيّمة (بيع + إيجار) — أساس التوفيق العملي مع الطلبات."""
     scored, _skipped_demand, _skipped_unreal = _score_listings(load_listings(), _load_clients())
@@ -1059,7 +1075,7 @@ def build_opportunities(limit_per_tier: int = 30, include_external: bool = True,
         tiers[key] = {
             "label": label,
             "description": description,
-            "items": items[:limit_per_tier],
+            "items": _limited_items_with_source_visibility(items, limit_per_tier),
         }
 
     contributing = list(dict.fromkeys(

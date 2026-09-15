@@ -1,8 +1,8 @@
 {
   "agent": "daily_data_update_agent",
   "status": "success",
-  "startedAt": "2026-09-02T06:00:02",
-  "finishedAt": "2026-09-02T06:03:51",
+  "startedAt": "2026-09-15T06:00:02",
+  "finishedAt": "2026-09-15T06:02:56",
   "steps": [
     {
       "name": "sync_source_registry",
@@ -57,7 +57,7 @@
       "name": "build_and_save_opportunities",
       "status": "ok",
       "result": {
-        "totalScored": 443,
+        "totalScored": 447,
         "includeExternal": true
       }
     },
@@ -66,7 +66,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 511,
+        "count": 545,
         "error": ""
       }
     },
@@ -75,7 +75,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 523,
+        "count": 551,
         "error": ""
       }
     },
@@ -85,7 +85,7 @@
       "result": {
         "status": "swept",
         "days": 14,
-        "cutoff": "2026-08-19T03:02:49.046680+00:00",
+        "cutoff": "2026-09-01T03:01:58.969913+00:00",
         "error": "",
         "count": null
       }
@@ -95,8 +95,8 @@
       "status": "ok",
       "result": {
         "status": "deduped",
-        "groups": 1,
-        "marked": 1,
+        "groups": 7,
+        "marked": 3,
         "error": ""
       }
     },
@@ -105,7 +105,7 @@
       "status": "ok",
       "result": {
         "status": "saved",
-        "count": 322,
+        "count": 331,
         "error": ""
       }
     },
@@ -114,18 +114,18 @@
       "status": "ok",
       "result": {
         "status": "success",
-        "count": 8,
+        "count": 5,
         "local": "saved",
         "database": "saved",
-        "note": "جمع 8 تطورًا، 5/11 مصادر عقارية"
+        "note": "جمع 5 تطورًا، 2/11 مصادر عقارية"
       }
     },
     {
       "name": "build_update_notifications",
       "status": "ok",
       "result": {
-        "added": 19,
-        "removed": 18,
+        "added": 16,
+        "removed": 17,
         "priceDrops": 0
       }
     },
@@ -144,11 +144,11 @@
   "summary": {
     "localListings": 182,
     "officialTransactionsImported": 0,
-    "marketListingsHarvested": 511,
-    "opportunitiesScored": 443,
+    "marketListingsHarvested": 545,
+    "opportunitiesScored": 447,
     "notificationCounts": {
-      "added": 19,
-      "removed": 18,
+      "added": 16,
+      "removed": 17,
       "priceDrops": 0
     },
     "whatsappAlerts": {
@@ -285,13 +285,13 @@
         "market_listings": {
           "label": "إعلانات السوق الخارجية المحصودة من كل المواقع",
           "available": true,
-          "count": 3376,
+          "count": 4821,
           "status": "ok"
         },
         "price_trends": {
           "label": "اتجاهات الأسعار الشهرية (وسيط لكل منطقة/نوع)",
           "available": true,
-          "count": 864,
+          "count": 1139,
           "status": "ok"
         },
         "market_ads": {
@@ -345,7 +345,7 @@
         "opportunities": {
           "label": "لقطات فرص محفوظة",
           "available": true,
-          "count": 412,
+          "count": 424,
           "status": "ok"
         },
         "search_history": {
@@ -356,38 +356,33 @@
         },
         "ai_provider_runs": {
           "label": "سجل محاولات مزودي الذكاء الاصطناعي",
-          "available": false,
-          "count": null,
-          "status": "http_404",
-          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.source_runs'\",\"message\":\"Could not find the table 'public.ai_provider_runs' in the schema cache\"}"
+          "available": true,
+          "count": 0,
+          "status": "ok"
         },
         "analysis_agent_runs": {
           "label": "سجل الوكلاء الرئيسيين لكل تحليل",
-          "available": false,
-          "count": null,
-          "status": "http_404",
-          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.source_runs'\",\"message\":\"Could not find the table 'public.analysis_agent_runs' in the schema cache\"}"
+          "available": true,
+          "count": 0,
+          "status": "ok"
         },
         "analysis_agent_steps": {
           "label": "خطوات ومخرجات الوكلاء الفرعية",
-          "available": false,
-          "count": null,
-          "status": "http_404",
-          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.client_leads'\",\"message\":\"Could not find the table 'public.analysis_agent_steps' in the schema cache\"}"
+          "available": true,
+          "count": 0,
+          "status": "ok"
         },
         "partner_feeds": {
           "label": "مصادر الشراكات والاشتراكات المرخصة",
-          "available": false,
-          "count": null,
-          "status": "http_404",
-          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.market_ads'\",\"message\":\"Could not find the table 'public.partner_feeds' in the schema cache\"}"
+          "available": true,
+          "count": 0,
+          "status": "ok"
         },
         "data_quality_events": {
           "label": "أحداث جودة البيانات وأسباب الاستبعاد",
-          "available": false,
-          "count": null,
-          "status": "http_404",
-          "detail": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":\"Perhaps you meant the table 'public.listing_quality_events'\",\"message\":\"Could not find the table 'public.data_quality_events' in the schema cache\"}"
+          "available": true,
+          "count": 0,
+          "status": "ok"
         }
       },
       "note": "قاعدة البيانات هدفها تجميع كل المصادر. رقم الفريج المحلي هو خط أساس فقط؛ المصادر الخارجية والرسمية تدخل عندما توجد صفوف منظمة في جداولها أو في أدلة التقرير."

@@ -196,6 +196,7 @@ const STATIC_DATA_MAP = {
   "/api/platform-dates": "platform-dates.json",
   "/api/platform-intelligence": "platform-intelligence.json",
   "/api/analytics-dashboard": "analytics-dashboard.json",
+  "/api/hermes/gateway": "hermes-gateway.json",
 };
 
 function apiUrl(path) {
@@ -562,6 +563,38 @@ async function fetchLivePriceTrends() {
     return { rows, tableOk: true, live: true };
   } catch {
     return null;
+  }
+}
+
+async function applyHermesGatewayStatus() {
+  // hermes gateway status — يقرأ صح ولا يظهر not installed وهو شغال
+  const el = document.getElementById("hermesGatewayStatus");
+  if (!el) return;
+  try {
+    const gw = await getJson("/api/hermes/gateway");
+    const pid = gw.pid || "";
+    const running = gw.running;
+    const installed = gw.installed;
+    let label, cls;
+    if (running && pid) {
+      label = "✅ Hermes gateway شغّال — PID " + pid + (gw.version ? " v" + gw.version : "");
+      cls = "ok";
+    } else if (installed && !running) {
+      label = "⏸️ Hermes gateway مثبّت — متوقف حالياً";
+      cls = "warn";
+    } else if (!installed) {
+      label = "❌ Hermes gateway غير مثبّت";
+      cls = "err";
+    } else {
+      label = "ℹ️ Hermes gateway: " + (gw.gateway_state || "unknown");
+      cls = "warn";
+    }
+    el.textContent = label;
+    el.className = "hermes-gw-status " + cls;
+    el.title = "المصدر: " + (gw.source || "") + " — " + (gw.hermes_home || "");
+  } catch (e) {
+    el.textContent = "⚠️ تعذر قراءة حالة Hermes gateway";
+    el.className = "hermes-gw-status warn";
   }
 }
 
@@ -8934,6 +8967,7 @@ async function boot() {
     // الموقع المنشور: محاولة قراءة مباشرة من القاعدة الحية (مفتاح anon + RLS للجداول العامة)
     // ليعرض أرقامًا حية فعلًا — مع السقوط الآمن للقطة إن تعذر الاتصال.
     if (STATIC_SNAPSHOT_MODE) applyLiveDbCounts(statusEl);
+    applyHermesGatewayStatus();
   } catch {
     setStatus("تعذر فحص البيانات");
   }

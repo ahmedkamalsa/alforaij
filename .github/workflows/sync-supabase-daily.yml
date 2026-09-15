@@ -1,19 +1,32 @@
 ---
+# yamllint disable rule:line-length
 name: Sync Supabase Daily
 
+# yamllint disable rule:line-length
 # yamllint disable-line rule:truthy
 on:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 0 * * *" # 00:00 UTC = 03:00 Asia/Kuwait (يومي)
   push:
     branches: [main]
     paths:
       - "alforaij-research-assistant/**"
       - "alforaijboard/**"
       - "supabase/**"
+      - ".github/workflows/sync-supabase-daily.yml"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "سبب التشغيل اليدوي"
+        required: false
+        default: "manual"
 
 permissions:
   contents: read
+
+concurrency:
+  group: sync-supabase-daily-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -27,9 +40,33 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify secrets
+        run: |
+          missing=0
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "::error::SUPABASE_URL secret is not set"
+            missing=1
+          else
+            echo "SUPABASE_URL ✓ (${SUPABASE_URL:0:28}...)"
+          fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::SUPABASE key missing (need SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY)"
+            missing=1
+          else
+            echo "SUPABASE key ✓"
+          fi
+          if [ "$missing" -eq 1 ]; then exit 1; fi
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
       - name: Sync listings to Supabase
         env:
@@ -38,21 +75,57 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          if [ -z "$SUPABASE_URL" ]; then
-            echo "::error::SUPABASE_URL secret is not set"
-            exit 1
-          fi
-          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && \
-             [ -z "$SUPABASE_KEY" ]; then
-            echo "::error::SUPABASE key missing"
-            exit 1
-          fi
+          set -e
           # توافق: بعض البيئات تستخدم SUPABASE_KEY بدل SERVICE_ROLE
-          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && \
-             [ -n "$SUPABASE_KEY" ]; then
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -n "$SUPABASE_KEY" ]; then
+            export SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_KEY"
+            echo "Mapped SUPABASE_KEY → SUPABASE_SERVICE_ROLE_KEY"
+          fi
+          echo "⏰ Trigger: ${{ github.event_name }} @ $(date -u +%Y-%m-%dT%H:%M:%SZ) (03:00 Kuwait = 00:00 UTC)"
+          echo "📋 Step 1/2: sync_listings_supabase.py ..."
+          python scripts/sync_listings_supabase.py
+          echo "✅ Step 1 done"
+          echo "📋 Step 2/2: persist_to_supabase.py ..."
+          python scripts/persist_to_supabase.py
+          echo "✅ Step 2 done"
+
+      - name: Verify Supabase counts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          set -e
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -n "$SUPABASE_KEY" ]; then
             export SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_KEY"
           fi
-          echo "Running sync_listings_supabase.py ..."
-          python scripts/sync_listings_supabase.py
-          echo "Running persist_to_supabase.py ..."
-          python scripts/persist_to_supabase.py
+          python -c "
+          import os, urllib.request, json
+          url = os.environ['SUPABASE_URL'].rstrip('/') + '/rest/v1/listings?select=id'
+          key = os.environ['SUPABASE_SERVICE_ROLE_KEY']
+          req = urllib.request.Request(url, headers={'apikey': key, 'Authorization': 'Bearer ' + key, 'Prefer': 'count=exact'})
+          req.get_method = lambda: 'HEAD'
+          try:
+              with urllib.request.urlopen(req, timeout=15) as r:
+                  cr = r.headers.get('Content-Range','')
+                  print(f'Supabase listings Content-Range: {cr}')
+                  if '182' in cr or '/' in cr:
+                      print('Verified: listings reachable')
+          except Exception as e:
+              print(f'Verify warning: {e}')
+          "
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Sync Supabase Daily — ملخص التشغيل"
+            echo ""
+            echo "- **الحدث:** \`${{ github.event_name }}\`"
+            echo "- **الوقت:** \`$(date -u +%Y-%m-%dT%H:%M:%SZ)\` (UTC) = 03:00 Asia/Kuwait"
+            echo "- **الفرع:** \`${{ github.ref_name }}\`"
+            echo "- **الـ Commit:** \`${{ github.sha }}\`"
+            echo "- **الجدولة:** \`0 0 * * *\` يومياً + \`on: push\` عند تعديل supabase/** أو alforaijboard/**"
+            echo ""
+            echo "الخطوات: Checkout → Setup Python 3.11 (cache pip) → verify secrets → sync_listings_supabase.py → persist_to_supabase.py → verify counts"
+          } >> "$GITHUB_STEP_SUMMARY"

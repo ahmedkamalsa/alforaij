@@ -17,6 +17,8 @@ import time
 import urllib.request
 import urllib.error
 
+import pytest
+
 BASE = "http://127.0.0.1:8000"
 PASS = 0
 FAIL = 0
@@ -58,6 +60,17 @@ def get(path, timeout=15, retries=5):
                 time.sleep(1)
                 continue
             return 0, {"error": str(e)}
+
+
+def _server_available() -> bool:
+    status, _body = get("/api/health", timeout=2, retries=1)
+    return status != 0
+
+
+pytestmark = pytest.mark.skipif(
+    not _server_available(),
+    reason="local API server is not running at http://127.0.0.1:8000",
+)
 
 
 def assert_test(name, condition, detail=""):

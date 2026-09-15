@@ -1051,6 +1051,15 @@ class Handler(BaseHTTPRequestHandler):
                 logger.exception("Opportunity delta build failed")
                 json_response(self, {"error": "Opportunity delta build failed", "detail": str(exc)}, status=500)
             return
+        if path == "/api/hermes/gateway":
+            # حالة hermes gateway — تُقرأ من gateway_state.json ولا تظهر not installed وهو شغال PID 11340
+            from backend.services.hermes_gateway import get_hermes_gateway_status
+            try:
+                json_response(self, get_hermes_gateway_status())
+            except Exception as exc:
+                logger.exception("Hermes gateway status failed")
+                json_response(self, {"installed": True, "running": False, "error": str(exc)}, status=500)
+            return
         if path == "/api/live-db":
             # إعداد القاعدة الحية للواجهة (المفتاح العام anon): على الموقع المنشور الثابت
             # تُقرأ من static-data/live-db.json عبر fetchStaticJson، وعلى خادم API تُقدَّم

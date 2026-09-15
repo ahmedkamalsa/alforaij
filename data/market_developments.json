@@ -1,36 +1,9 @@
 {
-  "generatedAt": "2026-09-02T06:02:55",
-  "count": 8,
+  "generatedAt": "2026-09-15T06:02:05",
+  "count": 5,
   "status": "success",
-  "note": "جمع 8 تطورًا، 5/11 مصادر عقارية",
+  "note": "جمع 5 تطورًا، 2/11 مصادر عقارية",
   "developments": [
-    {
-      "url": "https://timeskuwait.com/kuwait-tightens-anti-money-laundering-controls-for-gold-and-real-estate-sectors/",
-      "title": "Kuwait tightens anti-money laundering controls for gold and real estate sectors",
-      "source": "timeskuwait",
-      "source_name": "TimesKuwait",
-      "category": "أخبار السوق",
-      "published": "Tue, 01 Se",
-      "summary": "Minister of Commerce and Industry Osama Boodai has updated anti-money laundering and counter-terrorist financing controls for businesses dealing in gold, precious stones and precious metals, as well as real estate brokers and intermediaries. The updated rules require companies and institutions in th"
-    },
-    {
-      "url": "https://alanba.com.kw/BBCNews/19202/",
-      "title": "ترامب: الولايات المتحدة أبرمت صفقة \"تاريخية\" للسيطرة على 65 مليار برميل من النفط الفنزويلي",
-      "source": "alanba",
-      "source_name": "الأنباء",
-      "category": "أخبار السوق",
-      "published": "",
-      "summary": ""
-    },
-    {
-      "url": "https://www.alraimedia.com/article/1777912/اقتصاد/حظر-بيع-وشراء-الذهب-والوساطة-عقاريا-لمن-يتعذر-معه-التحقق-من-المستفيد-الفعلي",
-      "title": "حظر بيع وشراء الذهب والوساطة عقارياً لِمَنْ يتعذّر معه التحقّق من «المستفيد الفعلي»",
-      "source": "alrai",
-      "source_name": "الراي",
-      "category": "أخبار السوق",
-      "published": "",
-      "summary": ""
-    },
     {
       "url": "https://www.kfh.com/en/home/Investor-Relations/Real-estate-Reports/Real-estate-reports.html",
       "title": "Real estate Reports",
@@ -90,15 +63,15 @@
       "name": "Kuwait Times",
       "status": "no_matches",
       "records": 0,
-      "note": "1 عنوانًا إجمالًا، 0 عقاريًا",
+      "note": "لا عناوين",
       "fetchMethod": "HTML",
       "endpoint": "https://kuwaittimes.com/"
     },
     {
       "name": "TimesKuwait",
-      "status": "success",
-      "records": 1,
-      "note": "10 عنوانًا إجمالًا، 1 عقاريًا",
+      "status": "no_matches",
+      "records": 0,
+      "note": "10 عنوانًا إجمالًا، 0 عقاريًا",
       "fetchMethod": "RSS",
       "endpoint": "https://timeskuwait.com/feed"
     },
@@ -120,9 +93,9 @@
     },
     {
       "name": "الأنباء",
-      "status": "success",
-      "records": 1,
-      "note": "1 عنوانًا إجمالًا، 1 عقاريًا",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
       "fetchMethod": "HTML",
       "endpoint": "https://www.alanba.com.kw/rss/"
     },
@@ -136,9 +109,9 @@
     },
     {
       "name": "الراي",
-      "status": "success",
-      "records": 1,
-      "note": "2 عنوانًا إجمالًا، 1 عقاريًا",
+      "status": "no_matches",
+      "records": 0,
+      "note": "لا عناوين",
       "fetchMethod": "HTML",
       "endpoint": "https://www.alraimedia.com/"
     },

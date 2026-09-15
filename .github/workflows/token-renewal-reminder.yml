@@ -1,0 +1,121 @@
+---
+# yamllint disable rule:line-length
+name: Token Renewal Reminder — sbp_0068
+
+# تذكير تجديد التوكن قبل 5 أيام من الانتهاء (02 Oct → 27 Sep)
+# يُنشئ Issue تلقائياً + تعليق في Actions log + summary
+
+# yamllint disable rule:line-length
+# yamllint disable-line rule:truthy
+on:
+  schedule:
+    - cron: "0 9 27 9 *" # 27 Sep 09:00 UTC = 12:00 Kuwait
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "إنشاء التذكير الآن حتى لو ليس 27 Sep"
+        required: false
+        default: "true"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute days left
+        id: calc
+        run: |
+          expiry="2026-10-02"
+          today=$(date -u +%Y-%m-%d)
+          # يحسب الأيام المتبقية حتى 02 Oct 2026
+          days=$(( ($(date -d "$expiry" +%s) - $(date -d "$today" +%s)) / 86400 ))
+          echo "expiry=$expiry" >> "$GITHUB_OUTPUT"
+          echo "today=$today" >> "$GITHUB_OUTPUT"
+          echo "days_left=$days" >> "$GITHUB_OUTPUT"
+          echo "Expiry: $expiry | Today: $today | Days left: $days"
+
+      - name: Create reminder issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const expiry = '${{ steps.calc.outputs.expiry }}';
+            const today = '${{ steps.calc.outputs.today }}';
+            const daysLeft = parseInt('${{ steps.calc.outputs.days_left }}', 10);
+            const tokenPrefix = 'sbp_0068';
+            const projectRef = 'bwspcsiazbwrrxpgoldx';
+            const title = `🔑 تذكير: جدّد توكن Supabase ${tokenPrefix}… قبل ${expiry} — متبقي ${daysLeft} يوم`;
+
+            // تجنب التكرار: ابحث عن issue مفتوح بنفس العنوان
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 30,
+            });
+            const dup = existing.data.find(i => i.title.includes(tokenPrefix) && i.title.includes('تذكير'));
+            if (dup) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: dup.number,
+                body: `⏰ تذكير متكرر — اليوم ${today} — متبقي **${daysLeft} يوم** حتى ${expiry}.\n\n> التوكن \`${tokenPrefix}…\` في https://supabase.com/dashboard/account/tokens\n> المشروع: \`${projectRef}\` — جدّد التوكن وحدّث Secrets: \`SUPABASE_ACCESS_TOKEN\` + \`SUPABASE_SERVICE_ROLE_KEY\` إن لزم.\n\nبعد التجديد أغلق هذا الـ Issue.`,
+              });
+              core.summary.addHeading('تذكير التوكن — تم التعليق على Issue موجود').addRaw(`Issue #${dup.number} — متبقي ${daysLeft} يوم`).write();
+              return;
+            }
+
+            const body = `## 🔑 تذكير تجديد التوكن — ${tokenPrefix}…
+
+            | البند | القيمة |
+            |---|---|
+            | التوكن | \`${tokenPrefix}…\` (prefix \`sbp_0068\`) |
+            | ينتهي | **${expiry}** (00:00 UTC) |
+            | اليوم | ${today} |
+            | متبقي | **${daysLeft} يوم** |
+            | المشروع | \`${projectRef}\` → https://supabase.com/dashboard/project/${projectRef} |
+            | إدارة التوكن | https://supabase.com/dashboard/account/tokens |
+
+            ### ماذا تفعل الآن (5 دقائق)
+            1. افتح https://supabase.com/dashboard/account/tokens
+            2. أنشئ توكن جديد لنفس المشروع \`${projectRef}\` (أو جدّد الحالي إن متاح).
+            3. حدّث Secrets في GitHub: \`Settings → Secrets and variables → Actions\`
+               - \`SUPABASE_ACCESS_TOKEN\`
+               - \`SUPABASE_SERVICE_ROLE_KEY\` / \`SUPABASE_KEY\` إن كان التوكن مرتبطاً بها
+            4. حدّث \`.env\` محلياً وشغّل \`python scripts/apply_migrations_remote.py --check\` للتحقق.
+            5. أغلق هذا الـ Issue بعد التأكد من نجاح \`Sync Supabase Daily\` القادم (03:00 Kuwait).
+
+            > هذا التذكير مجدول تلقائياً يوم **27 Sep 09:00 UTC (12:00 Kuwait)** — قبل 5 أيام من الانتهاء.
+            > شُغّل يدوياً عبر \`workflow_dispatch\` إن احتجت اختباره قبل الموعد.
+
+            ---
+            *Workflow: \`.github/workflows/token-renewal-reminder.yml\` — cron \`0 9 27 9 *\`*`;
+
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['token-renewal', 'automation'],
+            });
+            core.summary.addHeading('تذكير التوكن — تم إنشاء Issue').addRaw(`Issue #${issue.data.number}: ${title}`).write();
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## 🔑 تذكير التوكن sbp_0068"
+            echo ""
+            echo "- **ينتهي:** 02 Oct 2026"
+            echo "- **التذكير:** 27 Sep 09:00 UTC (12:00 Kuwait) — قبل 5 أيام"
+            echo "- **اليوم:** ${{ steps.calc.outputs.today }} — متبقي ${{ steps.calc.outputs.days_left }} يوم"
+            echo "- **المشروع:** bwspcsiazbwrrxpgoldx"
+            echo "- **التوكن:** https://supabase.com/dashboard/account/tokens"
+            echo "- **الجدولة:** \`0 9 27 9 *\` + workflow_dispatch"
+          } >> "$GITHUB_STEP_SUMMARY"
