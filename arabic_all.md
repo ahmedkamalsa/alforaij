@@ -806,3 +806,76 @@ hermes -p alforaij-pro auth list
 6. Codex موجود داخل Hermes، لكنه يبقى escalation اختياريًا فقط وليس افتراضيًا.
 
 الخلاصة المصححة: Hermes Agent عندك ليس ناقص مفاتيح بشكل عام؛ عنده مفاتيح وبروفايل جاهز. المطلوب الآن هو إدارة الصحة والتوجيه والتكلفة فوق هذه المفاتيح الموجودة، وليس إعادة طلبها منك.
+
+## 26. تحسين OS Environment Variables من ملفات Hermes - 2026-09-16
+
+بناءً على موافقتك، تم تنفيذ تحسين محلي آمن لمتغيرات Windows User environment variables بدون عرض أي قيمة سرية.
+
+ما تم عمله:
+
+- إنشاء سكربت:
+  - `D:\foraj_social\287\hermes-ops\scripts\sync-hermes-env-to-user.ps1`
+- السكربت يقرأ فقط من:
+  - `C:\Users\hello\AppData\Local\Hermes\.env`
+  - `C:\Users\hello\AppData\Local\Hermes\supabase.env`
+- لا يقرأ ولا ينسخ OAuth من `auth.json`.
+- لا يطبع أي قيمة سرية.
+- يستخدم allow-list محددة بدل نسخ كل شيء عشوائيًا.
+- يكتب إلى `HKCU:\Environment` كـ User environment variables.
+
+المتغيرات التي أصبحت متاحة على مستوى User:
+
+```text
+BROWSER_USE_API_KEY
+GITHUB_TOKEN
+HERMES_LANGFUSE_PUBLIC_KEY
+HERMES_LANGFUSE_SECRET_KEY
+LM_API_KEY
+OPENCODE_ZEN_API_KEY
+OPENROUTER_API_KEY
+SUPABASE_ANON_KEY
+SUPABASE_KEY
+SUPABASE_PROJECT_REF
+SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SECRET_KEY
+SUPABASE_SERVICE_KEY
+SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_URL
+TERMINAL_ENV
+```
+
+نتيجة التحقق:
+
+```text
+source_files_present = 2
+changed_count بعد أول تشغيل = 10
+unchanged_count بعد أول تشغيل = 6
+DryRun بعد التنفيذ = changed_count 0 / unchanged_count 16
+```
+
+فائدة هذا التحسين:
+
+1. السكربتات خارج Hermes تستطيع قراءة المفاتيح من بيئة Windows مباشرة.
+2. لا نحتاج تكرار إدخال المفاتيح في كل مشروع محلي.
+3. `SUPABASE_SERVICE_ROLE_KEY` تم ضبطه كاسم alias مفيد من `SUPABASE_SERVICE_KEY` حتى تتوافق الأدوات التي تتوقع الاسم الشائع.
+4. Hermes نفسه لم يتغير، وما زال يستخدم credential store والبروفايل الحالي.
+
+طريقة إعادة المزامنة لاحقًا:
+
+```powershell
+cd D:\foraj_social\287
+.\hermes-ops\scripts\sync-hermes-env-to-user.ps1
+```
+
+اختبار بدون تغيير:
+
+```powershell
+.\hermes-ops\scripts\sync-hermes-env-to-user.ps1 -DryRun
+```
+
+ملاحظة مهمة:
+
+```text
+قد تحتاج فتح Terminal جديد حتى ترى كل البرامج المتغيرات الجديدة تلقائيًا.
+الجلسة الحالية تم تحديثها أثناء تشغيل السكربت، لكن البرامج المفتوحة سابقًا قد لا ترث القيم الجديدة.
+```
