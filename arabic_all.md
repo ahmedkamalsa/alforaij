@@ -236,25 +236,25 @@ supabase/setup_all.sql
 
 ## 12. روابط رسمية
 
-- Supabase: https://supabase.com/
-- Supabase Edge Functions: https://supabase.com/docs/guides/functions
-- Supabase RLS: https://supabase.com/docs/guides/database/postgres/row-level-security
-- Supabase AI/vector: https://supabase.com/docs/guides/ai
-- Vercel build settings: https://vercel.com/docs/deployments/configure-a-build
-- Vercel environment variables: https://vercel.com/docs/environment-variables
-- Cloudflare Workers: https://developers.cloudflare.com/workers/
-- Cloudflare secrets: https://developers.cloudflare.com/workers/configuration/secrets/
-- Cloudflare Turnstile: https://developers.cloudflare.com/turnstile/
-- Upstash Redis: https://upstash.com/docs/redis
-- Upstash rate limiting: https://upstash.com/docs/redis/sdks/ratelimit-ts
-- Firebase pricing: https://firebase.google.com/pricing
-- OpenRouter models: https://openrouter.ai/models
-- OpenRouter docs: https://openrouter.ai/docs
-- Gemini API: https://ai.google.dev/gemini-api/docs
-- Gemini pricing: https://ai.google.dev/pricing
-- Groq docs: https://console.groq.com/docs
-- Groq pricing: https://groq.com/pricing/
-- Hugging Face Inference Providers: https://huggingface.co/docs/inference-providers
+- Supabase: <https://supabase.com/>
+- Supabase Edge Functions: <https://supabase.com/docs/guides/functions>
+- Supabase RLS: <https://supabase.com/docs/guides/database/postgres/row-level-security>
+- Supabase AI/vector: <https://supabase.com/docs/guides/ai>
+- Vercel build settings: <https://vercel.com/docs/deployments/configure-a-build>
+- Vercel environment variables: <https://vercel.com/docs/environment-variables>
+- Cloudflare Workers: <https://developers.cloudflare.com/workers/>
+- Cloudflare secrets: <https://developers.cloudflare.com/workers/configuration/secrets/>
+- Cloudflare Turnstile: <https://developers.cloudflare.com/turnstile/>
+- Upstash Redis: <https://upstash.com/docs/redis>
+- Upstash rate limiting: <https://upstash.com/docs/redis/sdks/ratelimit-ts>
+- Firebase pricing: <https://firebase.google.com/pricing>
+- OpenRouter models: <https://openrouter.ai/models>
+- OpenRouter docs: <https://openrouter.ai/docs>
+- Gemini API: <https://ai.google.dev/gemini-api/docs>
+- Gemini pricing: <https://ai.google.dev/pricing>
+- Groq docs: <https://console.groq.com/docs>
+- Groq pricing: <https://groq.com/pricing/>
+- Hugging Face Inference Providers: <https://huggingface.co/docs/inference-providers>
 
 ## 13. القرارات الاحترافية المقترحة
 
@@ -445,7 +445,7 @@ SUPABASE_ANON_KEY
 remote:
 
 ```text
-https://github.com/ahmedkamalsa/alforaij.git
+<https://github.com/ahmedkamalsa/alforaij.git>
 ```
 
 commits:
@@ -485,7 +485,7 @@ Deploy alforaijboard Pages: success
 remote:
 
 ```text
-https://github.com/ahmedkamalsa/alforaijboard.git
+<https://github.com/ahmedkamalsa/alforaijboard.git>
 ```
 
 branch:
@@ -511,7 +511,7 @@ origin/safety/pre-reorg-20260914-163154
 رابط إنشاء Pull Request:
 
 ```text
-https://github.com/ahmedkamalsa/alforaijboard/pull/new/safety/pre-reorg-20260914-163154
+<https://github.com/ahmedkamalsa/alforaijboard/pull/new/safety/pre-reorg-20260914-163154>
 ```
 
 ## 21. حالة Git النهائية
@@ -640,6 +640,7 @@ D:\ahmed\1\قواعد بيانات.txt
 - لم أفتح مسار paid تلقائي.
 
 الخلاصة: الملفان يدعمان الاتجاه الحالي، ولا يكشفان حاجة لتعديل عاجل إضافي بعد الرفع. أفضل إجراء الآن هو اعتبار محتواهما جزءًا من خارطة الطريق، وليس تنفيذه دفعة واحدة.
+
 ## 24. تجربة مباشرة شاملة للبرامج والربط - 2026-09-16
 
 ### ما تم اختباره فعليًا
@@ -664,8 +665,8 @@ D:\ahmed\1\قواعد بيانات.txt
   - قراءة service role لجدول `listings`: OK
   - قراءة anon لجدول `market_listings`: OK
 - روابط GitHub Pages التي تم التحقق منها:
-  - `https://ahmedkamalsa.github.io/alforaij/`
-  - `https://ahmedkamalsa.github.io/alforaijboard/`
+  - `<https://ahmedkamalsa.github.io/alforaij/`>
+  - `<https://ahmedkamalsa.github.io/alforaijboard/`>
 
 ### الاستفادة العملية الآن
 
@@ -692,7 +693,7 @@ cd D:\foraj_social\287\alforaij-research-assistant
 ثم افتح:
 
 ```text
-http://127.0.0.1:8000
+<http://127.0.0.1:8000>
 ```
 
 ### المفاتيح الموجودة والمفاتيح الناقصة
@@ -712,14 +713,14 @@ http://127.0.0.1:8000
 
 مصادر الحصول على المفاتيح:
 
-- Google OAuth / Client ID: https://developers.google.com/identity/protocols/oauth2
-- Gemini API key: https://aistudio.google.com/api-keys
-- OpenRouter API key: https://openrouter.ai/
-- Groq console/API keys: https://console.groq.com/
-- Hugging Face tokens: https://huggingface.co/settings/tokens
-- Upstash Redis REST: https://upstash.com/docs/redis/features/restapi
-- Cloudflare API Tokens: https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
-- Vercel account tokens: https://vercel.com/account/tokens
+- Google OAuth / Client ID: <https://developers.google.com/identity/protocols/oauth2>
+- Gemini API key: <https://aistudio.google.com/api-keys>
+- OpenRouter API key: <https://openrouter.ai/>
+- Groq console/API keys: <https://console.groq.com/>
+- Hugging Face tokens: <https://huggingface.co/settings/tokens>
+- Upstash Redis REST: <https://upstash.com/docs/redis/features/restapi>
+- Cloudflare API Tokens: <https://developers.cloudflare.com/fundamentals/api/get-started/create-token/>
+- Vercel account tokens: <https://vercel.com/account/tokens>
 
 ### رأيي الاحترافي بعد التجربة
 
@@ -1020,8 +1021,8 @@ Hermes يستطيع تنفيذ أوامر وقراءة/تعديل ملفات د�
 تم التحقق من روابط GitHub Pages:
 
 ```text
-https://ahmedkamalsa.github.io/alforaij/
-https://ahmedkamalsa.github.io/alforaijboard/
+<https://ahmedkamalsa.github.io/alforaij/>
+<https://ahmedkamalsa.github.io/alforaijboard/>
 ```
 
 كلاهما رجع HTTP 200 في آخر تحقق.
@@ -1063,7 +1064,7 @@ https://ahmedkamalsa.github.io/alforaijboard/
 ### ما تم تنفيذه فعليًا
 
 1. **إصلاح عداد موقع alforaijboard على GitHub Pages**
-   - الرابط المنشور: https://ahmedkamalsa.github.io/alforaijboard/
+   - الرابط المنشور: <https://ahmedkamalsa.github.io/alforaijboard/>
    - كان الموقع يعرض أرقامًا قديمة/ناقصة لأن العدّ كان يعتمد على لقطة ثابتة أو استعلام Supabase غير مناسب.
    - تم تعديل `app.js` في فرع `gh-pages` ليقرأ العدد الحي من Supabase عبر `market_listings` باستخدام `Prefer: count=exact` مع fallback آمن.
    - التحقق المنشور أعطى:
@@ -1075,7 +1076,7 @@ https://ahmedkamalsa.github.io/alforaijboard/
 2. **إصلاح رسالة Hermes gateway على GitHub Pages**
    - GitHub Pages لا يستطيع فحص خدمة Hermes الموجودة على جهازك المحلي.
    - بدل ظهور رسالة خاطئة: `Hermes gateway غير مثبّت`، أصبح الموقع يعرض أن Gateway محلي ويجب فحصه من:
-     - http://127.0.0.1:8000
+     - <http://127.0.0.1:8000>
    - تم الإبقاء على فحص Hermes الحقيقي في التطبيق المحلي، وليس في الصفحة العامة الثابتة.
 
 3. **إصلاح فرع main المستخدم غالبًا بواسطة Netlify**
@@ -1083,7 +1084,7 @@ https://ahmedkamalsa.github.io/alforaijboard/
    - الاختبار المحلي لنسخة `site/` أعطى:
      - `متصل بـ Supabase (٤٬٨٢١ إعلان)`
    - تم الدفع إلى GitHub `main` ليتمكن Netlify من إعادة النشر إذا كان مربوطًا بهذا الفرع.
-   - ملاحظة: فحص `https://alforaijboard.netlify.app/` من الطرفية انتهى بـ timeout مرتين، لذلك لم أستطع تأكيد Netlify خارجيًا من الشبكة الحالية. الكود الذي يحتاجه Netlify تم دفعه.
+   - ملاحظة: فحص `<https://alforaijboard.netlify.app/`> من الطرفية انتهى بـ timeout مرتين، لذلك لم أستطع تأكيد Netlify خارجيًا من الشبكة الحالية. الكود الذي يحتاجه Netlify تم دفعه.
 
 4. **إصلاح كاش التصميم المحلي في alforaij-research-assistant**
    - تم رفع نسخة cache جديدة في Service Worker وكسر كاش `styles.css` و `app.js`.
@@ -1094,7 +1095,7 @@ https://ahmedkamalsa.github.io/alforaijboard/
 
 - Hermes gateway مثبت ويعمل محليًا حسب فحص التطبيق المحلي.
 - الاختبار المحلي السابق أظهر أن endpoint:
-  - `http://127.0.0.1:8000/api/hermes/gateway`
+  - `<http://127.0.0.1:8000/api/hermes/gateway`>
   يرجع حالة تشغيل حقيقية مع إصدار Hermes.
 - الاستخدام العملي اليومي:
 
@@ -1112,10 +1113,10 @@ cd D:\foraj_social\287
 ### كيف يستفيد مستخدم عادي
 
 - افتح GitHub Pages لمتابعة لوحة alforaijboard العامة:
-  - https://ahmedkamalsa.github.io/alforaijboard/
+  - <https://ahmedkamalsa.github.io/alforaijboard/>
 - إذا أردت التشغيل المحلي الكامل مع Hermes والـGateway:
   - شغل تطبيق الفريج المحلي من مشروع `alforaij-research-assistant`.
-  - افتح: http://127.0.0.1:8000
+  - افتح: <http://127.0.0.1:8000>
 - GitHub Pages يعرض البيانات العامة والحية من Supabase، لكنه لا يستطيع التحكم في جهازك المحلي أو فحص Hermes gateway الحقيقي.
 
 ### كيف يستفيد مطور أو Agent جديد
@@ -1152,7 +1153,57 @@ python agent\validate_static_site.py
 
 ### توصية تشغيل نهائية
 
-- استخدم GitHub Pages كرابط مؤكد الآن: https://ahmedkamalsa.github.io/alforaijboard/
+- استخدم GitHub Pages كرابط مؤكد الآن: <https://ahmedkamalsa.github.io/alforaijboard/>
 - استخدم المحلي `127.0.0.1:8000` عندما تريد Hermes gateway والوظائف المحلية.
 - اعتبر Netlify بحاجة إلى انتظار redeploy أو فحص من لوحة Netlify إذا ظل الرابط لا يفتح.
+---
 
+## تحديث تنفيذ فعلي - إصلاح عداد الفريج الحي 2026-09-16
+
+### المشكلة
+
+كان الموقع يعرض `الفريج 182` لأن الكود كان يحسب سجلات الفريج من لقطة `dashboard-summary.json` الثابتة. هذه اللقطة ليست API الفريج الأصلي ولا تتحدث تلقائيًا مع `front.alforaij.com`.
+
+### السبب الفني
+
+- مصدر `182`: عدد السجلات داخل `dashboard-summary.json` التي تحمل `source == "الفريج"`.
+- مصدر الفريج الحي الصحيح موجود في API عام مستخدم أصلًا داخل سكربتات المشروع:
+  - `search.alforaij.com/api/internallistings/search`
+- تم اختبار API بدون مفتاح، وكانت النتائج الحالية:
+  - transactionType=1: `220`
+  - transactionType=2: `50`
+  - transactionType=3: `38`
+  - transactionType=4: `5`
+  - transactionType=5: `6`
+  - الإجمالي الحي: `319`
+
+### ما تم إصلاحه
+
+1. تم تحديث GitHub Pages branch `gh-pages` ليقرأ عدد الفريج الحي من API العام بدل الاعتماد على لقطة `182`.
+2. تم تحديث فرع العمل الآمن `safety/pre-reorg-20260914-163154` في `alforaijboard/site/app.js` بنفس المنطق.
+3. بقيت اللقطة الثابتة fallback فقط إذا تعذر الاتصال بـ API الفريج.
+4. لا توجد أسرار أو مفاتيح جديدة مطلوبة لهذا الإصلاح.
+
+### نتيجة التحقق
+
+- اختبار GitHub Pages المنشور بعد النشر أعطى:
+  - `البيانات: 5140 إعلان مباشر من القاعدة`
+  - `الفريج 319 حي`
+  - `المواقع الخارجية 4821`
+- اختبار الفرع المحلي الآمن أعطى:
+  - `السوق الخارجي: ٤٬٨٢١`
+  - `الفريج: ٣١٩`
+
+### ملاحظة مهمة
+
+هذا الإصلاح يحدث **العداد** مباشرة من API الفريج، لكنه لا يستبدل كل جدول السجلات المحلي بلقطة كاملة جديدة. للحصول على تحديث كامل لكل تفاصيل سجلات الفريج داخل اللوحة، نحتاج pipeline يجلب صفحات API كلها ويحفظ نسخة normalized في Supabase أو static-data.
+
+### مفاتيح مطلوبة للتحسينات الاحترافية القادمة
+
+لا أحتاج مفاتيح لإصلاح عداد الفريج. للتحسينات القادمة فقط:
+
+- `UPSTASH_REDIS_REST_URL` و `UPSTASH_REDIS_REST_TOKEN`: من لوحة Upstash Redis لاستخدام rate limit/cache لطلبات AI.
+- `FIREBASE_API_KEY` و `FIREBASE_APP_ID` و `FIREBASE_MESSAGING_SENDER_ID`: من Firebase Project Settings إذا أردنا Analytics/FCM/Remote Config.
+- `CLOUDFLARE_API_TOKEN`: من Cloudflare API Tokens إذا أردنا Worker/Pages/CDN automation.
+- `NETLIFY_AUTH_TOKEN`: من Netlify User Settings إذا أردنا فرض deploy والتحقق من Netlify CLI بدل انتظار الربط التلقائي.
+- مفاتيح عقارية خارجية مثل RentCast/ATTOM/HouseCanary فقط إذا أردت مصادر تقييم عقاري خارج الكويت/الخليج؛ ليست مطلوبة للإصلاح الحالي.
