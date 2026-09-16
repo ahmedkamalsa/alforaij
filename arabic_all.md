@@ -1206,4 +1206,71 @@ python agent\validate_static_site.py
 - `FIREBASE_API_KEY` و `FIREBASE_APP_ID` و `FIREBASE_MESSAGING_SENDER_ID`: من Firebase Project Settings إذا أردنا Analytics/FCM/Remote Config.
 - `CLOUDFLARE_API_TOKEN`: من Cloudflare API Tokens إذا أردنا Worker/Pages/CDN automation.
 - `NETLIFY_AUTH_TOKEN`: من Netlify User Settings إذا أردنا فرض deploy والتحقق من Netlify CLI بدل انتظار الربط التلقائي.
+
+## تحديث تنفيذي أخير - الربط الحي وHermes routes 2026-09-16
+
+### ما تم تنفيذه فعليًا
+
+1. تم إصلاح سبب ظهور `الفريج 182`: الرقم كان من لقطة ثابتة داخل `dashboard-summary.json` وليس من API الفريج الحي.
+2. تم اعتماد عداد الفريج الحي من API الفريج العام:
+   - بيع: `220`
+   - إيجار: `50`
+   - أنواع أخرى: `38 + 5 + 6`
+   - الإجمالي الحي: `319`
+3. تم تحديث لوحة `alforaijboard` لتعرض الإجمالي الحي:
+   - الفريج الحي: `319`
+   - المواقع الخارجية من Supabase: `4821`
+   - الإجمالي: `5140`
+4. تم دفع إصلاح GitHub Pages والتحقق من الرابط المنشور على:
+   - `https://ahmedkamalsa.github.io/alforaijboard/`
+5. تم دفع فرع `main` وإضافة Netlify Function للعدادات الحية مع Upstash cache fallback.
+6. تم عمل Netlify deploy مباشر بالـAPI لموقع:
+   - `https://alforaijboard.netlify.app`
+   - deploy id: `6aa9fe0d46720281c9d9328f`
+   - حالة Netlify API: `ready`
+
+### ملاحظات التحقق
+
+- GitHub Pages تم التحقق منه بصريًا/آليًا وظهر `5140` و`الفريج 319 حي`.
+- Netlify API أكد أن النشر جاهز، لكن الوصول إلى `*.netlify.app` من الجهاز انتهى بـtimeout رغم أن DNS يعمل. لذلك حالة Netlify من ناحية النشر: جاهز من API، ومن ناحية التصفح من هذه الشبكة: لم أستطع تأكيد العرض بسبب timeout.
+- موقع Netlify غير مربوط بفرع Git حاليًا (`repo_branch = null`)، لذلك `git push` وحده لا ينشر Netlify. تم استخدام API deploy مباشر بدل ذلك.
+
+### المفاتيح والبيئة
+
+- تم حفظ إعدادات Firebase Web في Windows User Environment بالأسماء:
+  - `FIREBASE_API_KEY`
+  - `FIREBASE_AUTH_DOMAIN`
+  - `FIREBASE_PROJECT_ID`
+  - `FIREBASE_STORAGE_BUCKET`
+  - `FIREBASE_MESSAGING_SENDER_ID`
+  - `FIREBASE_APP_ID`
+  - `FIREBASE_MEASUREMENT_ID`
+- تم اختبار Upstash Redis REST ونجح `PING`.
+- تم اختبار Netlify token عبر API ونجح.
+- Cloudflare token الحالي رجع `401 Unauthorized`، لذلك لا أستطيع اعتماد Cloudflare automation حتى يتم إنشاء token صحيح جديد.
+- لأن بعض المفاتيح تم إرسالها داخل الشات، الأفضل أمنيًا تدويرها لاحقًا من لوحات الخدمات، حتى لو لم تُحفظ في Git.
+
+### Hermes routing
+
+- `openrouter/dots-studio/dots-3-note-preview:free` ما زال أفضل route مجاني صحي ومفعل للبرمجة/البحث/الاستدلال.
+- تم إضافة Gemini وHugging Face إلى سياسة المرشحين داخل `hermes-smart.py` والـ`model-health-registry.json`.
+- الاختبار الفعلي لـGemini وHugging Face فشل لأن متغيرات البيئة غير موجودة حاليًا:
+  - Gemini يحتاج `GOOGLE_API_KEY` أو `GEMINI_API_KEY`.
+  - Hugging Face يحتاج `HF_TOKEN`.
+- لذلك حالتهما الصحيحة الآن `AUTH_REQUIRED` وليس `HEALTHY`. لن يستخدمهما Hermes تلقائيًا قبل نجاح health check فعلي.
+- بعد إضافة المفاتيح الصحيحة وتشغيل:
+
+```powershell
+python hermes-ops\scripts\hermes-smart.py refresh-registry
+```
+
+يمكن تحويلهما إلى verified-free routes فقط إذا نجح الاختبار الصغير وبقي السعر/الكوتة ضمن المجاني.
+
+### أين الفائدة العملية الآن؟
+
+- الموقع لم يعد يعتمد على رقم `182` القديم في العداد، بل يقرأ عداد الفريج الحي.
+- Hermes Pro يختار route مجاني صحي بدل استخدام paid/unknown.
+- Upstash جاهز للكاش والـrate limit عند فتح API/AI endpoints.
+- Firebase جاهز كطبقة Analytics/FCM مستقبلية، وليس بديلًا لـSupabase.
+- Cloudflare مؤجل حتى يصل token صحيح.
 - مفاتيح عقارية خارجية مثل RentCast/ATTOM/HouseCanary فقط إذا أردت مصادر تقييم عقاري خارج الكويت/الخليج؛ ليست مطلوبة للإصلاح الحالي.
