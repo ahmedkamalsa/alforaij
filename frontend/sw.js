@@ -8,7 +8,7 @@
  * 4. Offline Fallback: صفحة بديلة عند غياب الاتصال
  */
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4-20260916';
 const CACHE_NAME = `alforaij-${CACHE_VERSION}`;
 const STATIC_CACHE = `alforaij-static-${CACHE_VERSION}`;
 const API_CACHE = `alforaij-api-${CACHE_VERSION}`;
