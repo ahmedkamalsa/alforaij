@@ -612,6 +612,29 @@ async function fetchLiveAlforaijCount() {
   return total;
 }
 
+async function applyLiveAlforaijStatusCount(statusEl, health = {}) {
+  const el = statusEl || $("healthStatus");
+  if (!el) return null;
+  try {
+    const liveLocal = await fetchLiveAlforaijCount();
+    if (!Number.isFinite(liveLocal) || liveLocal <= 0) return null;
+    const snapshotLocal = Number(el.dataset.snapshotLocal || health.localRecords || health.records || 0);
+    const snapshotTotal = Number(health.totalRecords || health.records || snapshotLocal || 0);
+    const external = Number(health.externalRecords || Math.max(0, snapshotTotal - snapshotLocal) || 0);
+    const total = liveLocal + external;
+    const aiStatus = health.aiAnalysis ? "\u0627\u0644\u062a\u062d\u0644\u064a\u0644 \u0627\u0644\u0630\u0643\u064a \u0645\u062a\u0627\u062d" : "\u062a\u062d\u0644\u064a\u0644 \u0645\u062d\u0644\u064a";
+    const dbState = health.supabase ? "\u0627\u0644\u0642\u0627\u0639\u062f\u0629: \u0645\u062a\u0635\u0644\u0629" : health.staticSnapshot ? "\u0627\u0644\u0642\u0627\u0639\u062f\u0629: \u0645\u062d\u062f\u062b\u0629 \u064a\u0648\u0645\u064a\u0627" : "\u0627\u0644\u0642\u0627\u0639\u062f\u0629: \u0645\u062d\u062f\u062b\u0629";
+    const breakdown = [`\u0627\u0644\u0641\u0631\u064a\u062c ${liveLocal}`, ...(external > 0 ? [`\u0627\u0644\u0645\u0648\u0627\u0642\u0639 \u0627\u0644\u062e\u0627\u0631\u062c\u064a\u0629 ${external}`] : [])].join(" + ");
+    el.dataset.live = "1";
+    el.dataset.snapshotLocal = String(liveLocal);
+    el.textContent = `\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a: ${total} \u0625\u0639\u0644\u0627\u0646 \u0645\u0628\u0627\u0634\u0631 \u0645\u0646 \u0627\u0644\u0642\u0627\u0639\u062f\u0629 (${breakdown}) | ${dbState} | ${aiStatus}`;
+    el.title = `\u0639\u062f\u0627\u062f \u0627\u0644\u0641\u0631\u064a\u062c \u0645\u0646 API \u0645\u0628\u0627\u0634\u0631: ${liveLocal} | \u0627\u0644\u0645\u0648\u0627\u0642\u0639 \u0627\u0644\u062e\u0627\u0631\u062c\u064a\u0629 \u0645\u0646 \u0627\u0644\u0644\u0642\u0637\u0629: ${external}`;
+    return liveLocal;
+  } catch {
+    return null;
+  }
+}
+
 async function applyLiveDbCounts(statusEl) {
   try {
     const cfg = await getJson("/api/live-db");
@@ -8976,6 +8999,7 @@ async function boot() {
       statusEl.title = `تفصيل البيانات — ${breakdown}${bySource ? ` · ${bySource}` : ""}`;
       statusEl.dataset.snapshotLocal = String(local);
       setStatus(`البيانات: ${total} إعلان من كل المصادر (${breakdown}) | ${dbState} | ${aiStatus}`);
+      applyLiveAlforaijStatusCount(statusEl, health);
     } else {
       setStatus(`البيانات: ${total} إعلان من كل المصادر | ${dbState} | ${aiStatus}`);
     }
