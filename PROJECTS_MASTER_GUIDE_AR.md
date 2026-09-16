@@ -31,6 +31,10 @@
 
 آخر commit في `alforaij-research-assistant`:
 
+`cd5da7d docs: add alforaij project guide`
+
+آخر commit تشغيلي أصلح رقم 182:
+
 `b787454 fix: refresh alforaij live count in static frontend`
 
 ## Netlify
@@ -96,3 +100,9 @@
 - `NETLIFY_SITE_ID`
 
 خزّن القيم كمتغيرات بيئة أو GitHub Secrets فقط، ولا تضعها داخل markdown.
+
+## آخر رفع توثيقي
+
+- `alforaij-research-assistant`: `cd5da7d`
+- `hermes-ops`: `24feec4`
+- `alforaijboard`: `d74a37a` على branch `safety/pre-reorg-20260914-163154`
