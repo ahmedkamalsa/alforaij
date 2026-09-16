@@ -1317,3 +1317,31 @@ python hermes-ops\scripts\hermes-smart.py refresh-registry
   - `huggingface/inclusionAI/Ling-3.0-flash-VL`
 - `LOCAL_SIMPLE` بقي:
   - `lmstudio/qwen3.5-4b`
+
+## نشر Hermes Ops الشامل - 2026-09-16
+
+تم تحويل مجلد `hermes-ops` إلى Git repository مستقل ورفعه على GitHub بعد استبعاد logs/cache/pyc والملفات الحساسة.
+
+الرابط:
+
+- `https://github.com/ahmedkamalsa/hermes-ops`
+
+ما يحتويه repo:
+
+- `scripts/hermes-smart.py`: اختيار route مجاني/محلي حسب الصحة والسعر.
+- `scripts/hermes-run.ps1`: تشغيل مهمة واحدة عبر Hermes مع logging آمن.
+- `scripts/Start-HermesPro-OneClick.ps1`: مدخل Hermes Pro اليومي.
+- `model-health-registry.json`: سجل صحة النماذج، وفيه OpenRouter/Gemini/Hugging Face/Qwen.
+- `FINAL_OPERATIONS.md` و`ARABIC_MASTER_REPORT.md`: دليل التشغيل النهائي.
+- `skills/real-estate-intelligence/SKILL.md`: skill عقاري جاهز للتثبيت/الرجوع.
+
+ملاحظات أمان:
+
+- لم يتم رفع أي مفاتيح أو tokens.
+- تم تجاهل `*.jsonl` و`__pycache__` و`logs/` و`tmp-*` و`.env`.
+- المفاتيح تبقى في Windows User Environment أو مخزن Hermes المحلي فقط.
+
+Cloudflare:
+
+- المفتاح الموجود في الصورة/المدخل هو مفتاح Cloudflare API، مفيد لـWorkers AI/Workers/Pages وليس هو المسؤول الوحيد عن Hermes.
+- المسؤول الفعلي عن تشغيل Hermes الشامل الآن هو `hermes-ops` مع registry وscripts، بينما Cloudflare مجرد provider/infra يمكن Hermes الاستفادة منه.
