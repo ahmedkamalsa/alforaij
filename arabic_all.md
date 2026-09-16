@@ -1275,3 +1275,45 @@ python hermes-ops\scripts\hermes-smart.py refresh-registry
 - Cloudflare مؤجل حتى يصل token صحيح.
 - مفاتيح عقارية خارجية مثل RentCast/ATTOM/HouseCanary فقط إذا أردت مصادر تقييم عقاري خارج الكويت/الخليج؛ ليست مطلوبة للإصلاح الحالي.
 
+
+## تحديث اعتماد Gemini وHugging Face وCloudflare - 2026-09-16
+
+تم حفظ مفاتيح التشغيل في Windows User Environment بدون كتابتها داخل Git أو عرضها في التقارير.
+
+### نتائج الاختبار
+
+- Gemini:
+  - المتغيرات المستخدمة: `GOOGLE_API_KEY` و`GEMINI_API_KEY`.
+  - اختبار Hermes صغير نجح.
+  - الحالة في `model-health-registry.json`: `HEALTHY`.
+  - النموذج المعتمد كمرشح مجاني: `gemini/gemini-2.5-flash`.
+- Hugging Face:
+  - المتغير المستخدم: `HF_TOKEN`.
+  - اختبار Hermes صغير نجح.
+  - الحالة في `model-health-registry.json`: `HEALTHY`.
+  - النموذج المعتمد كمرشح مجاني: `huggingface/inclusionAI/Ling-3.0-flash-VL`.
+- Cloudflare:
+  - تم حفظ Global API Key كمتغير بيئة.
+  - اختبار Cloudflare API نجح.
+  - يظل الاستخدام العملي المقترح لاحقًا هو Workers AI/Workers/Pages حسب الحاجة، مع تفضيل Account/User scoped tokens عند الإنشاء الجديد.
+
+### سياسة routing بعد التحديث
+
+- `LOCAL_SIMPLE` ما زال يستخدم `lmstudio/qwen3.5-4b` أولًا.
+- `CODING/RESEARCH/REASONING`:
+  1. أفضل OpenRouter verified-free صحي.
+  2. بدائل OpenRouter المجانية الصحية.
+  3. Gemini المجاني الصحي.
+  4. Hugging Face المجاني الصحي.
+  5. Qwen المحلي.
+- `openai-codex/gpt-5.5` لا يستخدم تلقائيًا، ويظل تصعيدًا صريحًا فقط.
+
+### تحقق فعلي
+
+- `python hermes-ops\scripts\hermes-smart.py select --task-class CODING` اختار:
+  - `openrouter/dots-studio/dots-3-note-preview:free`
+- البدائل الصحية تضمنت:
+  - `gemini/gemini-2.5-flash`
+  - `huggingface/inclusionAI/Ling-3.0-flash-VL`
+- `LOCAL_SIMPLE` بقي:
+  - `lmstudio/qwen3.5-4b`
