@@ -598,16 +598,31 @@ async function applyHermesGatewayStatus() {
   }
 }
 
+async function fetchLiveAlforaijCount() {
+  const transactionTypes = [1, 2, 3, 4, 5];
+  let total = 0;
+  for (const transactionType of transactionTypes) {
+    const url = `https://search.alforaij.com/api/internallistings/search?page=1&pageSize=1&transactionType=${transactionType}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`alforaij-count-${transactionType}-${res.status}`);
+    const data = await res.json();
+    const count = Number(data.totalCount ?? data.total ?? data.count ?? data.meta?.total ?? 0);
+    if (Number.isFinite(count)) total += count;
+  }
+  return total;
+}
+
 async function applyLiveDbCounts(statusEl) {
   try {
     const cfg = await getJson("/api/live-db");
     if (!cfg || !cfg.url || !cfg.anonKey) return;
     const headers = { apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}` };
     const base = cfg.url.replace(/\/$/, "");
-    const [market, opps] = await Promise.all([
+    const [market, opps, liveLocal] = await Promise.all([
       fetch(`${base}/rest/v1/market_listings?select=count`, { headers }).then((r) => r.json()),
       // عدد الفرص الحقيقي: آخر لقطة فرص (total_scored) — لا عدد صفوف اللقطات المتراكمة
       fetch(`${base}/rest/v1/opportunities?select=total_scored,total_listings&order=generated_at.desc&limit=1`, { headers }).then((r) => r.json()),
+      fetchLiveAlforaijCount().catch(() => null),
     ]);
     const marketN = Number((market[0] || {}).count || 0);
     const oppRow = Array.isArray(opps) && opps[0] ? opps[0] : null;
@@ -617,7 +632,7 @@ async function applyLiveDbCounts(statusEl) {
     const el = statusEl || $("healthStatus");
     if (!el) return;
     // إعلانات الفريج المحلية من اللقطة (مصدرها ملف محلي لا جدول القاعدة)
-    const localN = Number(el.dataset.snapshotLocal || 0);
+    const localN = Number(liveLocal || el.dataset.snapshotLocal || 0);
     const breakdown = [`الفريج ${localN}`, `المواقع الخارجية ${marketN}`].join(" + ");
     const oppsText = scoredN > 0 ? ` | ${scoredN.toLocaleString("en-US")} فرصة مقيّمة (من ${listedN.toLocaleString("en-US")} مفحوصة)` : "";
     el.textContent = `البيانات: ${localN + marketN} إعلان مباشر من القاعدة (${breakdown}) | القاعدة: متصلة${oppsText}`;

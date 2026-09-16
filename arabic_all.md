@@ -1345,3 +1345,38 @@ Cloudflare:
 
 - المفتاح الموجود في الصورة/المدخل هو مفتاح Cloudflare API، مفيد لـWorkers AI/Workers/Pages وليس هو المسؤول الوحيد عن Hermes.
 - المسؤول الفعلي عن تشغيل Hermes الشامل الآن هو `hermes-ops` مع registry وscripts، بينما Cloudflare مجرد provider/infra يمكن Hermes الاستفادة منه.
+
+## تصحيح عاجل بعد خطأ Netlify - 2026-09-16
+
+حدث خطأ في النشر: تم رفع artifact غير مناسب فوق موقع `alforaijboard.netlify.app`، فظهر HTML خام ورسالة `Page not found` داخل الصفحة.
+
+ما تم تصحيحه فورًا:
+
+- تم عمل rollback عبر Netlify API إلى deploy السابق السليم:
+  - `6a707818a2fdbb28edf9267e`
+  - العنوان: `Remove QA report from employee dashboard`
+- الرابط الحالي بعد rollback:
+  - `https://alforaijboard.netlify.app/`
+- هذا الرابط الآن عاد إلى موقع لوحة الأرقام والعروض، وليس artifact اللوحة الأخرى.
+
+تنبيه مهم:
+
+- موقع Netlify الحالي ليس مربوطًا بفرع Git، لذلك أي نشر يدوي خاطئ يستبدل الموقع فورًا.
+- لن يتم نشر أي artifact جديد فوقه إلا بعد مطابقة المصدر المحلي 100% مع الموقع المطلوب.
+- مصدر موقع Netlify الحالي الأقرب محليًا هو `vs/site`، وليس `alforaijboard/site` ولا `alforaij-research-assistant/frontend`.
+
+ما تم عمله دون نشر فوق Netlify:
+
+- تم تعديل `alforaij-research-assistant/frontend/app.js` لإضافة قراءة عداد الفريج الحي من API الرسمي باستخدام `meta.total`.
+- اختبار API الحالي أظهر:
+  - بيع: `220`
+  - إيجار: `50`
+  - أنواع أخرى: `38 + 5 + 6`
+  - إجمالي الفريج الحي: `319`
+  - إجمالي الفريج + المواقع الخارجية: `5140`
+
+القرار الصحيح من الآن:
+
+1. الحفاظ على موقع Netlify كما كان وعدم تغيير تصميمه.
+2. تحديث بياناته فقط من المصدر المحلي المطابق له (`vs/site`) أو من نفس pipeline الذي أنشأ deploy الأصلي.
+3. عدم استخدام `alforaijboard/site` أو `alforaij-research-assistant/frontend` كبديل فوق هذا الرابط إلا إذا طلبت ذلك صراحة.
