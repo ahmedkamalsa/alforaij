@@ -1,4 +1,4 @@
-# التقرير العربي الشامل للتنفيذ والتنظيف والنشر
+﻿# التقرير العربي الشامل للتنفيذ والتنظيف والنشر
 
 تاريخ التحديث: 2026-09-16  
 المساحة: `D:\foraj_social\287`
@@ -1226,13 +1226,13 @@ python agent\validate_static_site.py
 5. تم دفع فرع `main` وإضافة Netlify Function للعدادات الحية مع Upstash cache fallback.
 6. تم عمل Netlify deploy مباشر بالـAPI لموقع:
    - `https://alforaijboard.netlify.app`
-   - deploy id: `6aa9fe0d46720281c9d9328f`
+   - deploy id: `6aaa02d7ccd47698f977237f`
    - حالة Netlify API: `ready`
 
 ### ملاحظات التحقق
 
 - GitHub Pages تم التحقق منه بصريًا/آليًا وظهر `5140` و`الفريج 319 حي`.
-- Netlify API أكد أن النشر جاهز، لكن الوصول إلى `*.netlify.app` من الجهاز انتهى بـtimeout رغم أن DNS يعمل. لذلك حالة Netlify من ناحية النشر: جاهز من API، ومن ناحية التصفح من هذه الشبكة: لم أستطع تأكيد العرض بسبب timeout.
+- Netlify API أكد أن النشر جاهز. أداة الويب الخارجية فتحت الصفحة الصحيحة. Playwright المحلي على Netlify نفسه فشل بسبب timeout من شبكة الجهاز، لكن اختبار نفس artifact محليًا أكد بعد تشغيل JavaScript ظهور `5140` و`الفريج 319` وعدم ظهور النص القديم `الفريج 182`.
 - موقع Netlify غير مربوط بفرع Git حاليًا (`repo_branch = null`)، لذلك `git push` وحده لا ينشر Netlify. تم استخدام API deploy مباشر بدل ذلك.
 
 ### المفاتيح والبيئة
@@ -1274,3 +1274,4 @@ python hermes-ops\scripts\hermes-smart.py refresh-registry
 - Firebase جاهز كطبقة Analytics/FCM مستقبلية، وليس بديلًا لـSupabase.
 - Cloudflare مؤجل حتى يصل token صحيح.
 - مفاتيح عقارية خارجية مثل RentCast/ATTOM/HouseCanary فقط إذا أردت مصادر تقييم عقاري خارج الكويت/الخليج؛ ليست مطلوبة للإصلاح الحالي.
+
