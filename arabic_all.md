@@ -1055,3 +1055,104 @@ https://ahmedkamalsa.github.io/alforaijboard/
    - بدون أسرار.
 
 الخلاصة: ما تم ليس مجرد توثيق؛ أصبح لديك مدخل عملي باسم `Hermes Pro`، ومفاتيح متاحة للبرامج كـ User env، وتوجيه free/local-first، ومشاريع منشورة. الاستخدام اليومي الآن هو أن تكلم Hermes Pro بالمهمة، وتحدد له حدود السلامة، وهو ينفذ داخل المشروع مثل agent محلي.
+
+---
+
+## تحديث نهائي بعد إصلاح النشر والربط - 2026-09-16
+
+### ما تم تنفيذه فعليًا
+
+1. **إصلاح عداد موقع alforaijboard على GitHub Pages**
+   - الرابط المنشور: https://ahmedkamalsa.github.io/alforaijboard/
+   - كان الموقع يعرض أرقامًا قديمة/ناقصة لأن العدّ كان يعتمد على لقطة ثابتة أو استعلام Supabase غير مناسب.
+   - تم تعديل `app.js` في فرع `gh-pages` ليقرأ العدد الحي من Supabase عبر `market_listings` باستخدام `Prefer: count=exact` مع fallback آمن.
+   - التحقق المنشور أعطى:
+     - إجمالي البيانات: `5003`
+     - الفريج المحلي: `182`
+     - المواقع الخارجية الحية: `4821`
+     - الفرص المقيمة: `447` من `748`
+
+2. **إصلاح رسالة Hermes gateway على GitHub Pages**
+   - GitHub Pages لا يستطيع فحص خدمة Hermes الموجودة على جهازك المحلي.
+   - بدل ظهور رسالة خاطئة: `Hermes gateway غير مثبّت`، أصبح الموقع يعرض أن Gateway محلي ويجب فحصه من:
+     - http://127.0.0.1:8000
+   - تم الإبقاء على فحص Hermes الحقيقي في التطبيق المحلي، وليس في الصفحة العامة الثابتة.
+
+3. **إصلاح فرع main المستخدم غالبًا بواسطة Netlify**
+   - تم تعديل `site/app.js` و `site/index.html` على فرع `main` حتى يستخدم الموقع الثابت العدّ الحي من Supabase.
+   - الاختبار المحلي لنسخة `site/` أعطى:
+     - `متصل بـ Supabase (٤٬٨٢١ إعلان)`
+   - تم الدفع إلى GitHub `main` ليتمكن Netlify من إعادة النشر إذا كان مربوطًا بهذا الفرع.
+   - ملاحظة: فحص `https://alforaijboard.netlify.app/` من الطرفية انتهى بـ timeout مرتين، لذلك لم أستطع تأكيد Netlify خارجيًا من الشبكة الحالية. الكود الذي يحتاجه Netlify تم دفعه.
+
+4. **إصلاح كاش التصميم المحلي في alforaij-research-assistant**
+   - تم رفع نسخة cache جديدة في Service Worker وكسر كاش `styles.css` و `app.js`.
+   - سبب التصميم المكسور محليًا كان غالبًا Service Worker أو كاش قديم في المتصفح.
+   - إن ظهر التصميم القديم عند المستخدم: افتح DevTools ثم Application ثم Clear site data، أو استخدم Hard Refresh.
+
+### حالة Hermes Pro العملية
+
+- Hermes gateway مثبت ويعمل محليًا حسب فحص التطبيق المحلي.
+- الاختبار المحلي السابق أظهر أن endpoint:
+  - `http://127.0.0.1:8000/api/hermes/gateway`
+  يرجع حالة تشغيل حقيقية مع إصدار Hermes.
+- الاستخدام العملي اليومي:
+
+```powershell
+cd D:\foraj_social\287
+.\hermes-ops\scripts\hermes-run.ps1 -Task "اكتب المهمة هنا" -WorkingDirectory "D:\foraj_social\287" -TaskClass CODING
+```
+
+للمهام البسيطة محليًا:
+
+```powershell
+.\hermes-ops\scripts\hermes-run.ps1 -Task "لخص حالة المشروع" -WorkingDirectory "D:\foraj_social\287" -TaskClass LOCAL_SIMPLE
+```
+
+### كيف يستفيد مستخدم عادي
+
+- افتح GitHub Pages لمتابعة لوحة alforaijboard العامة:
+  - https://ahmedkamalsa.github.io/alforaijboard/
+- إذا أردت التشغيل المحلي الكامل مع Hermes والـGateway:
+  - شغل تطبيق الفريج المحلي من مشروع `alforaij-research-assistant`.
+  - افتح: http://127.0.0.1:8000
+- GitHub Pages يعرض البيانات العامة والحية من Supabase، لكنه لا يستطيع التحكم في جهازك المحلي أو فحص Hermes gateway الحقيقي.
+
+### كيف يستفيد مطور أو Agent جديد
+
+ابدأ بهذه الأوامر:
+
+```powershell
+cd D:\foraj_social\287\alforaijboard
+git status
+python agent\validate_static_site.py
+```
+
+لا تعد تنظيم المشروع قبل إصلاح المشكلة المطلوبة. لإصلاح عدادات الموقع:
+
+- GitHub Pages live deploy source: فرع `gh-pages`.
+- Netlify/static source المحتمل: فرع `main` داخل `site/`.
+- فرع العمل الآمن السابق: `safety/pre-reorg-20260914-163154`.
+
+### Commits المهمة في هذا التحديث
+
+- `alforaijboard gh-pages`: `5686a99 fix: make github gateway status local-only`
+- `alforaijboard gh-pages`: `761e6fb fix: publish live dashboard counts`
+- `alforaijboard main`: `14dc4ef fix: use live supabase count on static site`
+- `alforaij-research-assistant main`: `dda25e4 fix: refresh frontend cache for local app`
+
+### نتيجة التحقق
+
+- `node --check app.js` على نسخة GitHub Pages: ناجح.
+- اختبار Playwright محلي لنسخة GitHub Pages: ناجح وعرض `5003 = 182 + 4821`.
+- اختبار Playwright على الرابط المنشور GitHub Pages: ناجح وعرض `5003 = 182 + 4821`.
+- اختبار `node --check site/app.js` على main: ناجح.
+- اختبار Playwright محلي لنسخة main/site: ناجح وعرض `٤٬٨٢١ إعلان`.
+- Netlify: تم دفع التعديل إلى `main`، لكن التحقق من الرابط الخارجي تعذر بسبب timeout من الشبكة الحالية.
+
+### توصية تشغيل نهائية
+
+- استخدم GitHub Pages كرابط مؤكد الآن: https://ahmedkamalsa.github.io/alforaijboard/
+- استخدم المحلي `127.0.0.1:8000` عندما تريد Hermes gateway والوظائف المحلية.
+- اعتبر Netlify بحاجة إلى انتظار redeploy أو فحص من لوحة Netlify إذا ظل الرابط لا يفتح.
+
