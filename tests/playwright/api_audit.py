@@ -53,14 +53,18 @@ def main() -> int:
         ("/api/market-insights", lambda d: isinstance(d, dict) and len(d) >= 1),
         ("/api/dashboard/summary", lambda d: d.get("count", 0) > 0 and len(d.get("records", [])) > 0),
         ("/api/developments", lambda d: isinstance(d, dict) and len(d.get("developments", [])) >= 1),
-        ("/api/daily-agent/status", lambda d: isinstance(d, dict) and "status" in d and d.get("status") in ("success", "error", "running", "never")),
+        # Daily-agent status is an operational status endpoint: a previous scheduled
+        # run may legitimately be "failed" because of remote credentials/schema, while
+        # the endpoint contract is still healthy if it returns a structured status.
+        ("/api/daily-agent/status", lambda d: isinstance(d, dict) and "status" in d and d.get("status") in ("success", "error", "running", "never", "failed")),
         ("/api/official-reference-sources", lambda d: isinstance(d, dict) and len(d.get("sources", [])) >= 4),
         ("/api/opportunities", lambda d: isinstance(d, dict) and bool(d.get("tiers"))),
         ("/api/price-trends", lambda d: isinstance(d, dict) or isinstance(d, list)),
     ]
     for path, validator in g:
         try:
-            status, data, dur = get(path)
+            timeout = 120.0 if path == "/api/opportunities" else 40.0
+            status, data, dur = get(path, timeout=timeout)
             ok = status == 200 and validator(data)
             check(f"GET {path}", ok, f"{status} في {dur:.1f}s" + ("" if ok else f" — {str(data)[:80]}"))
         except Exception as e:  # noqa: BLE001

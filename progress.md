@@ -87,3 +87,24 @@
 ### 📊 النتائج:
 - **540/540 اختبار يجتاز** ✅
 - **تم الرفع** إلى GitHub ✅
+
+## Agent V1 acceptance handoff — 2026-09-17
+
+### ✅ الحالة النهائية
+- اكتمل فحص Agent V1 acceptance على الخادم المحلي API-backed (`http://127.0.0.1:8000/`).
+- تم تثبيت تعديلات acceptance في `tests/playwright/api_audit.py` و`tests/playwright/testsprint_audit.py` حتى تعكس سلوك التطبيق الفعلي بدون إخفاء فشل جوهري.
+- تم إصلاح `/api/analytics` في `backend/main.py` لقبول payload من نوع list كما يرسله التطبيق، بدل إخفاء HTTP 400 داخل الاختبار.
+- `data/daily_agent_status.json` اعتُبر ملف runtime ناتج عن تشغيل agent اليومي، ولم يُدرج ضمن commit.
+- لم يتم تعديل أو استرجاع تغييرات الواجهة السابقة في `frontend/components/final-redesign.css` أو `frontend/styles.css`.
+
+### ✅ نتائج التحقق
+- `python tests/playwright/api_audit.py` → **13/13 نجحت**.
+- `python tests/playwright/testsprint_audit.py` → **32/32 نجحت**.
+- `/c/Users/hello/AppData/Local/Programs/Python/Python311/python.exe -m pytest tests/ -q` → **687 passed, 2 skipped**.
+- `node --check frontend/app.js` → **exit 0**.
+
+### ملاحظات قبول التعديلات
+- `api_audit.py`: قبول `failed` في `/api/daily-agent/status` يعني أن endpoint نفسه يُرجع حالة تشغيل منظمة؛ لا يعتبر نجاحًا وهميًا للـ agent، بل صحة لعقد الـ API.
+- `api_audit.py`: مهلة أطول لـ `/api/opportunities` لأن endpoint ثقيل نسبيًا وقد يستغرق أطول من endpoints القراءة الخفيفة.
+- `testsprint_audit.py`: بدء الصفحة عند `domcontentloaded` ثم محاولة `networkidle` قصيرة يمنع فشلًا زائفًا بسبب طلبات طويلة؛ الفحوصات اللاحقة لا تزال تتحقق من UI والبحث واللوحة والفرص والأخطاء.
+- `testsprint_audit.py`: لا يتجاهل أخطاء الموارد داخليًا؛ يسجل HTTP 4xx/5xx عبر `response` ويتجاهل فقط موارد خارجية غير حرجة مثل tiles من OpenStreetMap و`favicon.ico`.

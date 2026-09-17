@@ -1210,16 +1210,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length", "0") or "0")
         body = self.rfile.read(length).decode("utf-8")
+        path = urlparse(self.path).path
         try:
             payload = json.loads(body or "{}")
         except json.JSONDecodeError:
             json_response(self, {"error": "Invalid JSON"}, status=400)
             return
-        if not isinstance(payload, dict):
+        if not isinstance(payload, dict) and not (path == "/api/analytics" and isinstance(payload, list)):
             json_response(self, {"error": "Invalid JSON"}, status=400)
             return
-        path = urlparse(self.path).path
-        text = _security.sanitize(str(payload.get("text") or ""))
+        text = _security.sanitize(str(payload.get("text") or "")) if isinstance(payload, dict) else ""
         if path == "/api/parse":
             json_response(self, {"request": parse_request(text).__dict__})
             return
