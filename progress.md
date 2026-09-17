@@ -102,6 +102,9 @@
 - `python tests/playwright/testsprint_audit.py` → **32/32 نجحت**.
 - `/c/Users/hello/AppData/Local/Programs/Python/Python311/python.exe -m pytest tests/ -q` → **687 passed, 2 skipped**.
 - `node --check frontend/app.js` → **exit 0**.
+- بعد push إلى `main`: نجحت GitHub Actions: Deploy to GitHub Pages، Performance checks، Backend pytest suite، CI/CD Pipeline.
+- GitHub Pages يرجع HTTP 200 على `https://ahmedkamalsa.github.io/alforaijboard/`.
+- بقي Workflow: `Mobile layout checks` فاشل بسبب overflow في عناصر hero/CSS؛ هذا مرتبط بتغييرات `frontend/components/final-redesign.css` و`frontend/styles.css` السابقة، ولم يتم لمسها حسب القيد.
 
 ### ملاحظات قبول التعديلات
 - `api_audit.py`: قبول `failed` في `/api/daily-agent/status` يعني أن endpoint نفسه يُرجع حالة تشغيل منظمة؛ لا يعتبر نجاحًا وهميًا للـ agent، بل صحة لعقد الـ API.
